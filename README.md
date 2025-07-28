@@ -29,6 +29,7 @@ npm run dev       # from Front-End
 ```
 
 API routes are available under `/api` and provide zone and parcel data used by the React components.
+All `GET` endpoints under `/api` are publicly accessible, while modifying requests require a valid JWT issued by Keycloak.
 
 ## Docker
 
