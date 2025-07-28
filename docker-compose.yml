@@ -3,7 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgis/postgis:16-3.4
-    container_name: zones-db
+    container_name: industria-db
     environment:
       POSTGRES_DB: industria
       POSTGRES_USER: postgres
@@ -18,13 +18,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - zones-network
+      - industria-network
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: zones-backend
+    container_name: industria-backend
     ports:
       - "8080:8080"
     environment:
@@ -39,7 +39,7 @@ services:
       db:
         condition: service_healthy
     networks:
-      - zones-network
+      - industria-network
 
   keycloak:
     image: quay.io/keycloak/keycloak:23.0.7
@@ -62,13 +62,13 @@ services:
       timeout: 10s
       retries: 10
     networks:
-      - zones-network
+      - industria-network
 
   frontend:
     build:
       context: ./Front-End
       dockerfile: Dockerfile
-    container_name: zones-frontend
+    container_name: industria-frontend
     volumes:
       # Monter le code source
       - ./Front-End:/app
@@ -92,11 +92,11 @@ services:
       - backend
     command: sh -c "bun install && bun run dev"
     networks:
-      - zones-network
+      - industria-network
 
   nginx:
     image: nginx:alpine
-    container_name: zones-nginx
+    container_name: industria-nginx
     ports:
       - "80:80"
     volumes:
@@ -106,10 +106,10 @@ services:
       - backend
     restart: unless-stopped
     networks:
-      - zones-network
+      - industria-network
 
 networks:
-  zones-network:
+  industria-network:
     driver: bridge
 
 volumes:
