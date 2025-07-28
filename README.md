@@ -41,10 +41,7 @@ docker compose up --build
 The frontend map now uses OpenStreetMap tiles, so no access token is required.
 
 This starts PostgreSQL, Keycloak, the API backend on port 8080 and the front-end on port 3000.
-The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your
-browser can reach the API directly on the host. When using Docker, the frontend
-server accesses the backend via `API_INTERNAL_URL=http://backend:8080`.
-An optional Nginx proxy listens on port 80.
+The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your browser can reach the API directly on the host. When using Docker, the frontend server accesses the backend via `API_INTERNAL_URL=http://backend:8080`.
 
 ### Sample data
 
@@ -57,9 +54,9 @@ On Windows use:
 ```bat
 scripts\init_db.bat
 ```
-The script runs `psql` inside the PostgreSQL container started by Docker
-Compose. It checks whether any users already exist and only runs
-`backend/db/init/initDB.sql` when needed. You can override the default
+The script runs `psql` inside the PostgreSQL container started by Docker Compose.
+It checks whether any users already exist and only runs `backend/db/init/initDB.sql`
+when needed. By default it connects to the service named `db`. You can override the
 container name and credentials with the environment variables `DB_CONTAINER`,
 `DB_NAME`, `DB_USER` and `DB_PASSWORD`.
 The backend validates JWT tokens issued by Keycloak. A Keycloak container is

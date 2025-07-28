@@ -2,7 +2,7 @@
 # Populate Industria database with sample data if not already initialized
 set -euo pipefail
 
-DB_CONTAINER=${DB_CONTAINER:-industria-db}
+DB_CONTAINER=${DB_CONTAINER:-db}
 DB_NAME=${DB_NAME:-industria}
 DB_USER=${DB_USER:-postgres}
 DB_PASSWORD=${DB_PASSWORD:-postgres}

@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 rem Default values
-if "%DB_CONTAINER%"=="" set DB_CONTAINER=industria-db
+if "%DB_CONTAINER%"=="" set DB_CONTAINER=db
 if "%DB_NAME%"=="" set DB_NAME=industria
 if "%DB_USER%"=="" set DB_USER=postgres
 if "%DB_PASSWORD%"=="" set DB_PASSWORD=postgres
