@@ -53,6 +53,10 @@ load the sample dataset with the helper script:
 ```bash
 ./scripts/init_db.sh
 ```
+On Windows use:
+```bat
+scripts\init_db.bat
+```
 The script connects to the `industria` database using the environment
 variables `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. It checks whether
 any users already exist and only runs `backend/db/init/initDB.sql` when
