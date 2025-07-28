@@ -15,13 +15,11 @@
     }
   ],
   "roles": {
-    "realm": {
-      "roles": [
-        {"name": "USER"},
-        {"name": "ZONE_MANAGER"},
-        {"name": "CONTENT_MANAGER"},
-        {"name": "ADMIN"}
-      ]
-    }
+    "realm": [
+      {"name": "USER"},
+      {"name": "ZONE_MANAGER"},
+      {"name": "CONTENT_MANAGER"},
+      {"name": "ADMIN"}
+    ]
   }
 }
