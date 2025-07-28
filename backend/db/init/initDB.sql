@@ -24,62 +24,62 @@ END $$;
 
 -- Users
 INSERT INTO "user" (
-  id, email, password, name, company, phone, role, is_active,
+  id, email, password, name, company, phone, role,
   created_at, updated_at
 ) VALUES
   ('user-admin', 'admin@zonespro.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-   'Administrateur ZonesPro', 'ZonesPro Management', '+212 5 37 57 20 00', 'ADMIN', true, NOW(), NOW()),
+   'Administrateur ZonesPro', 'ZonesPro Management', '+212 5 37 57 20 00', 'ADMIN', NOW(), NOW()),
   ('user-manager', 'manager@zonespro.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-   'Manager Commercial', 'ZonesPro Management', '+212 5 37 57 20 01', 'ZONE_MANAGER', true, NOW(), NOW()),
+   'Manager Commercial', 'ZonesPro Management', '+212 5 37 57 20 01', 'ZONE_MANAGER', NOW(), NOW()),
   ('user-demo', 'demo@entreprise.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-   'Utilisateur Démo', 'Entreprise Démo SA', '+212 6 12 34 56 78', 'USER', true, NOW(), NOW())
+   'Utilisateur Démo', 'Entreprise Démo SA', '+212 6 12 34 56 78', 'USER', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Spatial reference system
 INSERT INTO spatial_reference_system (
-  id, name, srid, proj4text, description, is_active, created_at, updated_at
+  id, name, srid, proj4text, description, created_at, updated_at
 ) VALUES (
   'srs-4326', 'WGS 84', 4326, '+proj=longlat +datum=WGS84 +no_defs',
-  'Default geodetic system', true, NOW(), NOW()
+  'Default geodetic system', NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Countries
 INSERT INTO country (
-  id, name, code, currency, default_srid, is_active, created_at, updated_at, srs_id
+  id, name, code, currency, default_srid, created_at, updated_at, srs_id
 ) VALUES (
-  'country-ma', 'Maroc', 'MA', 'MAD', 4326, true, NOW(), NOW(), 'srs-4326'
+  'country-ma', 'Maroc', 'MA', 'MAD', 4326, NOW(), NOW(), 'srs-4326'
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Regions
 INSERT INTO region (
-  id, name, code, is_active, created_at, updated_at, country_id
+  id, name, code, created_at, updated_at, country_id
 ) VALUES
-  ('region-cas', 'Casablanca-Settat', 'CAS', true, NOW(), NOW(), 'country-ma'),
-  ('region-rab', 'Rabat-Salé-Kénitra', 'RAB', true, NOW(), NOW(), 'country-ma')
+  ('region-cas', 'Casablanca-Settat', 'CAS', NOW(), NOW(), 'country-ma'),
+  ('region-rab', 'Rabat-Salé-Kénitra', 'RAB', NOW(), NOW(), 'country-ma')
 ON CONFLICT (id) DO NOTHING;
 
 -- Zone types
 INSERT INTO zone_type (
-  id, name, description, is_active, created_at, updated_at
+  id, name, description, created_at, updated_at
 ) VALUES
-  ('zt-private', 'Privée', 'Zone à gestion privée', true, NOW(), NOW()),
-  ('zt-public', 'Publique', 'Zone à gestion publique', true, NOW(), NOW())
+  ('zt-private', 'Privée', 'Zone à gestion privée', NOW(), NOW()),
+  ('zt-public', 'Publique', 'Zone à gestion publique', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Activities
 INSERT INTO activity (
-  id, name, description, icon, category, is_active, created_at, updated_at
+  id, name, description, icon, category, created_at, updated_at
 ) VALUES
-  ('act-auto', 'Automobile', 'Industrie automobile', 'car', 'industrie', true, NOW(), NOW()),
-  ('act-log', 'Logistique', 'Stockage et distribution', 'package', 'industrie', true, NOW(), NOW())
+  ('act-auto', 'Automobile', 'Industrie automobile', 'car', 'industrie', NOW(), NOW()),
+  ('act-log', 'Logistique', 'Stockage et distribution', 'package', 'industrie', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Amenities
 INSERT INTO amenity (
-  id, name, description, icon, category, is_active, created_at, updated_at
+  id, name, description, icon, category, created_at, updated_at
 ) VALUES
-  ('amn-electricity', 'Électricité', 'Alimentation électrique', 'zap', 'Infrastructure', true, NOW(), NOW()),
-  ('amn-water', 'Eau potable', 'Réseau d''eau', 'droplet', 'Infrastructure', true, NOW(), NOW())
+  ('amn-electricity', 'Électricité', 'Alimentation électrique', 'zap', 'Infrastructure', NOW(), NOW()),
+  ('amn-water', 'Eau potable', 'Réseau d''eau', 'droplet', 'Infrastructure', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Zone
@@ -125,12 +125,12 @@ ON CONFLICT (id) DO NOTHING;
 -- Appointment
 INSERT INTO appointment (
   id, contact_name, contact_email, contact_phone, company_name, message,
-  requested_date, confirmed_date, status, notes, is_active,
+  requested_date, confirmed_date, status, notes,
   created_at, updated_at, parcel_id, managed_by
 ) VALUES (
   'appt-1', 'Ahmed Benali', 'a.benali@entreprise.ma', '+212 6 12 34 56 78',
   'Industries Benali', 'Intéressé par une parcelle',
-  '2024-02-15T10:00:00Z', NULL, 'PENDING', NULL, true,
+  '2024-02-15T10:00:00Z', NULL, 'PENDING', NULL,
   NOW(), NOW(), 'parcel-1', 'user-manager'
 ) ON CONFLICT (id) DO NOTHING;
 

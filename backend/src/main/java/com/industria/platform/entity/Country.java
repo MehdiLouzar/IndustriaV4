@@ -20,7 +20,6 @@ public class Country {
     private String code;
     private String currency;
     private Integer defaultSrid;
-    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

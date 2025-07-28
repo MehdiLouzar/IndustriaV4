@@ -20,7 +20,6 @@ public class Activity {
     private String description;
     private String icon;
     private String category;
-    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

@@ -25,7 +25,6 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

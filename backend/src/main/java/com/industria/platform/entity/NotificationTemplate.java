@@ -23,7 +23,6 @@ public class NotificationTemplate {
     private String htmlBody;
     @Column(columnDefinition = "text")
     private String textBody;
-    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
