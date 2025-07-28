@@ -45,6 +45,14 @@ The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your
 browser can reach the API directly on the host. When using Docker, the frontend
 server accesses the backend via `API_INTERNAL_URL=http://backend:8080`.
 An optional Nginx proxy listens on port 80.
+
+### Sample data
+
+After starting the backend once so Hibernate can create the schema, run:
+```bash
+psql -U postgres -d industria -f backend/db/init/initDB.sql
+```
+This populates demo users, zones and related entities.
 The backend adds CORS headers in each API route so the React app can call the API
 without extra configuration.
 
