@@ -6,7 +6,17 @@ import fr from './locales/fr/translation.json';
 const resources = { en: { translation: en }, fr: { translation: fr } } as const;
 
 function getCookieLang() {
-  if (typeof document === 'undefined') return 'fr';
+  if (typeof window === 'undefined') {
+    try {
+      // Read cookie on the server using next/headers
+      // wrapped in a dynamic require so it is not bundled for the client
+      const { cookies } = require('next/headers');
+      const lang = cookies().get('lng')?.value;
+      return lang || 'fr';
+    } catch {
+      return 'fr';
+    }
+  }
   const match = document.cookie.match(/(?:^|; )lng=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : 'fr';
 }
