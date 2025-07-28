@@ -48,11 +48,15 @@ An optional Nginx proxy listens on port 80.
 
 ### Sample data
 
-After starting the backend once so Hibernate can create the schema, run:
+After starting the backend once so Hibernate can create the schema, you can
+load the sample dataset with the helper script:
 ```bash
-psql -U postgres -d industria -f backend/db/init/initDB.sql
+./scripts/init_db.sh
 ```
-This populates demo users, zones and related entities.
+The script connects to the `industria` database using the environment
+variables `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`. It checks whether
+any users already exist and only runs `backend/db/init/initDB.sql` when
+needed. This populates demo users, zones and related entities.
 The backend validates JWT tokens issued by Keycloak. A Keycloak container is
 included in `docker-compose.yml` and exposes the realm `industria` on
 `http://localhost:8081`. Default admin credentials are `admin/admin`.
