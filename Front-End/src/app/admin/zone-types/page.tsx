@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,17 +16,12 @@ interface ZoneType {
 }
 
 export default function ZoneTypesAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<ZoneType[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<ZoneType>({ id: '', name: '' })
-
-  useEffect(() => {
-    if (session && session.user.role !== 'ADMIN') router.push('/auth/login')
-  }, [session])
 
   async function load() {
     const items = await fetchApi<ZoneType[]>('/api/zone-types')

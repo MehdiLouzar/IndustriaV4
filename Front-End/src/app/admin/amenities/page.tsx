@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,7 +19,6 @@ interface Amenity {
 }
 
 export default function AmenitiesAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<Amenity[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -34,7 +32,6 @@ export default function AmenitiesAdmin() {
     category: '',
   })
 
-  useEffect(() => { if (session && session.user.role !== 'ADMIN') router.push('/auth/login') }, [session])
 
   async function load() {
     const items = await fetchApi<Amenity[]>('/api/amenities')

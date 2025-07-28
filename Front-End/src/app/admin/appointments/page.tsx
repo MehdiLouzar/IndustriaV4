@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,7 +32,6 @@ interface Appointment {
 const statuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']
 
 export default function AppointmentsAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<Appointment[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -52,7 +50,6 @@ export default function AppointmentsAdmin() {
     status: 'PENDING',
   })
 
-  useEffect(() => { if (session && session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER') router.push('/auth/login') }, [session])
 
   async function load() {
     const [a, p] = await Promise.all([

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,15 +71,6 @@ export default function RegisterPage() {
       const data = response;
 
       setSuccess(true);
-
-      // Auto-connexion après inscription
-      setTimeout(async () => {
-        await signIn('credentials', {
-          email: formData.email,
-          password: formData.password,
-          callbackUrl: '/',
-        });
-      }, 2000);
 
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Une erreur est survenue');

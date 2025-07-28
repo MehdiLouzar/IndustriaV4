@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,6 @@ interface Activity {
 }
 
 export default function ActivitiesAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<Activity[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -32,7 +30,6 @@ export default function ActivitiesAdmin() {
     icon: '',
   })
 
-  useEffect(() => { if (session && session.user.role !== 'ADMIN') router.push('/auth/login') }, [session])
 
   async function load() {
     const items = await fetchApi<Activity[]>('/api/activities')
