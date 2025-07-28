@@ -2,14 +2,12 @@
 setlocal enabledelayedexpansion
 
 rem Default values
-if "%DB_HOST%"=="" set DB_HOST=localhost
-if "%DB_PORT%"=="" set DB_PORT=5432
+if "%DB_CONTAINER%"=="" set DB_CONTAINER=industria-db
 if "%DB_NAME%"=="" set DB_NAME=industria
 if "%DB_USER%"=="" set DB_USER=postgres
 if "%DB_PASSWORD%"=="" set DB_PASSWORD=postgres
 
-set PGPASSWORD=%DB_PASSWORD%
-set PSQL=psql -h %DB_HOST% -p %DB_PORT% -U %DB_USER% -d %DB_NAME%
+set PSQL=docker compose exec -T %DB_CONTAINER% env PGPASSWORD=%DB_PASSWORD% psql -U %DB_USER% -d %DB_NAME%
 
 for /f %%A in ('%PSQL% -tAc "SELECT 1 FROM information_schema.tables WHERE table_name=''users''"') do set HAS_TABLE=%%A
 if "!HAS_TABLE!"=="1" (
@@ -21,7 +19,8 @@ if "!HAS_TABLE!"=="1" (
 )
 
 echo Loading sample data into %DB_NAME%...
-%PSQL% -f backend/db/init/initDB.sql
+type backend\db\init\initDB.sql | %PSQL%
 
 echo Database initialization complete.
 endlocal
+
