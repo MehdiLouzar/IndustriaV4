@@ -40,7 +40,7 @@ docker compose up --build
 
 The frontend map now uses OpenStreetMap tiles, so no access token is required.
 
-This starts PostgreSQL, the API backend on port 8080 and the front-end on port 3000.
+This starts PostgreSQL, Keycloak, the API backend on port 8080 and the front-end on port 3000.
 The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your
 browser can reach the API directly on the host. When using Docker, the frontend
 server accesses the backend via `API_INTERNAL_URL=http://backend:8080`.
@@ -53,6 +53,9 @@ After starting the backend once so Hibernate can create the schema, run:
 psql -U postgres -d industria -f backend/db/init/initDB.sql
 ```
 This populates demo users, zones and related entities.
+The backend validates JWT tokens issued by Keycloak. A Keycloak container is
+included in `docker-compose.yml` and exposes the realm `industria` on
+`http://localhost:8081`. Default admin credentials are `admin/admin`.
 The backend adds CORS headers in each API route so the React app can call the API
 without extra configuration.
 

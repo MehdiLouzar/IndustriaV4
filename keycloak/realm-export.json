@@ -1,0 +1,27 @@
+{
+  "realm": "industria",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "backend",
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "frontend",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:3000/*"]
+    }
+  ],
+  "roles": {
+    "realm": {
+      "roles": [
+        {"name": "USER"},
+        {"name": "ZONE_MANAGER"},
+        {"name": "CONTENT_MANAGER"},
+        {"name": "ADMIN"}
+      ]
+    }
+  }
+}
