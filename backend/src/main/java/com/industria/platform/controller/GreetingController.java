@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/public")
+@RequestMapping("/api/public")
 public class GreetingController {
 
     private final MessageSource messageSource;
