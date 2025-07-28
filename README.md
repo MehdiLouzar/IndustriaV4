@@ -48,3 +48,10 @@ An optional Nginx proxy listens on port 80.
 The backend adds CORS headers in each API route so the React app can call the API
 without extra configuration.
 
+### Domain model
+
+The Spring Boot API uses JPA entities generated from the provided PlantUML
+diagram. Key entities include `Zone`, `Parcel`, `Appointment` and supporting
+reference tables like `Region` and `Activity`. Business rules such as automatic
+status propagation between zones and parcels are handled in the service layer.
+

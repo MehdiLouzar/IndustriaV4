@@ -40,4 +40,14 @@ public class Parcel {
     @ManyToOne
     @JoinColumn(name = "zone_id")
     private Zone zone;
+
+    @ManyToOne
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @OneToMany(mappedBy = "parcel")
+    private Set<Appointment> appointments;
+
+    @OneToMany(mappedBy = "parcel")
+    private Set<ParcelAmenity> amenities;
 }

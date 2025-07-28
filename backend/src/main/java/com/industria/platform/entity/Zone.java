@@ -42,4 +42,22 @@ public class Zone {
 
     @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Parcel> parcels;
+
+    @ManyToOne
+    @JoinColumn(name = "zone_type_id")
+    private ZoneType zoneType;
+
+    @ManyToOne
+    @JoinColumn(name = "region_id")
+    private Region region;
+
+    @ManyToOne
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @OneToMany(mappedBy = "zone")
+    private Set<ZoneActivity> activities;
+
+    @OneToMany(mappedBy = "zone")
+    private Set<ZoneAmenity> amenities;
 }
