@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, MapPin, Building2 } from 'lucide-react';
 import AuthButton from '@/components/AuthButton';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 export default function Header({ showAdminLink = false }: { showAdminLink?: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -53,10 +54,11 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
               <span className="text-sm">Zones Industrielles du Maroc</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <Badge variant="secondary" className="bg-white text-red-600 hover:bg-gray-100">
               Zones B2B
             </Badge>
+            <LanguageSwitcher />
           </div>
         </div>
       </div>
