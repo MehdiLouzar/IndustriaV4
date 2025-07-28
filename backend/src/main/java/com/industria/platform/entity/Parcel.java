@@ -1,0 +1,43 @@
+package com.industria.platform.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.Set;
+
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Parcel {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
+
+    private String reference;
+    private Double area;
+
+    @Enumerated(EnumType.STRING)
+    private ParcelStatus status;
+
+    private Boolean isShowroom;
+    private Double cos;
+    private Double cus;
+    private Double heightLimit;
+    private Double setback;
+
+    @Column(columnDefinition = "text")
+    private String geometry;
+
+    private Integer srid;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
+
+    @ManyToOne
+    @JoinColumn(name = "zone_id")
+    private Zone zone;
+}
