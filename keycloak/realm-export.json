@@ -21,5 +21,52 @@
       {"name": "CONTENT_MANAGER"},
       {"name": "ADMIN"}
     ]
-  }
+  },
+  "users": [
+    {
+      "username": "admin@zonespro.ma",
+      "email": "admin@zonespro.ma",
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "ZonesPro",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "manager@zonespro.ma",
+      "email": "manager@zonespro.ma",
+      "enabled": true,
+      "firstName": "Manager",
+      "lastName": "ZonesPro",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ZONE_MANAGER"]
+    },
+    {
+      "username": "demo@entreprise.ma",
+      "email": "demo@entreprise.ma",
+      "enabled": true,
+      "firstName": "Utilisateur",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER"]
+    }
+  ]
 }

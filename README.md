@@ -64,6 +64,16 @@ needed. This populates demo users, zones and related entities.
 The backend validates JWT tokens issued by Keycloak. A Keycloak container is
 included in `docker-compose.yml` and exposes the realm `industria` on
 `http://localhost:8081`. Default admin credentials are `admin/admin`.
+When the container starts it imports `keycloak/realm-export.json` which defines
+demo users matching the accounts shown on the login page:
+
+```
+- admin@zonespro.ma / password123 (ADMIN)
+- manager@zonespro.ma / password123 (ZONE_MANAGER)
+- demo@entreprise.ma / password123 (USER)
+```
+If you run Keycloak manually, pass `--import-realm` with the path to this file
+to precreate these users.
 The backend adds CORS headers in each API route so the React app can call the API
 without extra configuration.
 
