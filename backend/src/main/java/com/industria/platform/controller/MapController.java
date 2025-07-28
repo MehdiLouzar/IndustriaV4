@@ -46,7 +46,7 @@ public class MapController {
 
     private double[] parseCentroid(String wkt) {
         if (wkt == null) return new double[]{0,0};
-        String numbers = wkt.replaceAll("[^0-9. -]", " ");
+        String numbers = wkt.replaceAll("[^0-9.\\- ]", " ");
         String[] parts = numbers.trim().split(" +");
         double sumX=0,sumY=0; int count=0;
         for(int i=0;i+1<parts.length;i+=2){
