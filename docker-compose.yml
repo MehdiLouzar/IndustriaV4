@@ -10,7 +10,6 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./Back-End/db/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -23,29 +22,45 @@ services:
 
   backend:
     build:
-      context: ./Back-End
+      context: ./backend
       dockerfile: Dockerfile
     container_name: zones-backend
-    volumes:
-      # Monter le code source
-      - ./Back-End:/Back-End
-      # Exclure node_modules pour éviter les conflits
-      - /Back-End/node_modules
-      # Persister les modules Prisma
-      - backend_node_modules:/Back-End/node_modules
     ports:
-      - "3001:3001"
+      - "8080:8080"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/industria
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=supersecretkey123456789
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/industria
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/industria
     restart: unless-stopped
     depends_on:
+      keycloak:
+        condition: service_healthy
       db:
         condition: service_healthy
-    command: sh -c "npm install && npx prisma generate && npx prisma db push && npm run dev"
+    networks:
+      - zones-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.7
+    container_name: keycloak
+    command: start-dev --http-port=8080 --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/industria
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/industria"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
     networks:
       - zones-network
 
@@ -68,8 +83,8 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
       # Exposed on localhost so the browser can reach the API
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
-      - API_INTERNAL_URL=http://backend:3001
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - API_INTERNAL_URL=http://backend:8080
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=supersecretkey123456789
     restart: unless-stopped
@@ -99,5 +114,4 @@ networks:
 
 volumes:
   db_data:
-  backend_node_modules:
   frontend_node_modules:
