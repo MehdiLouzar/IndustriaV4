@@ -28,8 +28,8 @@ public class SecurityConfig {
                     "/api/regions",
                     "/api/zone-types",
                     "/api/zones",
-                    "/api/map/**").permitAll()
-                .requestMatchers("/public/**").permitAll()
+                    "/api/map/**",
+                    "/api/public/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
