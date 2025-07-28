@@ -45,4 +45,22 @@ class StatusServiceTest {
         statusService.updateParcelStatus("p1", ParcelStatus.RESERVEE);
         assertEquals(ZoneStatus.RESERVEE, zone.getStatus());
     }
+
+    @Test
+    void updateParcelStatusShouldMakeZoneLibreWhenAnyParcelLibre() {
+        Zone zone = Zone.builder().id("z2").status(ZoneStatus.RESERVEE).build();
+        Parcel p1 = Parcel.builder().id("p1").status(ParcelStatus.RESERVEE).zone(zone).build();
+        Parcel p2 = Parcel.builder().id("p2").status(ParcelStatus.LIBRE).zone(zone).build();
+        Set<Parcel> parcels = new HashSet<>();
+        parcels.add(p1); parcels.add(p2);
+
+        when(parcelRepository.findById("p2")).thenReturn(Optional.of(p2));
+        when(parcelRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(parcelRepository.findByZoneId("z2")).thenReturn(parcels);
+        when(zoneRepository.findById("z2")).thenReturn(Optional.of(zone));
+        when(zoneRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        statusService.updateParcelStatus("p2", ParcelStatus.LIBRE);
+        assertEquals(ZoneStatus.LIBRE, zone.getStatus());
+    }
 }

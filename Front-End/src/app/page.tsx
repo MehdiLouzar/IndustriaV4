@@ -3,6 +3,8 @@ import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamicLib from 'next/dynamic';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { fetchApi } from '@/lib/utils';
 import ZoneGrid from '@/components/ZoneGrid';
 import Footer from '@/components/Footer';
 
@@ -32,6 +34,15 @@ function LazyMapView() {
 }
 
 export default function Home() {
+  const { t, i18n } = useTranslation();
+  const [welcome, setWelcome] = React.useState('');
+  React.useEffect(() => {
+    fetchApi<{ message: string }>("/api/public/greeting", {
+      headers: { 'Accept-Language': i18n.language }
+    }).then((d) => {
+      if (d?.message) setWelcome(d.message);
+    });
+  }, [i18n.language]);
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
@@ -41,7 +52,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Plateforme B2B Zones Industrielles
+              {welcome || t('welcome')}
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Découvrez et réservez des zones industrielles, parcs logistiques et zones franches
