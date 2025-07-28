@@ -1,0 +1,4 @@
+# Ignore database files
+**/*.db
+# Ignore macOS DS_Store
+.DS_Store
