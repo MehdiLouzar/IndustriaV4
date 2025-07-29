@@ -29,6 +29,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                .securityMatcher(request ->
+                    !HttpMethod.GET.matches(request.getMethod())
+                )
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             );
         return http.build();
