@@ -46,8 +46,9 @@ The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your 
 
 ### Sample data
 
-After starting the backend once so Hibernate can create the schema, you can
-load the sample dataset with the helper script:
+Run the backend at least once so Hibernate can create the schema, then load the
+sample dataset with the helper script. If the tables are missing, the script
+prints a reminder to start the backend first:
 ```bash
 ./scripts/init_db.sh
 ```

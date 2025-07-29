@@ -9,11 +9,14 @@ DB_PASSWORD=${DB_PASSWORD:-postgres}
 
 PSQL="docker compose exec -e PGPASSWORD=$DB_PASSWORD -T $DB_CONTAINER psql -U $DB_USER -d $DB_NAME"
 
-if $PSQL -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='users'" | grep -q 1; then
-    if $PSQL -tAc "SELECT 1 FROM users LIMIT 1" | grep -q 1; then
-        echo "Database already contains users. Skipping initialization."
-        exit 0
-    fi
+if ! $PSQL -tAc "SELECT 1 FROM information_schema.tables WHERE table_name='users'" | grep -q 1; then
+    echo "Database schema not found. Start the backend once to let Hibernate create the tables."
+    exit 1
+fi
+
+if $PSQL -tAc "SELECT 1 FROM users LIMIT 1" | grep -q 1; then
+    echo "Database already contains users. Skipping initialization."
+    exit 0
 fi
 
 echo "Loading sample data into $DB_NAME..."
