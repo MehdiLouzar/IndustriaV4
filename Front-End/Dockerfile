@@ -2,10 +2,9 @@ FROM oven/bun:1
 
 WORKDIR /app
 
-# Copier package.json seulement
+# Copy manifest files
 COPY package.json bun.lockb* ./
 
-# Les dépendances seront installées par la commande dans docker-compose
-# RUN bun install est fait dans le docker-compose command
+# Dependencies installed at runtime via bun install
 
 EXPOSE 3000
