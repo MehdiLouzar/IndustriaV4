@@ -29,7 +29,7 @@ curl -f %KEYCLOAK_URL%/health/ready >nul 2>&1
 if errorlevel 1 (
     echo ❌ Keycloak n'est pas accessible sur %KEYCLOAK_URL%
     echo 📝 Assurez-vous que les conteneurs sont démarrés
-    echo 📝 Commande: docker-compose -p %PROJECT_NAME% up -d
+    echo 📝 Commande: docker compose -p %PROJECT_NAME% up -d
     pause
     exit /b 1
 )
