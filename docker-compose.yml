@@ -1,6 +1,6 @@
-version: '3.8'
 
 services:
+  # Base de données principale pour l'application
   db:
     image: postgis/postgis:16-3.4
     container_name: industria-db
@@ -10,16 +10,77 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
+      # Script d'initialisation pour créer la DB Keycloak
+      - ./keycloak/db/init-keycloak-db.sql:/docker-entrypoint-initdb.d/01-init-keycloak-db.sql:ro
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d industria && pg_isready -U postgres -d keycloak"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - industria-network
+    restart: unless-stopped
 
+  # Keycloak avec configuration optimisée
+  keycloak:
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
+    container_name: industria-keycloak
+    environment:
+      # Administration Keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      
+      # Configuration base de données
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_DB_SCHEMA: public
+      
+      # Configuration réseau et sécurité
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_PROXY: edge
+      
+      # Configuration pour développement
+      KC_LOG_LEVEL: INFO
+      KC_METRICS_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      
+      # Configuration cache et performance
+      KC_CACHE: ispn
+      KC_CACHE_STACK: tcp
+      
+    volumes:
+      # Configuration realm à importer
+      - ./keycloak/realm-industria.json:/opt/keycloak/data/import/realm-industria.json:ro
+      # Optionnel: thèmes personnalisés
+      - ./keycloak/themes:/opt/keycloak/themes:ro
+      # Persistance des données Keycloak
+      - keycloak_data:/opt/keycloak/data
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\n\r\n' >&3 && cat <&3 | grep -q 'HTTP/1.1 200'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - industria-network
+    restart: unless-stopped
+    # Commande pour démarrer avec import du realm
+    command: ["start", "--import-realm", "--optimized"]
+
+  # Backend de l'application
   backend:
     build:
       context: ./backend
@@ -28,10 +89,27 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Configuration base de données
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/industria
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      
+      # Configuration Keycloak OAuth2
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/industria
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/industria/protocol/openid_connect/certs
+      
+      # URLs pour communication interne
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_REALM: industria
+      KEYCLOAK_RESOURCE: backend
+      
+      # Configuration profil Spring
+      SPRING_PROFILES_ACTIVE: docker
+      
+      # Configuration logging
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
+      LOGGING_LEVEL_ROOT: INFO
+      
     restart: unless-stopped
     depends_on:
       keycloak:
@@ -40,65 +118,101 @@ services:
         condition: service_healthy
     networks:
       - industria-network
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:23.0.7
-    container_name: keycloak
-    command: start-dev --http-port=8080 --import-realm
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://db:5432/industria
-      KC_DB_USERNAME: postgres
-      KC_DB_PASSWORD: postgres
-    volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
-    ports:
-      - "8081:8080"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/industria"]
-      interval: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
       timeout: 10s
-      retries: 10
-    networks:
-      - industria-network
+      retries: 3
+      start_period: 60s
 
+  # Frontend de l'application
   frontend:
     build:
       context: ./Front-End
       dockerfile: Dockerfile
     container_name: industria-frontend
     volumes:
-      # Monter le code source
       - ./Front-End:/app
-      # Exclure node_modules
-      - /app/node_modules
-      # Persister les node_modules
       - frontend_node_modules:/app/node_modules
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - HOSTNAME=0.0.0.0
-      # Exposed on localhost so the browser can reach the API
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
-      - API_INTERNAL_URL=http://backend:8080
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=supersecretkey123456789
+      # Configuration Next.js
+      NODE_ENV: development
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      
+      # URLs API
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      API_INTERNAL_URL: http://backend:8080
+      
+      # Configuration NextAuth avec Keycloak
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-supersecretkey123456789}
+      
+      # Configuration Keycloak pour NextAuth
+      KEYCLOAK_ID: frontend
+      KEYCLOAK_SECRET: ""  # Public client, pas de secret
+      KEYCLOAK_ISSUER: http://localhost:8081/realms/industria
+      
+      # URLs publiques Keycloak (accessible depuis le navigateur)
+      NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:8081
+      NEXT_PUBLIC_KEYCLOAK_REALM: industria
+      NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: frontend
+      
     restart: unless-stopped
     depends_on:
-      - backend
-    command: sh -c "bun install && bun run dev"
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    command: ["bun", "run", "dev"]
     networks:
       - industria-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
+  # Service optionnel : MailHog pour tester les emails en développement
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: industria-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Interface web
+    networks:
+      - industria-network
+    restart: unless-stopped
+    profiles:
+      - dev  # Activer seulement en mode développement
+
+  # Service optionnel : Adminer pour administrer la base de données
+  adminer:
+    image: adminer:latest
+    container_name: industria-adminer
+    ports:
+      - "8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DESIGN: pepa-linha
+    networks:
+      - industria-network
+    restart: unless-stopped
+    profiles:
+      - dev  # Activer seulement en mode développement
 
 networks:
   industria-network:
     driver: bridge
+    name: industria-network
 
 volumes:
   db_data:
+    name: industria_db_data
+  keycloak_data:
+    name: industria_keycloak_data
   frontend_node_modules:
+    name: industria_frontend_node_modules

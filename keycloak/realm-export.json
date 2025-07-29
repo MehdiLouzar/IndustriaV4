@@ -1,27 +1,143 @@
 {
   "realm": "industria",
   "enabled": true,
+  "displayName": "Industria Realm",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "defaultRoles": ["USER"],
+  "requiredCredentials": ["password"],
+  "passwordPolicy": "length(8) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
   "clients": [
     {
       "clientId": "backend",
+      "name": "Backend Service",
+      "description": "Service backend pour l'API",
+      "enabled": true,
       "bearerOnly": true,
-      "protocol": "openid-connect"
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "foo",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "frontend",
+      "name": "Frontend Application",
+      "description": "Application frontend React/Angular/Vue",
+      "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
-      "redirectUris": ["http://localhost:3000/*"]
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "https://yourdomain.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://yourdomain.com"
+      ],
+      "baseUrl": "http://localhost:3000",
+      "rootUrl": "http://localhost:3000",
+      "adminUrl": "",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "roles": {
     "realm": [
-      {"name": "USER"},
-      {"name": "ZONE_MANAGER"},
-      {"name": "CONTENT_MANAGER"},
-      {"name": "ADMIN"}
+      {
+        "name": "USER",
+        "description": "Utilisateur standard avec accès de base",
+        "composite": false
+      },
+      {
+        "name": "ZONE_MANAGER",
+        "description": "Gestionnaire de zone avec permissions étendues",
+        "composite": true,
+        "composites": {
+          "realm": ["USER"]
+        }
+      },
+      {
+        "name": "CONTENT_MANAGER",
+        "description": "Gestionnaire de contenu",
+        "composite": true,
+        "composites": {
+          "realm": ["USER"]
+        }
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrateur avec tous les privilèges",
+        "composite": true,
+        "composites": {
+          "realm": ["USER", "ZONE_MANAGER", "CONTENT_MANAGER"]
+        }
+      }
     ]
   },
+  "groups": [
+    {
+      "name": "Administrators",
+      "path": "/Administrators",
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "name": "Managers",
+      "path": "/Managers",
+      "realmRoles": ["ZONE_MANAGER", "CONTENT_MANAGER"]
+    },
+    {
+      "name": "Users",
+      "path": "/Users",
+      "realmRoles": ["USER"]
+    }
+  ],
   "users": [
     {
       "username": "admin@zonespro.ma",
@@ -29,14 +145,20 @@
       "enabled": true,
       "firstName": "Admin",
       "lastName": "ZonesPro",
+      "emailVerified": true,
+      "attributes": {
+        "department": ["IT"],
+        "employee_id": ["ADM001"]
+      },
       "credentials": [
         {
           "type": "password",
-          "value": "password123",
-          "temporary": false
+          "value": "Admin@123!",
+          "temporary": true
         }
       ],
-      "realmRoles": ["ADMIN"]
+      "realmRoles": ["ADMIN"],
+      "groups": ["/Administrators"]
     },
     {
       "username": "manager@zonespro.ma",
@@ -44,14 +166,20 @@
       "enabled": true,
       "firstName": "Manager",
       "lastName": "ZonesPro",
+      "emailVerified": true,
+      "attributes": {
+        "department": ["Operations"],
+        "employee_id": ["MGR001"]
+      },
       "credentials": [
         {
           "type": "password",
-          "value": "password123",
-          "temporary": false
+          "value": "Manager@123!",
+          "temporary": true
         }
       ],
-      "realmRoles": ["ZONE_MANAGER"]
+      "realmRoles": ["ZONE_MANAGER"],
+      "groups": ["/Managers"]
     },
     {
       "username": "demo@entreprise.ma",
@@ -59,14 +187,34 @@
       "enabled": true,
       "firstName": "Utilisateur",
       "lastName": "Demo",
+      "emailVerified": true,
+      "attributes": {
+        "department": ["Demo"],
+        "employee_id": ["USR001"]
+      },
       "credentials": [
         {
           "type": "password",
-          "value": "password123",
-          "temporary": false
+          "value": "Demo@123!",
+          "temporary": true
         }
       ],
-      "realmRoles": ["USER"]
+      "realmRoles": ["USER"],
+      "groups": ["/Users"]
     }
-  ]
+  ],
+  "scopeMappings": [
+    {
+      "client": "backend",
+      "roles": ["USER", "ZONE_MANAGER", "CONTENT_MANAGER", "ADMIN"]
+    }
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "backend",
+        "roles": ["view-users", "view-clients"]
+      }
+    ]
+  }
 }
