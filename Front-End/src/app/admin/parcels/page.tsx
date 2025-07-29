@@ -59,7 +59,7 @@ interface ParcelForm {
   vertices: { lambertX: string; lambertY: string }[]
 }
 
-const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
+const statuses = ['LIBRE', 'RESERVEE', 'INDISPONIBLE', 'VENDU', 'EN_DEVELOPPEMENT']
 
 export default function ParcelsAdmin() {
   const router = useRouter()
@@ -73,7 +73,7 @@ export default function ParcelsAdmin() {
     reference: '',
     area: '',
     price: '',
-    status: 'AVAILABLE',
+    status: 'LIBRE',
     isFree: true,
     isShowroom: false,
     cos: '',
@@ -206,7 +206,7 @@ export default function ParcelsAdmin() {
       reference: '',
       area: '',
       price: '',
-      status: 'AVAILABLE',
+      status: 'LIBRE',
       isFree: true,
       isShowroom: false,
       cos: '',
@@ -258,7 +258,7 @@ export default function ParcelsAdmin() {
       reference: '',
       area: '',
       price: '',
-      status: 'AVAILABLE',
+      status: 'LIBRE',
       isFree: true,
       isShowroom: false,
       cos: '',

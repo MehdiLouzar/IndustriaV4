@@ -139,22 +139,25 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
         })();
 
   const zoneColor: Record<string, string> = {
-    AVAILABLE: "green",
-    RESERVED: "orange",
-    OCCUPIED: "red",
-    SHOWROOM: "blue",
+    LIBRE: "green",
+    RESERVEE: "orange",
+    INDISPONIBLE: "red",
+    VENDU: "blue",
+    EN_DEVELOPPEMENT: "gray",
   };
 
   const parcelColor = (s: string) => {
     switch (s) {
-      case "AVAILABLE":
+      case "LIBRE":
         return "green";
-      case "RESERVED":
+      case "RESERVEE":
         return "red";
-      case "OCCUPIED":
+      case "INDISPONIBLE":
         return "gray";
-      case "SHOWROOM":
+      case "VENDU":
         return "blue";
+      case "EN_DEVELOPPEMENT":
+        return "orange";
       default:
         return "gray";
     }
@@ -206,7 +209,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                         Lat: {p.latitude.toFixed(5)}, Lon: {p.longitude.toFixed(5)}
                       </div>
                     )}
-                    {p.status === "AVAILABLE" && p.isFree && (
+                    {p.status === "LIBRE" && p.isFree && (
                       <Button
                         size="sm"
                         className="mt-1"

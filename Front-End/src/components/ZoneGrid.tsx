@@ -42,14 +42,16 @@ export default function ZoneGrid() {
 
   const mapStatus = (status: string): IndustrialZone['status'] => {
     switch (status) {
-      case 'RESERVED':
-        return 'Réservé';
-      case 'OCCUPIED':
-        return 'Occupé';
-      case 'SHOWROOM':
-        return 'Showroom';
+      case 'RESERVEE':
+        return 'Réservée';
+      case 'INDISPONIBLE':
+        return 'Indisponible';
+      case 'VENDU':
+        return 'Vendu';
+      case 'EN_DEVELOPPEMENT':
+        return 'En développement';
       default:
-        return 'Disponible';
+        return 'Libre';
     }
   };
 

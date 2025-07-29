@@ -62,10 +62,11 @@ interface ZoneForm {
 }
 
 const statuses = [
-  'AVAILABLE',
-  'RESERVED',
-  'OCCUPIED',
-  'SHOWROOM',
+  'LIBRE',
+  'RESERVEE',
+  'INDISPONIBLE',
+  'VENDU',
+  'EN_DEVELOPPEMENT',
 ]
 
 export default function ZonesAdmin() {
@@ -85,7 +86,7 @@ export default function ZonesAdmin() {
     address: '',
     totalArea: '',
     price: '',
-    status: 'AVAILABLE',
+    status: 'LIBRE',
 
     lambertX: '',
     lambertY: '',
@@ -241,7 +242,7 @@ export default function ZonesAdmin() {
       address: '',
       totalArea: '',
       price: '',
-      status: 'AVAILABLE',
+      status: 'LIBRE',
       lambertX: '',
       lambertY: '',
       latitude: '',
@@ -296,7 +297,7 @@ export default function ZonesAdmin() {
       address: '',
       totalArea: '',
       price: '',
-      status: 'AVAILABLE',
+      status: 'LIBRE',
       lambertX: '',
       lambertY: '',
       latitude: '',

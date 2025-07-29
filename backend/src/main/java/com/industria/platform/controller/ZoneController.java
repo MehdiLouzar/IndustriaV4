@@ -6,7 +6,10 @@ import com.industria.platform.dto.ZoneTypeDto;
 import com.industria.platform.entity.Zone;
 import com.industria.platform.entity.ZoneAmenity;
 import com.industria.platform.entity.ZoneStatus;
+import com.industria.platform.repository.RegionRepository;
 import com.industria.platform.repository.ZoneRepository;
+import com.industria.platform.repository.ZoneTypeRepository;
+import com.industria.platform.repository.AmenityRepository;
 import com.industria.platform.service.StatusService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +21,18 @@ public class ZoneController {
 
     private final StatusService statusService;
     private final ZoneRepository zoneRepository;
+    private final RegionRepository regionRepository;
+    private final ZoneTypeRepository zoneTypeRepository;
+    private final AmenityRepository amenityRepository;
 
-    public ZoneController(StatusService statusService, ZoneRepository zoneRepository) {
+    public ZoneController(StatusService statusService, ZoneRepository zoneRepository,
+                          RegionRepository regionRepository, ZoneTypeRepository zoneTypeRepository,
+                          AmenityRepository amenityRepository) {
         this.statusService = statusService;
         this.zoneRepository = zoneRepository;
+        this.regionRepository = regionRepository;
+        this.zoneTypeRepository = zoneTypeRepository;
+        this.amenityRepository = amenityRepository;
     }
 
     @PutMapping("/{id}/status")
@@ -45,9 +56,45 @@ public class ZoneController {
         )).toList();
     }
 
+    @PostMapping
+    public ZoneDto create(@RequestBody ZoneDto dto) {
+        Zone z = new Zone();
+        updateEntity(z, dto);
+        zoneRepository.save(z);
+        return toDto(z);
+    }
+
     @GetMapping("/{id}")
     public ZoneDto get(@PathVariable String id) {
         Zone z = zoneRepository.findById(id).orElseThrow();
+        return toDto(z);
+    }
+
+    @PutMapping("/{id}")
+    public ZoneDto update(@PathVariable String id, @RequestBody ZoneDto dto) {
+        Zone z = zoneRepository.findById(id).orElseThrow();
+        updateEntity(z, dto);
+        zoneRepository.save(z);
+        return toDto(z);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable String id) { zoneRepository.deleteById(id); }
+
+    private void updateEntity(Zone z, ZoneDto dto) {
+        z.setName(dto.name());
+        z.setDescription(dto.description());
+        z.setTotalArea(dto.totalArea());
+        z.setPrice(dto.price());
+        if (dto.status() != null)
+            z.setStatus(ZoneStatus.valueOf(dto.status()));
+        if (dto.region() != null && dto.region().id() != null)
+            z.setRegion(regionRepository.findById(dto.region().id()).orElse(null));
+        if (dto.zoneType() != null && dto.zoneType().id() != null)
+            z.setZoneType(zoneTypeRepository.findById(dto.zoneType().id()).orElse(null));
+    }
+
+    private ZoneDto toDto(Zone z) {
         return new ZoneDto(
                 z.getId(), z.getName(), z.getDescription(), z.getTotalArea(), z.getPrice(), z.getStatus().name(),
                 z.getRegion() == null ? null : new RegionDto(z.getRegion().getId(), z.getRegion().getName(), z.getRegion().getCode(), null),
