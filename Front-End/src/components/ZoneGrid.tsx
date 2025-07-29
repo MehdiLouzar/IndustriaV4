@@ -62,8 +62,8 @@ export default function ZoneGrid() {
         qs.set(k, v)
       })
       const data = await fetchApi<ZoneResponse[]>(`/api/zones?${qs.toString()}`)
-      if (!data) return
-      const mapped: IndustrialZone[] = data.map((z) => ({
+      const list = data ?? []
+      const mapped: IndustrialZone[] = list.map((z) => ({
         id: z.id,
         name: z.name,
         description: z.description ?? '',

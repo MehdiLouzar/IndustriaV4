@@ -164,20 +164,20 @@ export default function MapView() {
   }, [fetchOverpassData])
 
   useEffect(() => {
-    fetchApi<{ features: ZoneFeature[] }>("/api/map/zones")
+    fetchApi<{ features?: ZoneFeature[] }>("/api/map/zones")
       .then((d) => {
-        if (!d) return
-        const conv = d.features.map((f) => ({
+        const list = d?.features ?? []
+        const conv = list.map((f) => ({
           ...f,
           coordinates: [f.coordinates[1], f.coordinates[0]],
         }))
         setZones(conv)
       })
       .catch(console.error)
-    fetchApi<{ features: ParcelFeature[] }>("/api/map/parcels")
+    fetchApi<{ features?: ParcelFeature[] }>("/api/map/parcels")
       .then((d) => {
-        if (!d) return
-        const conv = d.features.map((f) => ({
+        const list = d?.features ?? []
+        const conv = list.map((f) => ({
           ...f,
           coordinates: [f.coordinates[1], f.coordinates[0]],
         }))

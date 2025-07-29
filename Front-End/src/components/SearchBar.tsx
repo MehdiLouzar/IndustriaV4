@@ -56,7 +56,9 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
         fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       ])
       if (r) setRegions(r)
+      else setRegions([])
       if (t) setZoneTypes(t)
+      else setZoneTypes([])
     }
     load()
   }, [])
