@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,7 +25,6 @@ interface Region {
 }
 
 export default function RegionsAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<Region[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -35,11 +33,6 @@ export default function RegionsAdmin() {
   const [countries, setCountries] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<Region>({ id: '', name: '', code: '', countryId: '' })
 
-  useEffect(() => {
-    if (session && session.user.role !== 'ADMIN') {
-      router.push('/auth/login')
-    }
-  }, [session])
 
   async function load() {
     const [r, c] = await Promise.all([

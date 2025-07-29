@@ -1,8 +1,6 @@
 export const dynamic = 'force-dynamic';
 
 import { redirect } from 'next/navigation';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,11 +28,6 @@ async function getAdminStats() {
 }
 
 export default async function AdminDashboard() {
-  const session = await getServerSession(authOptions);
-
-  if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER')) {
-    redirect('/auth/login');
-  }
 
   const stats = await getAdminStats();
 
@@ -121,9 +114,7 @@ export default async function AdminDashboard() {
     }
   ];
 
-  const filteredCards = adminCards.filter(card =>
-    card.permission.includes(session.user.role)
-  );
+  const filteredCards = adminCards;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,14 +124,9 @@ export default async function AdminDashboard() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-              <p className="text-gray-600">
-                Tableau de bord - {session.user.role === 'ADMIN' ? 'Administrateur' : 'Manager'}
-              </p>
+              <p className="text-gray-600">Tableau de bord</p>
             </div>
             <div className="flex items-center gap-4">
-              <Badge className={session.user.role === 'ADMIN' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}>
-                {session.user.role === 'ADMIN' ? 'Administrateur' : 'Manager'}
-              </Badge>
               <Link href="/">
                 <Button variant="outline">
                   ← Retour au site

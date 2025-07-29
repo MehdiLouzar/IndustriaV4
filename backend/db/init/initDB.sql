@@ -12,7 +12,7 @@ DECLARE
     'notification', 'notification_template', 'audit_log', 'appointment',
     'parcel_amenity', 'zone_amenity', 'zone_activity',
     'parcel', 'zone', 'amenity', 'activity', 'zone_type',
-    'region', 'country', 'spatial_reference_system', 'user'
+    'region', 'country', 'spatial_reference_system', 'users'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tables LOOP
@@ -23,7 +23,7 @@ BEGIN
 END $$;
 
 -- Users
-INSERT INTO "user" (
+INSERT INTO users (
   id, email, password, name, company, phone, role,
   created_at, updated_at
 ) VALUES

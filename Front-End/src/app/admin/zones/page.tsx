@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -70,7 +69,6 @@ const statuses = [
 ]
 
 export default function ZonesAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [zones, setZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -102,13 +100,7 @@ export default function ZonesAdmin() {
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
   useEffect(() => {
-    if (session && session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER') {
       router.push('/auth/login')
-    }
-  }, [session])
-
-  async function load() {
-    const [z, t, r, a, m] = await Promise.all([
       fetchApi<Zone[]>('/api/zones'),
       fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       fetchApi<{ id: string; name: string }[]>('/api/regions'),

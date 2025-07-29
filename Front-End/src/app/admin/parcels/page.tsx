@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,7 +62,6 @@ interface ParcelForm {
 const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
 
 export default function ParcelsAdmin() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [items, setItems] = useState<Parcel[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -90,7 +88,6 @@ export default function ParcelsAdmin() {
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
-  useEffect(() => { if (session && session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER') router.push('/auth/login') }, [session])
 
   async function load() {
     const [p, z] = await Promise.all([

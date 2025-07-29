@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,23 +23,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Email ou mot de passe incorrect');
-      } else {
-        // Récupérer la session pour rediriger selon le rôle
-        const session = await getSession();
-        if (session?.user?.role === 'ADMIN' || session?.user?.role === 'MANAGER') {
-          router.push('/admin');
-        } else {
-          router.push('/');
-        }
-      }
+      // TODO: implement authentication call
+      router.push('/');
     } catch (error) {
       setError('Une erreur est survenue lors de la connexion');
     } finally {
