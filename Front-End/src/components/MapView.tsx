@@ -35,9 +35,27 @@ type ZoneFeature = {
   }
 }
 
+type ZoneFeatureResp = {
+  coordinates: [number, number]
+  id: string
+  name: string
+  status: string
+  availableParcels: number
+  activityIcons: string[]
+  amenityIcons: string[]
+}
+
 type ParcelFeature = {
   geometry: { type: string; coordinates: [number, number] }
   properties: { id: string; reference: string; isShowroom: boolean; status: string }
+}
+
+type ParcelFeatureResp = {
+  coordinates: [number, number]
+  id: string
+  reference: string
+  isShowroom: boolean
+  status: string
 }
 
 export default function MapView() {
@@ -163,28 +181,33 @@ export default function MapView() {
   }, [fetchOverpassData])
 
   useEffect(() => {
-    fetchApi<{ features: ZoneFeature[] }>("/api/map/zones")
+    fetchApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
       .then((d) => {
         if (!d) return
-        const conv = d.features.map((f) => ({
-          ...f,
-          // convert to [lat, lon] for Leaflet
-          geometry: {
-            type: f.geometry.type,
-            coordinates: [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+        const conv: ZoneFeature[] = d.features.map((f) => ({
+          geometry: { type: "Point", coordinates: [f.coordinates[0], f.coordinates[1]] },
+          properties: {
+            id: f.id,
+            name: f.name,
+            status: f.status,
+            availableParcels: f.availableParcels,
+            activityIcons: f.activityIcons,
+            amenityIcons: f.amenityIcons,
           },
         }))
         setZones(conv)
       })
       .catch(console.error)
-    fetchApi<{ features: ParcelFeature[] }>("/api/map/parcels")
+    fetchApi<{ features: ParcelFeatureResp[] }>("/api/map/parcels")
       .then((d) => {
         if (!d) return
-        const conv = d.features.map((f) => ({
-          ...f,
-          geometry: {
-            type: f.geometry.type,
-            coordinates: [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+        const conv: ParcelFeature[] = d.features.map((f) => ({
+          geometry: { type: "Point", coordinates: [f.coordinates[0], f.coordinates[1]] },
+          properties: {
+            id: f.id,
+            reference: f.reference,
+            isShowroom: f.isShowroom,
+            status: f.status,
           },
         }))
         setParcels(conv)
