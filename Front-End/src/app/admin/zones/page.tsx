@@ -17,12 +17,6 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 
-interface Vertex {
-  seq: number
-  lambertX: number
-  lambertY: number
-}
-
 interface Zone {
   id: string
   name: string
@@ -31,15 +25,10 @@ interface Zone {
   totalArea?: number | null
   price?: number | null
   status: string
-  lambertX?: number | null
-  lambertY?: number | null
-  latitude?: number | null
-  longitude?: number | null
-  zoneTypeId?: string | null
-  regionId?: string | null
-  activities?: { activityId: string }[]
-  amenities?: { amenityId: string }[]
-  vertices?: Vertex[]
+  region?: { id: string; name: string } | null
+  zoneType?: { id: string; name: string } | null
+  amenities?: string[]
+  activities?: string[]
 }
 
 interface ZoneForm {
@@ -50,22 +39,18 @@ interface ZoneForm {
   totalArea: string
   price: string
   status: string
-  lambertX: string
-  lambertY: string
-  latitude: string
-  longitude: string
   zoneTypeId: string
   regionId: string
   activityIds: string[]
   amenityIds: string[]
-  vertices: { lambertX: string; lambertY: string }[]
 }
 
 const statuses = [
-  'AVAILABLE',
-  'RESERVED',
-  'OCCUPIED',
-  'SHOWROOM',
+  'LIBRE',
+  'RESERVEE',
+  'INDISPONIBLE',
+  'VENDU',
+  'EN_DEVELOPPEMENT',
 ]
 
 export default function ZonesAdmin() {
@@ -85,22 +70,16 @@ export default function ZonesAdmin() {
     address: '',
     totalArea: '',
     price: '',
-    status: 'AVAILABLE',
-
-    lambertX: '',
-    lambertY: '',
-    latitude: '',
-    longitude: '',
+    status: 'LIBRE',
     zoneTypeId: '',
     regionId: '',
     activityIds: [],
     amenityIds: [],
-    vertices: [],
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
-  useEffect(() => {
-      router.push('/auth/login')
+  async function load() {
+    const [z, t, r, a, m] = await Promise.all([
       fetchApi<Zone[]>('/api/zones'),
       fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       fetchApi<{ id: string; name: string }[]>('/api/regions'),
@@ -152,32 +131,6 @@ export default function ZonesAdmin() {
     }))
   }
 
-  const addVertex = () => {
-    setForm((f) => ({
-      ...f,
-      vertices: [...f.vertices, { lambertX: '', lambertY: '' }],
-    }))
-  }
-
-  const updateVertex = (
-    index: number,
-    field: 'lambertX' | 'lambertY',
-    value: string
-  ) => {
-    setForm((f) => {
-      const verts = [...f.vertices]
-      verts[index] = { ...verts[index], [field]: value }
-      return { ...f, vertices: verts }
-    })
-  }
-
-  const removeVertex = (index: number) => {
-    setForm((f) => {
-      const verts = [...f.vertices]
-      verts.splice(index, 1)
-      return { ...f, vertices: verts }
-    })
-  }
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
@@ -207,19 +160,9 @@ export default function ZonesAdmin() {
       totalArea: form.totalArea ? parseFloat(form.totalArea) : undefined,
       price: form.price ? parseFloat(form.price) : undefined,
       status: form.status,
-      lambertX: form.lambertX ? parseFloat(form.lambertX) : undefined,
-      lambertY: form.lambertY ? parseFloat(form.lambertY) : undefined,
-      latitude: form.latitude ? parseFloat(form.latitude) : undefined,
-      longitude: form.longitude ? parseFloat(form.longitude) : undefined,
-      zoneTypeId: form.zoneTypeId || undefined,
-      regionId: form.regionId || undefined,
-      activityIds: form.activityIds,
-      amenityIds: form.amenityIds,
-      vertices: form.vertices.map((v, i) => ({
-        seq: i,
-        lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
-        lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
-      })),
+      zoneType: form.zoneTypeId ? { id: form.zoneTypeId } : undefined,
+      region: form.regionId ? { id: form.regionId } : undefined,
+      amenities: form.amenityIds,
     }
     if (form.id) {
       await fetchApi(`/api/zones/${form.id}`, {
@@ -241,16 +184,11 @@ export default function ZonesAdmin() {
       address: '',
       totalArea: '',
       price: '',
-      status: 'AVAILABLE',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
+      status: 'LIBRE',
       zoneTypeId: '',
       regionId: '',
       activityIds: [],
       amenityIds: [],
-      vertices: [],
     })
     setImages([])
     setOpen(false)
@@ -266,18 +204,10 @@ export default function ZonesAdmin() {
       totalArea: z.totalArea?.toString() ?? '',
       price: z.price?.toString() ?? '',
       status: z.status,
-      lambertX: z.lambertX?.toString() ?? '',
-      lambertY: z.lambertY?.toString() ?? '',
-      latitude: z.latitude?.toString() ?? '',
-      longitude: z.longitude?.toString() ?? '',
-      zoneTypeId: z.zoneTypeId || '',
-      regionId: z.regionId || '',
-      activityIds: z.activities ? z.activities.map(a => a.activityId) : [],
-      amenityIds: z.amenities ? z.amenities.map(a => a.amenityId) : [],
-      vertices: z.vertices ? z.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
-        lambertX: v.lambertX.toString(),
-        lambertY: v.lambertY.toString(),
-      })) : [],
+      zoneTypeId: z.zoneType?.id || '',
+      regionId: z.region?.id || '',
+      activityIds: z.activities ? z.activities : [],
+      amenityIds: z.amenities ? z.amenities : [],
     })
     setImages([])
     setOpen(true)
@@ -296,16 +226,11 @@ export default function ZonesAdmin() {
       address: '',
       totalArea: '',
       price: '',
-      status: 'AVAILABLE',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
+      status: 'LIBRE',
       zoneTypeId: '',
       regionId: '',
       activityIds: [],
       amenityIds: [],
-      vertices: [],
     })
     setImages([])
     setOpen(true)
@@ -335,7 +260,7 @@ export default function ZonesAdmin() {
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
-                  <td className="p-2 align-top">{zone.regionId}</td>
+                  <td className="p-2 align-top">{zone.region?.name}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(zone)}>Éditer</Button>
                     <Button size="sm" variant="destructive" onClick={() => del(zone.id)}>
@@ -383,49 +308,6 @@ export default function ZonesAdmin() {
                 <Label htmlFor="price">Prix DH/m²</Label>
                 <Input id="price" name="price" value={form.price} onChange={handleChange} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lambertX">Lambert X</Label>
-                <Input id="lambertX" name="lambertX" value={form.lambertX} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="lambertY">Lambert Y</Label>
-                <Input id="lambertY" name="lambertY" value={form.lambertY} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input id="latitude" name="latitude" value={form.latitude} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input id="longitude" name="longitude" value={form.longitude} onChange={handleChange} />
-              </div>
-            </div>
-            <div>
-              <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
-                <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
-                  <Input
-                    placeholder="X"
-                    value={v.lambertX}
-                    onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Y"
-                      value={v.lambertY}
-                      onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
-                    />
-                    <Button type="button" size="sm" variant="destructive" onClick={() => removeVertex(idx)}>
-                      ×
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              <Button type="button" size="sm" onClick={addVertex}>Ajouter un point</Button>
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>

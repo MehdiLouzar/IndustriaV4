@@ -36,20 +36,22 @@ export default function ZoneGrid() {
     totalArea?: number;
     price?: number;
     status: string;
-    region?: { name: string };
-    amenities?: { amenity: { name: string } }[];
+    region?: { id: string; name: string };
+    amenities?: string[];
   }
 
   const mapStatus = (status: string): IndustrialZone['status'] => {
     switch (status) {
-      case 'RESERVED':
-        return 'Réservé';
-      case 'OCCUPIED':
-        return 'Occupé';
-      case 'SHOWROOM':
-        return 'Showroom';
+      case 'RESERVEE':
+        return 'Réservée';
+      case 'INDISPONIBLE':
+        return 'Indisponible';
+      case 'VENDU':
+        return 'Vendu';
+      case 'EN_DEVELOPPEMENT':
+        return 'En développement';
       default:
-        return 'Disponible';
+        return 'Libre';
     }
   };
 
@@ -60,8 +62,8 @@ export default function ZoneGrid() {
         qs.set(k, v)
       })
       const data = await fetchApi<ZoneResponse[]>(`/api/zones?${qs.toString()}`)
-      if (!data) return
-      const mapped: IndustrialZone[] = data.map((z) => ({
+      const list = data ?? []
+      const mapped: IndustrialZone[] = list.map((z) => ({
         id: z.id,
         name: z.name,
         description: z.description ?? '',
@@ -71,7 +73,7 @@ export default function ZoneGrid() {
         type: 'Zone Industrielle',
         status: mapStatus(z.status),
         image: 'https://source.unsplash.com/featured/?industrial',
-        features: z.amenities?.map((a) => a.amenity.name) ?? [],
+        features: z.amenities ?? [],
       }));
       setZones(mapped)
     }

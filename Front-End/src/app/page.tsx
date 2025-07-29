@@ -2,7 +2,7 @@
 import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamicLib from 'next/dynamic';
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchApi } from '@/lib/utils';
 import ZoneGrid from '@/components/ZoneGrid';
@@ -84,7 +84,9 @@ export default function Home() {
       {/* Zones grid section */}
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
-          <ZoneGrid />
+          <Suspense fallback={<p>Chargement...</p>}>
+            <ZoneGrid />
+          </Suspense>
         </div>
       </section>
 

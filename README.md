@@ -42,7 +42,8 @@ docker compose up --build
 The frontend map now uses OpenStreetMap tiles, so no access token is required.
 
 This starts PostgreSQL, Keycloak, the API backend on port 8080 and the front-end on port 3000.
-The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your browser can reach the API directly on the host. When using Docker, the frontend server accesses the backend via `API_INTERNAL_URL=http://backend:8080`.
+The front-end image now performs a production build during `docker compose build` and serves the Next.js application without mounting the source code.
+It is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your browser can reach the API directly on the host, while the container communicates with the backend via `API_INTERNAL_URL=http://backend:8080`.
 
 ### Sample data
 

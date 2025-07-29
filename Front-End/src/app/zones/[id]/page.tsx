@@ -12,9 +12,9 @@ import Footer from "@/components/Footer";
 import AppointmentForm from "@/components/AppointmentForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import DynamicIcon from "@/components/DynamicIcon";
 import { fetchApi } from "@/lib/utils";
 
+interface Vertex { seq: number; lat: number; lon: number }
 interface Parcel {
   id: string;
   reference: string;
@@ -22,8 +22,8 @@ interface Parcel {
   latitude?: number;
   longitude?: number;
   area?: number | null;
-  price?: number | null;
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  isShowroom?: boolean | null;
+  vertices?: Vertex[];
 }
 
 interface Zone {
@@ -37,10 +37,10 @@ interface Zone {
   price?: number | null;
   region?: { name: string } | null;
   zoneType?: { name: string } | null;
-  activities?: { activity: { name: string } }[];
-  amenities?: { amenity: { name: string; icon?: string } }[];
+  activities?: string[];
+  amenities?: string[];
   parcels: Parcel[];
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  vertices?: Vertex[];
 }
 
 export default function ZonePage() {
@@ -79,8 +79,7 @@ export default function ZonePage() {
           )}
           {zone.activities && zone.activities.length > 0 && (
             <p>
-              Activités:{" "}
-              {zone.activities.map((a) => a.activity.name).join(", ")}
+              Activités: {zone.activities.join(", ")}
             </p>
           )}
         </CardContent>
@@ -91,10 +90,9 @@ export default function ZonePage() {
               <span className="text-lg font-semibold">Equipements de proximité</span>
             </div>
             <div className="flex flex-wrap gap-4">
-              {zone.amenities.map((a, i) => (
+              {zone.amenities.map((name, i) => (
                 <div key={i} className="flex flex-col items-center text-sm">
-                  <DynamicIcon name={a.amenity.icon} className="w-6 h-6" />
-                  <span>{a.amenity.name}</span>
+                  <span>{name}</span>
                 </div>
               ))}
             </div>

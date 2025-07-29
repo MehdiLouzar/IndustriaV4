@@ -33,7 +33,7 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
 
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
   const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
-  const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
+  const statuses = ['LIBRE', 'RESERVEE', 'INDISPONIBLE', 'VENDU', 'EN_DEVELOPPEMENT']
   const priceRanges = [
     { label: 'Tout prix', min: undefined, max: undefined },
     { label: 'Moins de 500 DH/m²', min: undefined, max: 500 },
@@ -56,7 +56,9 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
         fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       ])
       if (r) setRegions(r)
+      else setRegions([])
       if (t) setZoneTypes(t)
+      else setZoneTypes([])
     }
     load()
   }, [])
