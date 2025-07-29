@@ -20,7 +20,7 @@ class GreetingControllerTest {
 
     @Test
     void greetingInFrench() throws Exception {
-        mockMvc.perform(get("/public/greeting").header("Accept-Language", "fr"))
+        mockMvc.perform(get("/api/public/greeting").header("Accept-Language", "fr"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Bienvenue sur la plateforme"));
     }
