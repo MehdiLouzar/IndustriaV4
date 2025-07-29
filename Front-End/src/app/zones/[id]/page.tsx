@@ -38,7 +38,7 @@ interface Zone {
   region?: { name: string } | null;
   zoneType?: { name: string } | null;
   activities?: { activity: { name: string } }[];
-  amenities?: { amenity: { name: string; icon?: string } }[];
+  amenities?: string[];
   parcels: Parcel[];
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
 }
@@ -91,10 +91,9 @@ export default function ZonePage() {
               <span className="text-lg font-semibold">Equipements de proximité</span>
             </div>
             <div className="flex flex-wrap gap-4">
-              {zone.amenities.map((a, i) => (
-                <div key={i} className="flex flex-col items-center text-sm">
-                  <DynamicIcon name={a.amenity.icon} className="w-6 h-6" />
-                  <span>{a.amenity.name}</span>
+              {zone.amenities.map((name, i) => (
+                <div key={i} className="flex items-center gap-1 text-sm">
+                  <span>{name}</span>
                 </div>
               ))}
             </div>
