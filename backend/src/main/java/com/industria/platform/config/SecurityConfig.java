@@ -29,8 +29,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
-                // Only enforce JWT auth for modifying requests
-                .securityMatcher(HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH)
+                // Only enforce JWT auth for non-GET requests
+                .securityMatcher(request -> !HttpMethod.GET.matches(request.getMethod()))
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             );
         return http.build();
