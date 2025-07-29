@@ -2,34 +2,30 @@
 
 import { MapContainer, TileLayer, Polygon, Popup } from "react-leaflet";
 import { useState, useRef, useEffect } from "react";
-import proj4 from "proj4";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
+interface Vertex { seq: number; lat: number; lon: number }
 interface Parcel {
   id: string;
   reference: string;
   status: string;
   isFree?: boolean;
-  lambertX?: number | null;
-  lambertY?: number | null;
   latitude?: number;
   longitude?: number;
   area?: number | null;
-  price?: number | null;
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  isShowroom?: boolean | null;
+  vertices?: Vertex[];
 }
 
 interface Zone {
   id: string;
   name: string;
   status: string;
-  lambertX?: number | null;
-  lambertY?: number | null;
   latitude?: number;
   longitude?: number;
   parcels: Parcel[];
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  vertices?: Vertex[];
 }
 
 export default function ZoneMap({ zone }: { zone: Zone }) {
@@ -44,41 +40,16 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     }, 100);
   }, []);
 
-  // Use parameters matching EPSG:26191 so parcels align with database values
-  const lambertMA =
-    '+proj=lcc +lat_1=33.3 +lat_0=33.3 +lon_0=-5.4 +k_0=0.999625769 +x_0=500000 +y_0=300000 +ellps=clrk80ign +towgs84=31,146,47,0,0,0,0 +units=m +no_defs';
-  const toLatLng = (x: number, y: number): [number, number] => {
-    const [lon, lat] = proj4(lambertMA, proj4.WGS84, [x, y]);
-    return [lon, lat];
-  };
 
-  const centroid = (verts: { lambertX: number; lambertY: number }[]): [number, number] | null => {
+  const centroid = (verts: Vertex[]): [number, number] | null => {
     if (!verts.length) return null
-    if (verts.length < 3) {
-      const sum = verts.reduce((acc, v) => [acc[0] + v.lambertX, acc[1] + v.lambertY], [0,0])
-      return [sum[0] / verts.length, sum[1] / verts.length]
+    let sumX = 0
+    let sumY = 0
+    for (const v of verts) {
+      sumX += v.lon
+      sumY += v.lat
     }
-    let area = 0
-    let cx = 0
-    let cy = 0
-    for (let i = 0; i < verts.length; i++) {
-      const x1 = verts[i].lambertX
-      const y1 = verts[i].lambertY
-      const x2 = verts[(i+1)%verts.length].lambertX
-      const y2 = verts[(i+1)%verts.length].lambertY
-      const f = x1*y2 - x2*y1
-      area += f
-      cx += (x1 + x2) * f
-      cy += (y1 + y2) * f
-    }
-    area *= 0.5
-    if (area === 0) {
-      const sum = verts.reduce((acc, v) => [acc[0] + v.lambertX, acc[1] + v.lambertY], [0,0])
-      return [sum[0] / verts.length, sum[1] / verts.length]
-    }
-    cx /= (6*area)
-    cy /= (6*area)
-    return [cx, cy]
+    return [sumX / verts.length, sumY / verts.length]
   }
 
   const center = zone.latitude != null && zone.longitude != null
@@ -88,21 +59,14 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
           const verts = [...zone.vertices].sort((a, b) => a.seq - b.seq)
           const c = centroid(verts)
           if (!c) return [31.7, -6.5]
-          const [lon, lat] = toLatLng(c[0], c[1])
-          return [lat, lon]
+          return [c[1], c[0]]
         })()
-      : zone.lambertX != null && zone.lambertY != null
-        ? (() => { const [lon, lat] = toLatLng(zone.lambertX, zone.lambertY); return [lat, lon] })()
-        : [31.7, -6.5]
+      : [31.7, -6.5]
 
   const zonePolygon: [number, number][] = zone.vertices && zone.vertices.length
     ? zone.vertices
         .sort((a, b) => a.seq - b.seq)
-        .map((v) =>
-          v.lat != null && v.lon != null
-            ? [v.lat, v.lon]
-            : (() => { const [lon, lat] = toLatLng(v.lambertX, v.lambertY); return [lat, lon] })()
-        )
+        .map((v) => [v.lat, v.lon])
     : (() => {
         const [lat, lon] = center;
         return [
@@ -117,26 +81,8 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     p.vertices && p.vertices.length
       ? p.vertices
           .sort((a, b) => a.seq - b.seq)
-          .map((v) =>
-            v.lat != null && v.lon != null
-              ? [v.lat, v.lon]
-              : (() => { const [lon, lat] = toLatLng(v.lambertX, v.lambertY); return [lat, lon] })()
-          )
-      : (() => {
-          const size = 100; // meters in Lambert units
-          const baseX = p.lambertX ?? zone.lambertX ?? 0;
-          const baseY = p.lambertY ?? zone.lambertY ?? 0;
-          const [lon1, lat1] = toLatLng(baseX - size, baseY - size);
-          const [lon2, lat2] = toLatLng(baseX - size, baseY + size);
-          const [lon3, lat3] = toLatLng(baseX + size, baseY + size);
-          const [lon4, lat4] = toLatLng(baseX + size, baseY - size);
-          return [
-            [lat1, lon1],
-            [lat2, lon2],
-            [lat3, lon3],
-            [lat4, lon4],
-          ];
-        })();
+          .map((v) => [v.lat, v.lon])
+      : []
 
   const zoneColor: Record<string, string> = {
     LIBRE: "green",
@@ -192,7 +138,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
         </Polygon>
         {zone.parcels.map(
           (p) =>
-            (p.lambertX != null && p.lambertY != null) && (
+            (p.vertices && p.vertices.length > 0) && (
               <Polygon
                 key={p.id}
                 positions={parcelPoly(p)}
@@ -202,7 +148,6 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                   <div className="space-y-1 text-sm">
                     <strong>{p.reference}</strong>
                     {p.area && <div>Surface: {p.area} m²</div>}
-                    {p.price && <div>Prix: {p.price} DH</div>}
                     <div>Statut: {p.status}</div>
                     {p.latitude != null && p.longitude != null && (
                       <div>

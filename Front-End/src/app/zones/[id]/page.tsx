@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { fetchApi } from "@/lib/utils";
 
+interface Vertex { seq: number; lat: number; lon: number }
 interface Parcel {
   id: string;
   reference: string;
@@ -21,8 +22,8 @@ interface Parcel {
   latitude?: number;
   longitude?: number;
   area?: number | null;
-  price?: number | null;
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  isShowroom?: boolean | null;
+  vertices?: Vertex[];
 }
 
 interface Zone {
@@ -39,7 +40,7 @@ interface Zone {
   activities?: string[];
   amenities?: string[];
   parcels: Parcel[];
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  vertices?: Vertex[];
 }
 
 export default function ZonePage() {
