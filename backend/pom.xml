@@ -53,11 +53,6 @@
                         <scope>runtime</scope>
                 </dependency>
                 <dependency>
-                        <groupId>org.hibernate.orm</groupId>
-                        <artifactId>hibernate-spatial</artifactId>
-                        <version>6.6.22.Final</version>
-                </dependency>
-                <dependency>
                         <groupId>org.projectlombok</groupId>
                         <artifactId>lombok</artifactId>
                         <optional>true</optional>
