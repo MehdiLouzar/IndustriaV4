@@ -24,20 +24,21 @@ import { TrainFront, Ship, Plane } from 'lucide-react'
 
 
 type ZoneFeature = {
-  geometry: { type: string; coordinates: [number, number] }
-  properties: {
-    id: string
-    name: string
-    status: string
-    availableParcels: number
-    activityIcons: string[]
-    amenityIcons: string[]
-  }
+  coordinates: [number, number]
+  id: string
+  name: string
+  status: string
+  availableParcels: number
+  activityIcons: string[]
+  amenityIcons: string[]
 }
 
 type ParcelFeature = {
-  geometry: { type: string; coordinates: [number, number] }
-  properties: { id: string; reference: string; isShowroom: boolean; status: string }
+  coordinates: [number, number]
+  id: string
+  reference: string
+  isShowroom: boolean
+  status: string
 }
 
 export default function MapView() {
@@ -168,11 +169,7 @@ export default function MapView() {
         if (!d) return
         const conv = d.features.map((f) => ({
           ...f,
-          // convert to [lat, lon] for Leaflet
-          geometry: {
-            type: f.geometry.type,
-            coordinates: [f.geometry.coordinates[1], f.geometry.coordinates[0]],
-          },
+          coordinates: [f.coordinates[1], f.coordinates[0]],
         }))
         setZones(conv)
       })
@@ -182,10 +179,7 @@ export default function MapView() {
         if (!d) return
         const conv = d.features.map((f) => ({
           ...f,
-          geometry: {
-            type: f.geometry.type,
-            coordinates: [f.geometry.coordinates[1], f.geometry.coordinates[0]],
-          },
+          coordinates: [f.coordinates[1], f.coordinates[0]],
         }))
         setParcels(conv)
       })
@@ -242,34 +236,34 @@ export default function MapView() {
       >
         {zones.map(z => (
           <Marker
-            key={z.properties.id}
-            position={z.geometry.coordinates}
+            key={z.id}
+            position={z.coordinates}
           >
             <Popup>
               <div className="space-y-1 text-sm p-1">
-                <strong className="block mb-1">{z.properties.name}</strong>
-                <div>Statut: {z.properties.status}</div>
-                <div>Parcelles disponibles: {z.properties.availableParcels}</div>
+                <strong className="block mb-1">{z.name}</strong>
+                <div>Statut: {z.status}</div>
+                <div>Parcelles disponibles: {z.availableParcels}</div>
                 <div>
-                  Lat: {z.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
-                  {z.geometry.coordinates[1].toFixed(5)}
+                  Lat: {z.coordinates[0].toFixed(5)}, Lon:{' '}
+                  {z.coordinates[1].toFixed(5)}
                 </div>
-                {z.properties.activityIcons.length > 0 && (
+                {z.activityIcons.length > 0 && (
                   <div className="flex gap-1 text-xl">
-                    {z.properties.activityIcons.map((ic, i) => (
+                    {z.activityIcons.map((ic, i) => (
                       <DynamicIcon key={i} name={ic} className="w-5 h-5" />
                     ))}
                   </div>
                 )}
-                {z.properties.amenityIcons.length > 0 && (
+                {z.amenityIcons.length > 0 && (
                   <div className="flex gap-1 text-xl">
-                    {z.properties.amenityIcons.map((ic, i) => (
+                    {z.amenityIcons.map((ic, i) => (
                       <DynamicIcon key={i} name={ic} className="w-5 h-5" />
                     ))}
                   </div>
                 )}
                 <Link
-                  href={`/zones/${z.properties.id}`}
+                  href={`/zones/${z.id}`}
                   className="text-blue-600 underline block mt-1"
                 >
                   Voir la zone
@@ -280,19 +274,19 @@ export default function MapView() {
         ))}
         {parcels.map(p => (
           <Marker
-            key={p.properties.id}
-            position={p.geometry.coordinates}
-            icon={p.properties.isShowroom ? showroomIcon : parcelIcon}
+            key={p.id}
+            position={p.coordinates}
+            icon={p.isShowroom ? showroomIcon : parcelIcon}
           >
             <Popup>
               <div className="space-y-1 text-sm">
-                <strong>{p.properties.reference}</strong>
-                <div>Statut: {p.properties.status}</div>
+                <strong>{p.reference}</strong>
+                <div>Statut: {p.status}</div>
                 <div>
-                  Lat: {p.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
-                  {p.geometry.coordinates[1].toFixed(5)}
+                  Lat: {p.coordinates[0].toFixed(5)}, Lon:{' '}
+                  {p.coordinates[1].toFixed(5)}
                 </div>
-                {p.properties.isShowroom && <div>Showroom</div>}
+                {p.isShowroom && <div>Showroom</div>}
               </div>
             </Popup>
           </Marker>
