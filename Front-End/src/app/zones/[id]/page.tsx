@@ -39,7 +39,7 @@ interface Zone {
   zoneType?: { name: string } | null;
   activities?: { activity: { name: string } }[];
   amenities?: string[];
-  parcels: Parcel[];
+  parcels?: Parcel[];
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
 }
 
@@ -107,7 +107,7 @@ export default function ZonePage() {
         </div>
       </div>
       <Footer />
-      {showForm && zone.parcels[0] && (
+      {showForm && zone.parcels && zone.parcels[0] && (
         <AppointmentForm
           parcel={{ id: zone.parcels[0].id, reference: zone.parcels[0].reference }}
           onClose={() => setShowForm(false)}
