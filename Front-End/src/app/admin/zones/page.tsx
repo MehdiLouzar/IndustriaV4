@@ -99,8 +99,8 @@ export default function ZonesAdmin() {
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
-  useEffect(() => {
-      router.push('/auth/login')
+  async function load() {
+    const [z, t, r, a, m] = await Promise.all([
       fetchApi<Zone[]>('/api/zones'),
       fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       fetchApi<{ id: string; name: string }[]>('/api/regions'),
@@ -116,7 +116,17 @@ export default function ZonesAdmin() {
     if (a) setActivities(a)
     if (m) setAmenities(m)
   }
-  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+    }
+    load()
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })

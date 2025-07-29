@@ -18,19 +18,41 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
 
     try {
-      // TODO: implement authentication call
-      router.push('/');
+      const params = new URLSearchParams()
+      params.append('grant_type', 'password')
+      params.append('client_id', 'frontend')
+      params.append('username', email)
+      params.append('password', password)
+
+      const res = await fetch(
+        'http://localhost:8081/realms/industria/protocol/openid-connect/token',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString(),
+        }
+      )
+      if (!res.ok) {
+        throw new Error('Email ou mot de passe incorrect')
+      }
+      const data = await res.json()
+      localStorage.setItem('token', data.access_token)
+      router.push('/')
     } catch (error) {
-      setError('Une erreur est survenue lors de la connexion');
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Une erreur est survenue lors de la connexion'
+      )
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const demoAccounts = [
     { email: 'admin@zonespro.ma', role: 'Administrateur', password: 'password123' },

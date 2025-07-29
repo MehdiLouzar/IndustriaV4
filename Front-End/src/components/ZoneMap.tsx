@@ -28,7 +28,7 @@ interface Zone {
   lambertY?: number | null;
   latitude?: number;
   longitude?: number;
-  parcels: Parcel[];
+  parcels?: Parcel[];
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
 }
 
@@ -187,7 +187,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
             </div>
           </Popup>
         </Polygon>
-        {zone.parcels.map(
+        {zone.parcels?.map(
           (p) =>
             (p.lambertX != null && p.lambertY != null) && (
               <Polygon

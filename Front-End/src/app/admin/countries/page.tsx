@@ -23,6 +23,8 @@ export default function CountriesAdmin() {
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Country>({ id: '', name: '', code: '' })
+
+  async function load() {
     const items = await fetchApi<Country[]>('/api/countries')
     if (items) {
       setItems(items)

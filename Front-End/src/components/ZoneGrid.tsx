@@ -37,7 +37,7 @@ export default function ZoneGrid() {
     price?: number;
     status: string;
     region?: { name: string };
-    amenities?: { amenity: { name: string } }[];
+    amenities?: string[];
   }
 
   const mapStatus = (status: string): IndustrialZone['status'] => {
@@ -71,7 +71,7 @@ export default function ZoneGrid() {
         type: 'Zone Industrielle',
         status: mapStatus(z.status),
         image: 'https://source.unsplash.com/featured/?industrial',
-        features: z.amenities?.map((a) => a.amenity.name) ?? [],
+        features: z.amenities ?? [],
       }));
       setZones(mapped)
     }
