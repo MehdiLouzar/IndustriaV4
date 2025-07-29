@@ -58,10 +58,7 @@ echo ✅ Keycloak accessible
 
 REM Obtenir le token d'accès admin
 echo 🔐 Authentification admin...
-for /f "usebackq tokens=*" %%i in (`curl -s -X POST "%KEYCLOAK_URL%/realms/master/protocol/openid-connect/token" -H "Content-Type: application/x-www-form-urlencoded" -d "username=admin&password=!KEYCLOAK_ADMIN_PASSWORD!&grant_type=password&client_id=admin-cli" ^| findstr /C:"access_token" ^| for /f "tokens=2 delims=:" %%j in ('more') do @echo %%j ^| for /f "tokens=1 delims=," %%k in ('more') do @echo %%k ^| for /f "tokens=*" %%l in ('more') do @echo %%l`) do set ACCESS_TOKEN=%%i
-
-REM Nettoyer le token (supprimer les guillemets)
-set ACCESS_TOKEN=!ACCESS_TOKEN:"=!
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Invoke-RestMethod -Method Post -Uri '%KEYCLOAK_URL%/realms/master/protocol/openid-connect/token' -Body 'username=admin&password=!KEYCLOAK_ADMIN_PASSWORD!&grant_type=password&client_id=admin-cli' -ContentType 'application/x-www-form-urlencoded').access_token"`) do set "ACCESS_TOKEN=%%i"
 
 if "!ACCESS_TOKEN!"=="" (
     echo ❌ Impossible d'obtenir le token d'accès
