@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Link from 'next/link'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
@@ -21,6 +21,52 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import osmtogeojson from 'osmtogeojson'
 import type { FeatureCollection } from 'geojson'
 import { TrainFront, Ship, Plane } from 'lucide-react'
+
+// Simple debounce utility to avoid excessive API calls
+function debounce<Args extends unknown[]>(func: (...args: Args) => void, delay: number) {
+  let timer: NodeJS.Timeout
+  return (...args: Args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => func(...args), delay)
+  }
+}
+
+// Small cache for Overpass results to reduce network usage
+class OverpassCache {
+  private cache = new Map<string, { data: FeatureCollection; ts: number }>()
+  private readonly TTL = 3_600_000 // 1 hour
+  private readonly MAX_SIZE = 20
+
+  private key(bbox: string, zoom: number) {
+    const precision = zoom > 12 ? 2 : 1
+    return bbox
+      .split(',')
+      .map((n) => parseFloat(n).toFixed(precision))
+      .join(',')
+  }
+
+  get(bbox: string, zoom: number) {
+    const k = this.key(bbox, zoom)
+    const item = this.cache.get(k)
+    if (!item) return null
+    if (Date.now() - item.ts > this.TTL) {
+      this.cache.delete(k)
+      return null
+    }
+    return item.data
+  }
+
+  set(bbox: string, zoom: number, data: FeatureCollection) {
+    const k = this.key(bbox, zoom)
+    this.cache.set(k, { data, ts: Date.now() })
+    if (this.cache.size > this.MAX_SIZE) {
+      const oldest = this.cache.keys().next().value
+      this.cache.delete(oldest)
+    }
+  }
+}
+
+const overpassCache = new OverpassCache()
 
 
 type ZoneFeature = {
@@ -68,8 +114,6 @@ export default function MapView() {
   const glMapRef = useRef<maplibregl.Map | null>(null)
   const glLoaded = useRef(false)
   const lastBbox = useRef('')
-  const debounceRef = useRef<number>()
-  const overpassCache = useRef<Map<string, { data: FeatureCollection; ts: number }>>(new Map())
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -80,33 +124,65 @@ export default function MapView() {
     }, 100)
   }, [])
 
-  const parcelIcon = L.divIcon({
-    html: '<div style="background:#3388ff;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
-    className: ''
-  })
-  const showroomIcon = L.divIcon({
-    html: '<div style="background:#e53e3e;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
-    className: ''
-  })
+  const ICONS = useMemo(
+    () => ({
+      parcel: L.divIcon({
+        html: '<div style="background:#3388ff;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
+        className: '',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+      }),
+      showroom: L.divIcon({
+        html: '<div style="background:#e53e3e;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
+        className: '',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+      }),
+      station: L.divIcon({
+        html: renderToStaticMarkup(<TrainFront width={16} height={16} stroke="#0066ff" />),
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      }),
+      port: L.divIcon({
+        html: renderToStaticMarkup(<Ship width={16} height={16} stroke="#333" />),
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      }),
+      airport: L.divIcon({
+        html: renderToStaticMarkup(<Plane width={16} height={16} stroke="#0a0" />),
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      }),
+    }),
+    []
+  )
 
-  const stationIcon = L.divIcon({
-    html: renderToStaticMarkup(<TrainFront width={20} height={20} stroke="#0066ff" />),
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  })
-  const portIcon = L.divIcon({
-    html: renderToStaticMarkup(<Ship width={20} height={20} stroke="#333" />),
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  })
-  const airportIcon = L.divIcon({
-    html: renderToStaticMarkup(<Plane width={20} height={20} stroke="#0a0" />),
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  })
+  const visibleZones = useMemo(() => {
+    if (!mapRef.current || zones.length < 100) return zones
+    try {
+      const b = mapRef.current.getBounds()
+      return zones.filter((z) =>
+        b.contains(L.latLng(z.geometry.coordinates[0], z.geometry.coordinates[1]))
+      )
+    } catch {
+      return zones
+    }
+  }, [zones])
+
+  const visibleParcels = useMemo(() => {
+    if (!mapRef.current || parcels.length < 100) return parcels
+    try {
+      const b = mapRef.current.getBounds()
+      return parcels.filter((p) =>
+        b.contains(L.latLng(p.geometry.coordinates[0], p.geometry.coordinates[1]))
+      )
+    } catch {
+      return parcels
+    }
+  }, [parcels])
 
   const applyOverpassData = useCallback(
     (geojson: FeatureCollection) => {
@@ -146,21 +222,14 @@ export default function MapView() {
     []
   )
 
-  const fetchOverpassData = useCallback(async (bbox: string) => {
-    const cached = overpassCache.current.get(bbox)
-    const now = Date.now()
-    if (cached && now - cached.ts < 600_000) {
-      applyOverpassData(cached.data)
-      return
-    }
-
-    const query = `[out:json][timeout:25];(
-      way["highway"~"motorway|trunk"](${bbox});
-      node["railway"="station"](${bbox});
-      node["public_transport"="station"](${bbox});
-      node["harbour"](${bbox});
-      node["aeroway"="aerodrome"](${bbox});
-    );out geom;`
+  const fetchOverpassData = useCallback(async (bbox: string, zoom: number) => {
+    const elements =
+      zoom > 10
+        ? 'way["highway"~"motorway|trunk"];' +
+          'node["railway"="station"];node["public_transport"="station"];' +
+          'node["harbour"];node["aeroway"="aerodrome"];'
+        : 'way["highway"="motorway"];node["aeroway"="aerodrome"];'
+    const query = `[out:json][timeout:25];(${elements})(${bbox});out geom;`
     try {
       const res = await fetch(
         'https://overpass-api.de/api/interpreter?data=' +
@@ -172,27 +241,31 @@ export default function MapView() {
       }
       const osm = await res.json()
       const geojson = osmtogeojson(osm) as FeatureCollection
-      overpassCache.current.set(bbox, { data: geojson, ts: now })
+      overpassCache.set(bbox, zoom, geojson)
       applyOverpassData(geojson)
     } catch (err) {
       console.error('Overpass fetch failed', err)
     }
   }, [])
 
-  const loadOverpassData = useCallback(() => {
-    if (!mapRef.current || !glMapRef.current || !glLoaded.current) return
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-    debounceRef.current = window.setTimeout(() => {
-      if (!mapRef.current) return
+  const loadOverpassData = useCallback(
+    debounce(() => {
+      if (!mapRef.current || !glMapRef.current || !glLoaded.current) return
+      const zoom = mapRef.current.getZoom()
+      if (zoom < 8) return
       const b = mapRef.current.getBounds()
       const bbox = `${b.getSouth().toFixed(2)},${b.getWest().toFixed(2)},${b.getNorth().toFixed(2)},${b.getEast().toFixed(2)}`
       if (bbox === lastBbox.current) return
       lastBbox.current = bbox
-      fetchOverpassData(bbox)
-    }, 1000)
-  }, [fetchOverpassData])
+      const cached = overpassCache.get(bbox, zoom)
+      if (cached) {
+        applyOverpassData(cached)
+        return
+      }
+      fetchOverpassData(bbox, zoom)
+    }, 1000),
+    [fetchOverpassData, applyOverpassData]
+  )
 
   useEffect(() => {
     fetchApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
@@ -267,17 +340,22 @@ export default function MapView() {
       <MapContainer
         center={[31.7, -6.5]}
         zoom={6}
+        preferCanvas={true}
         style={{ height: 600, width: '100%' }}
         whenCreated={(m) => {
           mapRef.current = m
         }}
       >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {/* Cluster pour zones industrielles */}
       <MarkerClusterGroup
+        maxClusterRadius={60}
+        disableClusteringAtZoom={14}
+        spiderfyOnMaxZoom={false}
         showCoverageOnHover={false}
         chunkedLoading
       >
-        {zones.map(z => (
+        {visibleZones.map(z => (
           <Marker
             key={z.properties.id}
             position={z.geometry.coordinates}
@@ -315,11 +393,19 @@ export default function MapView() {
             </Popup>
           </Marker>
         ))}
-        {parcels.map(p => (
+      </MarkerClusterGroup>
+      {/* Cluster séparé pour parcelles */}
+      <MarkerClusterGroup
+        maxClusterRadius={30}
+        disableClusteringAtZoom={16}
+        showCoverageOnHover={false}
+        chunkedLoading
+      >
+        {visibleParcels.map(p => (
           <Marker
             key={p.properties.id}
             position={p.geometry.coordinates}
-            icon={p.properties.isShowroom ? showroomIcon : parcelIcon}
+            icon={p.properties.isShowroom ? ICONS.showroom : ICONS.parcel}
           >
             <Popup>
               <div className="space-y-1 text-sm">
@@ -334,14 +420,21 @@ export default function MapView() {
             </Popup>
           </Marker>
         ))}
-        {pois.map((poi) => (
-          <Marker
-            key={poi.id}
-            position={poi.coordinates}
-            icon={poi.type === 'station' ? stationIcon : poi.type === 'port' ? portIcon : airportIcon}
-          />
-        ))}
       </MarkerClusterGroup>
+      {/* Points d'intérêt sans clustering */}
+      {pois.map((poi) => (
+        <Marker
+          key={poi.id}
+          position={poi.coordinates}
+          icon={
+            poi.type === 'station'
+              ? ICONS.station
+              : poi.type === 'port'
+              ? ICONS.port
+              : ICONS.airport
+          }
+        />
+      ))}
       </MapContainer>
       <div className="absolute bottom-2 right-2 bg-white/80 p-2 text-xs rounded shadow space-y-1 z-10">
         <div>
