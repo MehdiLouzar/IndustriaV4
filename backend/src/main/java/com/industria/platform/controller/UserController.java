@@ -4,6 +4,7 @@ import com.industria.platform.dto.UserDto;
 import com.industria.platform.entity.User;
 import com.industria.platform.entity.UserRole;
 import com.industria.platform.repository.UserRepository;
+import com.industria.platform.repository.ZoneRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -13,8 +14,12 @@ import java.util.List;
 @RequestMapping("/api/users")
 public class UserController {
     private final UserRepository repo;
+    private final ZoneRepository zoneRepo;
 
-    public UserController(UserRepository repo) {this.repo = repo;}
+    public UserController(UserRepository repo, ZoneRepository zoneRepo) {
+        this.repo = repo;
+        this.zoneRepo = zoneRepo;
+    }
 
     @GetMapping
     public List<UserDto> all() {
@@ -47,6 +52,12 @@ public class UserController {
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) { repo.deleteById(id); }
 
+    @GetMapping("/{id}/zones/count")
+    public CountResponse zoneCount(@PathVariable String id) {
+        int cnt = zoneRepo.countByCreatedById(id);
+        return new CountResponse(cnt);
+    }
+
     private void updateEntity(User u, UserDto dto) {
         u.setEmail(dto.email());
         u.setName(dto.name());
@@ -61,4 +72,6 @@ public class UserController {
                 u.getRole() == null ? null : u.getRole().name(),
                 u.getCompany(), u.getPhone(), u.getDeletedAt() == null);
     }
+
+    public record CountResponse(int count) {}
 }

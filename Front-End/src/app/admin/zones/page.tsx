@@ -390,7 +390,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -403,7 +403,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneTypeId">Type</Label>
-              <Select value={form.zoneTypeId} onValueChange={handleZoneType}>
+              <Select value={form.zoneTypeId || undefined} onValueChange={handleZoneType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -416,7 +416,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="regionId">Région</Label>
-              <Select value={form.regionId} onValueChange={handleRegion}>
+              <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>

@@ -302,7 +302,7 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneId">Zone</Label>
-              <Select value={form.zoneId} onValueChange={handleZone}>
+              <Select value={form.zoneId || undefined} onValueChange={handleZone}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -315,7 +315,7 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>

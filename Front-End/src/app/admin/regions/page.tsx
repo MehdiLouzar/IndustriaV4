@@ -151,7 +151,7 @@ export default function RegionsAdmin() {
             </div>
             <div>
               <Label htmlFor="countryId">Pays</Label>
-              <Select value={form.countryId} onValueChange={handleCountry}>
+              <Select value={form.countryId || undefined} onValueChange={handleCountry}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>

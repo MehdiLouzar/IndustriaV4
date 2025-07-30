@@ -228,7 +228,7 @@ export default function AppointmentsAdmin() {
             </div>
             <div>
               <Label htmlFor="parcelId">Parcelle</Label>
-              <Select value={form.parcelId} onValueChange={handleParcel}>
+              <Select value={form.parcelId || undefined} onValueChange={handleParcel}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -241,7 +241,7 @@ export default function AppointmentsAdmin() {
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>

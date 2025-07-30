@@ -25,6 +25,7 @@ interface User {
   company?: string
   phone?: string
   isActive?: boolean
+  zoneCount?: number
 }
 
 const roles = ['ADMIN', 'MANAGER', 'USER']
@@ -50,7 +51,13 @@ export default function UsersAdmin() {
   async function load() {
     const users = await fetchApi<User[]>('/api/users')
     if (users) {
-      setItems(users)
+      const withCounts = await Promise.all(
+        users.map(async (u) => {
+          const c = await fetchApi<{ count: number }>(`/api/users/${u.id}/zones/count`)
+          return { ...u, zoneCount: c ? c.count : 0 }
+        })
+      )
+      setItems(withCounts)
       setCurrentPage(1)
     }
   }
@@ -144,6 +151,7 @@ export default function UsersAdmin() {
                 <th className="p-2">Email</th>
                 <th className="p-2">Rôle</th>
                 <th className="p-2">Société</th>
+                <th className="p-2">Zones</th>
                 <th className="p-2 w-32"></th>
               </tr>
             </thead>
@@ -155,6 +163,7 @@ export default function UsersAdmin() {
                   <td className="p-2 align-top">{u.email}</td>
                   <td className="p-2 align-top">{u.role}</td>
                   <td className="p-2 align-top">{u.company}</td>
+                  <td className="p-2 align-top">{u.zoneCount ?? 0}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(u)}>Éditer</Button>
                     <Button size="sm" variant="destructive" onClick={() => del(u.id)}>
@@ -199,7 +208,7 @@ export default function UsersAdmin() {
             </div>
             <div>
               <Label htmlFor="role">Rôle</Label>
-              <Select value={form.role} onValueChange={handleRole}>
+              <Select value={form.role || undefined} onValueChange={handleRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
