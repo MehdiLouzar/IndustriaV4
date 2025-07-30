@@ -46,8 +46,9 @@ The front-end is built with `NEXT_PUBLIC_API_URL=http://localhost:8080` so your 
 
 ### Sample data
 
-After starting the backend once so Hibernate can create the schema, you can
-load the sample dataset with the helper script:
+Run the backend at least once so Hibernate can create the schema, then load the
+sample dataset with the helper script. If the tables are missing, the script
+prints a reminder to start the backend first:
 ```bash
 ./scripts/init_db.sh
 ```
@@ -57,9 +58,11 @@ scripts\init_db.bat
 ```
 The script runs `psql` inside the PostgreSQL container started by Docker Compose.
 It checks whether any users already exist and only runs `backend/db/init/initDB.sql`
-when needed. By default it connects to the service named `db`. You can override the
-container name and credentials with the environment variables `DB_CONTAINER`,
-`DB_NAME`, `DB_USER` and `DB_PASSWORD`.
+when needed. By default it connects to the service named `db`. If your compose
+file uses another name such as `postgres`, set `DB_CONTAINER` accordingly.
+The script checks that the service is running and prints a helpful message if
+it is not. You can override the container name and credentials with the
+environment variables `DB_CONTAINER`, `DB_NAME`, `DB_USER` and `DB_PASSWORD`.
 The backend validates JWT tokens issued by Keycloak. A Keycloak container is
 included in `docker-compose.yml` and exposes the realm `industria` on
 `http://localhost:8081`. Default admin credentials are `admin/admin`.

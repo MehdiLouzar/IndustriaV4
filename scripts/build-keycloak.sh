@@ -19,7 +19,7 @@ fi
 
 # Nettoyer les containers existants
 echo "🧹 Nettoyage des containers existants..."
-docker-compose -p $PROJECT_NAME down -v 2>/dev/null || true
+docker compose -p $PROJECT_NAME down -v 2>/dev/null || true
 
 # Builder l'image
 echo "🔨 Construction de l'image Keycloak..."
@@ -28,7 +28,7 @@ docker build -t keycloak-industria:latest .
 if [ "$ENVIRONMENT" = "prod" ]; then
     echo "🏭 Configuration pour PRODUCTION"
     
-    # Utiliser le docker-compose de production
+    # Utiliser Docker compose en production
     export KC_DB=postgres
     export KC_HOSTNAME_STRICT=true
     export KC_HTTP_ENABLED=false
@@ -57,7 +57,7 @@ fi
 
 # Lancer les services
 echo "🚀 Lancement des services..."
-docker-compose -p $PROJECT_NAME up -d
+docker compose -p $PROJECT_NAME up -d
 
 # Attendre que Keycloak soit prêt
 echo "⏳ Attente du démarrage de Keycloak..."
@@ -77,7 +77,7 @@ done
 
 if [ $count -ge $timeout ]; then
     echo "❌ Timeout: Keycloak n'a pas démarré dans les temps"
-    docker-compose -p $PROJECT_NAME logs keycloak
+    docker compose -p $PROJECT_NAME logs keycloak
     exit 1
 fi
 
@@ -108,7 +108,7 @@ if [ "$ENVIRONMENT" = "dev" ]; then
 fi
 
 echo "📊 Pour voir les logs:"
-echo "   docker-compose -p $PROJECT_NAME logs -f"
+echo "   docker compose -p $PROJECT_NAME logs -f"
 echo ""
 echo "🛑 Pour arrêter:"
-echo "   docker-compose -p $PROJECT_NAME down"
+echo "   docker compose -p $PROJECT_NAME down"
