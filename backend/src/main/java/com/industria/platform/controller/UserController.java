@@ -23,12 +23,16 @@ public class UserController {
 
     @GetMapping
     public List<UserDto> all() {
-        return repo.findAll().stream().map(this::toDto).toList();
+        return repo.findAll().stream()
+                .map(u -> toDto(u, zoneRepo.countByCreatedById(u.getId())))
+                .toList();
     }
 
     @GetMapping("/{id}")
     public UserDto get(@PathVariable String id) {
-        return repo.findById(id).map(this::toDto).orElse(null);
+        return repo.findById(id)
+                .map(u -> toDto(u, zoneRepo.countByCreatedById(id)))
+                .orElse(null);
     }
 
     @PostMapping
@@ -37,7 +41,7 @@ public class UserController {
         updateEntity(u, dto);
         u.setCreatedAt(LocalDateTime.now());
         repo.save(u);
-        return toDto(u);
+        return toDto(u, zoneRepo.countByCreatedById(u.getId()));
     }
 
     @PutMapping("/{id}")
@@ -46,7 +50,7 @@ public class UserController {
         updateEntity(u, dto);
         u.setUpdatedAt(LocalDateTime.now());
         repo.save(u);
-        return toDto(u);
+        return toDto(u, zoneRepo.countByCreatedById(u.getId()));
     }
 
     @DeleteMapping("/{id}")
@@ -67,10 +71,11 @@ public class UserController {
             u.setRole(UserRole.valueOf(dto.role()));
     }
 
-    private UserDto toDto(User u) {
+    private UserDto toDto(User u, int zoneCount) {
         return new UserDto(u.getId(), u.getEmail(), u.getName(),
                 u.getRole() == null ? null : u.getRole().name(),
-                u.getCompany(), u.getPhone(), u.getDeletedAt() == null);
+                u.getCompany(), u.getPhone(), u.getDeletedAt() == null,
+                zoneCount);
     }
 
     public record CountResponse(int count) {}

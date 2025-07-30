@@ -12,11 +12,18 @@ export function getBaseUrl() {
   return process.env.NEXT_PUBLIC_API_URL || '';
 }
 
+const fetchCache = new Map<string, unknown>();
+
 export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
     const url = new URL(path, getBaseUrl())
     const headers = new Headers(init?.headers)
     const method = init?.method?.toUpperCase() || 'GET'
+
+    const cacheKey = `${method}:${url}`
+    if (method === 'GET' && fetchCache.has(cacheKey)) {
+      return fetchCache.get(cacheKey) as T
+    }
 
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token')
@@ -34,7 +41,11 @@ export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T |
       }
       return null
     }
-    return await res.json()
+    const data = await res.json()
+    if (method === 'GET') {
+      fetchCache.set(cacheKey, data)
+    }
+    return data
   } catch (err) {
     console.error(err)
     return null

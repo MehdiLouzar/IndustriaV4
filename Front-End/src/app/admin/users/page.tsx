@@ -51,13 +51,7 @@ export default function UsersAdmin() {
   async function load() {
     const users = await fetchApi<User[]>('/api/users')
     if (users) {
-      const withCounts = await Promise.all(
-        users.map(async (u) => {
-          const c = await fetchApi<{ count: number }>(`/api/users/${u.id}/zones/count`)
-          return { ...u, zoneCount: c ? c.count : 0 }
-        })
-      )
-      setItems(withCounts)
+      setItems(users)
       setCurrentPage(1)
     }
   }
