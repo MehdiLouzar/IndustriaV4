@@ -13,23 +13,35 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.config.http.SessionCreationPolicy;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    // 1) Chaîne publique : seuls les GET sur /api/** sont autorisés
     @Bean
     @Order(1)
     public SecurityFilterChain publicApi(HttpSecurity http) throws Exception {
         http
-            .securityMatcher(HttpMethod.GET, "/api/**")
+            // ← on ne passe QUE le pattern d’URL ici
+            .securityMatcher("/api/**")    
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .authorizeHttpRequests(auth -> auth
+                // on autorise seulement les GET
+                .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+                // on refuse toute autre méthode (POST, PUT…) sur /api/**
+                .anyRequest().denyAll()
+            )
+            .sessionManagement(sess -> 
+                sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            );
         return http.build();
     }
 
+    // 2) Chaîne JWT : toutes les autres requêtes sur /api/** doivent être authentifiées
     @Bean
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
@@ -37,11 +49,15 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                // si vous avez d’autres endpoints publics, spécifiez-les ici
                 .requestMatchers("/api/public/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+            )
+            .sessionManagement(sess -> 
+                sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
         return http.build();
     }
