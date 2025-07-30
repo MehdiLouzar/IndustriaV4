@@ -35,15 +35,17 @@ export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T |
 
     const res = await fetch(url.toString(), { ...init, headers })
     if (!res.ok) {
-      // Drop invalid tokens on unauthorized responses
-      if (res.status === 401 && typeof window !== 'undefined') {
-        localStorage.removeItem('token')
-      }
-      return null
+        // Drop invalid tokens on unauthorized responses
+        if (res.status === 401 && typeof window !== 'undefined') {
+            localStorage.removeItem('token')
+        }
+        return null
     }
     const data = await res.json()
     if (method === 'GET') {
       fetchCache.set(cacheKey, data)
+    } else {
+      fetchCache.clear()
     }
     return data
   } catch (err) {
