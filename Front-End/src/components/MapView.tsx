@@ -25,10 +25,12 @@ import { TrainFront, Ship, Plane } from 'lucide-react'
 // Simple debounce utility to avoid excessive API calls
 function debounce<Args extends unknown[]>(func: (...args: Args) => void, delay: number) {
   let timer: NodeJS.Timeout
-  return (...args: Args) => {
+  const debounced = (...args: Args) => {
     clearTimeout(timer)
     timer = setTimeout(() => func(...args), delay)
   }
+  debounced.cancel = () => clearTimeout(timer)
+  return debounced
 }
 
 // Small cache for Overpass results to reduce network usage
@@ -114,14 +116,16 @@ export default function MapView() {
   const glMapRef = useRef<maplibregl.Map | null>(null)
   const glLoaded = useRef(false)
   const lastBbox = useRef('')
+  const overpassAbort = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!mapRef.current) return
-    // when dynamically loaded, Leaflet may calculate size before the element is
-    // visible; invalidateSize fixes overflow issues
-    setTimeout(() => {
+    const t = setTimeout(() => {
       mapRef.current?.invalidateSize()
     }, 100)
+    return () => {
+      clearTimeout(t)
+    }
   }, [])
 
   const ICONS = useMemo(
@@ -223,6 +227,9 @@ export default function MapView() {
   )
 
   const fetchOverpassData = useCallback(async (bbox: string, zoom: number) => {
+    overpassAbort.current?.abort()
+    const ctrl = new AbortController()
+    overpassAbort.current = ctrl
     const elements =
       zoom > 10
         ? 'way["highway"~"motorway|trunk"];' +
@@ -232,21 +239,26 @@ export default function MapView() {
     const query = `[out:json][timeout:25];(${elements})(${bbox});out geom;`
     try {
       const res = await fetch(
-        'https://overpass-api.de/api/interpreter?data=' +
-          encodeURIComponent(query)
+        'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query),
+        { signal: ctrl.signal }
       )
       if (!res.ok) {
         console.error('Overpass HTTP error', res.status, res.statusText)
         return
       }
       const osm = await res.json()
+      if (ctrl.signal.aborted) return
       const geojson = osmtogeojson(osm) as FeatureCollection
       overpassCache.set(bbox, zoom, geojson)
       applyOverpassData(geojson)
     } catch (err) {
-      console.error('Overpass fetch failed', err)
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error('Overpass fetch failed', err)
+      }
+    } finally {
+      if (overpassAbort.current === ctrl) overpassAbort.current = null
     }
-  }, [])
+  }, [applyOverpassData])
 
   const loadOverpassData = useCallback(
     debounce(() => {
@@ -265,7 +277,7 @@ export default function MapView() {
       fetchOverpassData(bbox, zoom)
     }, 1000),
     [fetchOverpassData, applyOverpassData]
-  )
+  ) as ReturnType<typeof debounce>
 
   useEffect(() => {
     fetchApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
@@ -304,6 +316,11 @@ export default function MapView() {
 
   useEffect(() => {
     if (!mapRef.current) return
+    const abortController = new AbortController()
+    const mapInstance = mapRef.current
+    let loadTimeout: NodeJS.Timeout | null = null
+    let isDestroyed = false
+
     const LMaplibre = L as unknown as typeof L & {
       maplibreGL: (opts: { style: string; interactive: boolean }) => {
         addTo(map: L.Map): { getMaplibreMap(): maplibregl.Map; remove(): void }
@@ -311,26 +328,66 @@ export default function MapView() {
     }
     const layer = LMaplibre
       .maplibreGL({ style: 'https://demotiles.maplibre.org/style.json', interactive: false })
-      .addTo(mapRef.current)
+      .addTo(mapInstance)
     glLayerRef.current = layer
     const mlMap = layer.getMaplibreMap() as maplibregl.Map
     glMapRef.current = mlMap
 
     const handleLoad = () => {
+      if (isDestroyed) return
       glLoaded.current = true
-      setTimeout(() => {
-        loadOverpassData()
-        mapRef.current?.on('moveend', loadOverpassData)
-      }, 300)
+      loadTimeout = setTimeout(() => {
+        if (!isDestroyed && !abortController.signal.aborted) {
+          loadOverpassData()
+          mapInstance?.on('moveend', loadOverpassData)
+        }
+      }, 500)
     }
 
     mlMap.on('load', handleLoad)
 
     return () => {
-      mapRef.current?.off('moveend', loadOverpassData)
-      mlMap.off('load', handleLoad)
-      glMapRef.current = null
-      glLayerRef.current?.remove()
+      console.log('🧹 MapView cleanup START')
+      isDestroyed = true
+      abortController.abort()
+      overpassAbort.current?.abort()
+      overpassAbort.current = null
+      if (loadTimeout) {
+        clearTimeout(loadTimeout)
+        loadTimeout = null
+      }
+      loadOverpassData.cancel()
+      try {
+        mapInstance?.off('moveend', loadOverpassData)
+        mlMap.off('load', handleLoad)
+      } catch (e: unknown) {
+        console.warn('Listener cleanup error:', e)
+      }
+      if (glMapRef.current) {
+        try {
+          glMapRef.current.remove()
+        } catch (e: unknown) {
+          console.warn('MapLibre destruction error:', e)
+        }
+        glMapRef.current = null
+      }
+      if (glLayerRef.current) {
+        try {
+          glLayerRef.current.remove()
+        } catch (e: unknown) {
+          console.warn('Layer destruction error:', e)
+        }
+        glLayerRef.current = null
+      }
+      glLoaded.current = false
+      if (typeof window !== 'undefined' && 'gc' in window) {
+        try {
+          ;((window as unknown) as { gc?: () => void }).gc?.()
+        } catch {
+          /* noop */
+        }
+      }
+      console.log('✅ MapView cleanup COMPLETE')
     }
   }, [loadOverpassData])
 

@@ -39,9 +39,10 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   useEffect(() => {
     if (!mapRef.current) return;
     // Ensure Leaflet calculates dimensions correctly when the component mounts
-    setTimeout(() => {
+    const t = setTimeout(() => {
       mapRef.current?.invalidateSize();
     }, 100);
+    return () => clearTimeout(t);
   }, []);
 
   // Use parameters matching EPSG:26191 so parcels align with database values
