@@ -33,6 +33,7 @@ function parseJwt(token: string) {
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<User & { password?: string }>({
     id: '',
     email: '',
@@ -56,6 +57,7 @@ export default function ProfilePage() {
         setUser(u)
         setForm({ id: u.id, email: u.email, name: u.name || '', company: u.company || '', phone: u.phone || '', role: u.role })
       }
+      setLoading(false)
     })
   }, [])
 
@@ -70,8 +72,16 @@ export default function ProfilePage() {
     router.push('/')
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">Chargement...</div>
+    )
+  }
+
   if (!user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">Impossible de charger le profil</div>
+    )
   }
 
   return (

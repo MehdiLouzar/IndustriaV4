@@ -22,7 +22,15 @@ import Link from 'next/link';
 async function getAdminStats() {
   const data = await fetchApi('/api/admin/stats');
   if (!data) {
-    throw new Error('Unable to load admin stats');
+    return {
+      totalUsers: 0,
+      totalZones: 0,
+      availableParcels: 0,
+      totalParcels: 0,
+      pendingAppointments: 0,
+      totalAppointments: 0,
+      recentActivities: []
+    };
   }
   return data;
 }
