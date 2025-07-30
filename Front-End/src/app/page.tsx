@@ -1,20 +1,35 @@
 "use client";
 import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
-import dynamicLib from 'next/dynamic';
-import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { fetchApi } from '@/lib/utils';
-import ZoneGrid from '@/components/ZoneGrid';
-import { Suspense } from 'react';
-import Footer from '@/components/Footer';
+import dynamicLib from 'next/dynamic'
+import React from 'react'
+import { useTranslation } from 'react-i18next'
+import { fetchApi } from '@/lib/utils'
+import { Suspense } from 'react'
+import Footer from '@/components/Footer'
 
-export const dynamic = 'force-dynamic';
-
+// Heavy components loaded lazily
 const MapViewLazy = dynamicLib(() => import('@/components/MapView'), {
   ssr: false,
-  loading: () => <p>Chargement de la carte...</p>,
-});
+  loading: () => (
+    <div className="h-[600px] bg-gradient-to-r from-gray-100 to-gray-200 animate-pulse rounded-lg flex items-center justify-center">
+      <div className="text-gray-500">Chargement de la carte interactive...</div>
+    </div>
+  ),
+})
+
+const ZoneGridLazy = dynamicLib(() => import('@/components/ZoneGrid'), {
+  ssr: false,
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-64 bg-gray-100 animate-pulse rounded" />
+      ))}
+    </div>
+  ),
+})
+
+export const dynamic = 'force-dynamic';
 
 function LazyMapView() {
   const ref = React.useRef<HTMLDivElement | null>(null)
@@ -26,7 +41,7 @@ function LazyMapView() {
         setShow(true)
         obs.disconnect()
       }
-    }, { rootMargin: '200px' })
+    }, { rootMargin: '100px' })
     if (ref.current) obs.observe(ref.current)
     return () => obs.disconnect()
   }, [])
@@ -35,15 +50,26 @@ function LazyMapView() {
 }
 
 export default function Home() {
-  const { t, i18n } = useTranslation();
-  const [welcome, setWelcome] = React.useState('');
+  const { t, i18n } = useTranslation()
+  const [welcome, setWelcome] = React.useState(t('welcome'))
+
   React.useEffect(() => {
+    const cacheKey = `greeting-${i18n.language}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) {
+      setWelcome(cached)
+      return
+    }
+
     fetchApi<{ message: string }>("/api/public/greeting", {
-      headers: { 'Accept-Language': i18n.language }
+      headers: { 'Accept-Language': i18n.language },
     }).then((d) => {
-      if (d?.message) setWelcome(d.message);
-    });
-  }, [i18n.language]);
+      if (d?.message) {
+        setWelcome(d.message)
+        sessionStorage.setItem(cacheKey, d.message)
+      }
+    })
+  }, [i18n.language, t])
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
@@ -86,7 +112,7 @@ export default function Home() {
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
           <Suspense fallback={<div>Chargement...</div>}>
-            <ZoneGrid />
+            <ZoneGridLazy />
           </Suspense>
         </div>
       </section>

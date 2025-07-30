@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,21 +33,27 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
 
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
   const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
-  const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
-  const priceRanges = [
-    { label: 'Tout prix', min: undefined, max: undefined },
-    { label: 'Moins de 500 DH/m²', min: undefined, max: 500 },
-    { label: '500 - 1000 DH/m²', min: 500, max: 1000 },
-    { label: '1000 - 3000 DH/m²', min: 1000, max: 3000 },
-    { label: 'Plus de 3000 DH/m²', min: 3000, max: undefined },
-  ]
-  const areaRanges = [
-    { label: 'Toute superficie', min: undefined, max: undefined },
-    { label: 'Moins de 10 000 m²', min: undefined, max: 10000 },
-    { label: '10 000 - 50 000 m²', min: 10000, max: 50000 },
-    { label: '50 000 - 100 000 m²', min: 50000, max: 100000 },
-    { label: 'Plus de 100 000 m²', min: 100000, max: undefined },
-  ]
+  const statuses = useMemo(() => ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM'], [])
+  const priceRanges = useMemo(
+    () => [
+      { label: 'Tout prix', min: undefined, max: undefined },
+      { label: 'Moins de 500 DH/m²', min: undefined, max: 500 },
+      { label: '500 - 1000 DH/m²', min: 500, max: 1000 },
+      { label: '1000 - 3000 DH/m²', min: 1000, max: 3000 },
+      { label: 'Plus de 3000 DH/m²', min: 3000, max: undefined },
+    ],
+    []
+  )
+  const areaRanges = useMemo(
+    () => [
+      { label: 'Toute superficie', min: undefined, max: undefined },
+      { label: 'Moins de 10 000 m²', min: undefined, max: 10000 },
+      { label: '10 000 - 50 000 m²', min: 10000, max: 50000 },
+      { label: '50 000 - 100 000 m²', min: 50000, max: 100000 },
+      { label: 'Plus de 100 000 m²', min: 100000, max: undefined },
+    ],
+    []
+  )
 
   useEffect(() => {
     async function load() {

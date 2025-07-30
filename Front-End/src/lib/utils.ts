@@ -12,7 +12,45 @@ export function getBaseUrl() {
   return process.env.NEXT_PUBLIC_API_URL || '';
 }
 
-const fetchCache = new Map<string, unknown>();
+// Simple in-memory cache with TTL and max size to avoid leaks
+class ApiCache {
+  private cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>()
+  private readonly maxSize = 50
+
+  set(key: string, data: unknown, ttl: number) {
+    if (this.cache.size >= this.maxSize) {
+      const oldest = this.cache.keys().next().value
+      this.cache.delete(oldest)
+    }
+    this.cache.set(key, { data, timestamp: Date.now(), ttl })
+  }
+
+  get(key: string) {
+    const item = this.cache.get(key)
+    if (!item) return null
+    if (Date.now() - item.timestamp > item.ttl) {
+      this.cache.delete(key)
+      return null
+    }
+    return item.data
+  }
+
+  cleanup() {
+    const now = Date.now()
+    for (const [k, v] of this.cache.entries()) {
+      if (now - v.timestamp > v.ttl) {
+        this.cache.delete(k)
+      }
+    }
+  }
+}
+
+const apiCache = new ApiCache()
+
+if (typeof window !== 'undefined') {
+  // periodic cleanup every 5min
+  setInterval(() => apiCache.cleanup(), 300_000)
+}
 
 export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
@@ -21,8 +59,9 @@ export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T |
     const method = init?.method?.toUpperCase() || 'GET'
 
     const cacheKey = `${method}:${url}`
-    if (method === 'GET' && fetchCache.has(cacheKey)) {
-      return fetchCache.get(cacheKey) as T
+    const cached = method === 'GET' ? apiCache.get(cacheKey) : null
+    if (cached) {
+      return cached as T
     }
 
     if (typeof window !== 'undefined') {
@@ -43,9 +82,12 @@ export async function fetchApi<T>(path: string, init?: RequestInit): Promise<T |
     }
     const data = await res.json()
     if (method === 'GET') {
-      fetchCache.set(cacheKey, data)
+      // zones endpoint has longer TTL
+      const ttl = url.pathname.includes('/zones') ? 600_000 : 300_000
+      apiCache.set(cacheKey, data, ttl)
     } else {
-      fetchCache.clear()
+      // mutation invalidates cache
+      apiCache.cleanup()
     }
     return data
   } catch (err) {

@@ -69,6 +69,7 @@ export default function MapView() {
   const glLoaded = useRef(false)
   const lastBbox = useRef('')
   const debounceRef = useRef<number>()
+  const overpassCache = useRef<Map<string, { data: FeatureCollection; ts: number }>>(new Map())
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -107,7 +108,52 @@ export default function MapView() {
     iconAnchor: [10, 10],
   })
 
+  const applyOverpassData = useCallback(
+    (geojson: FeatureCollection) => {
+      const newPois: Poi[] = []
+      for (const f of geojson.features) {
+        if (f.geometry.type === 'Point') {
+          const [lon, lat] = f.geometry.coordinates as [number, number]
+          const props = f.properties as Record<string, unknown>
+          if (props.railway === 'station' || props.public_transport === 'station') {
+            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'station' })
+          } else if (props.harbour != null) {
+            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'port' })
+          } else if (props.aeroway === 'aerodrome') {
+            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'airport' })
+          }
+        }
+      }
+      setPois(newPois)
+
+      if (glMapRef.current?.getSource('overpass')) {
+        ;(glMapRef.current.getSource('overpass') as maplibregl.GeoJSONSource).setData(geojson)
+      } else if (glMapRef.current) {
+        glMapRef.current.addSource('overpass', { type: 'geojson', data: geojson })
+        glMapRef.current.addLayer({
+          id: 'highways',
+          type: 'line',
+          source: 'overpass',
+          filter: ['match', ['get', 'highway'], ['motorway', 'trunk'], true, false],
+          minzoom: 0,
+          paint: {
+            'line-color': '#0000ff',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2, 8, 4, 12, 8, 16, 10],
+          },
+        })
+      }
+    },
+    []
+  )
+
   const fetchOverpassData = useCallback(async (bbox: string) => {
+    const cached = overpassCache.current.get(bbox)
+    const now = Date.now()
+    if (cached && now - cached.ts < 600_000) {
+      applyOverpassData(cached.data)
+      return
+    }
+
     const query = `[out:json][timeout:25];(
       way["highway"~"motorway|trunk"](${bbox});
       node["railway"="station"](${bbox});
@@ -126,40 +172,8 @@ export default function MapView() {
       }
       const osm = await res.json()
       const geojson = osmtogeojson(osm) as FeatureCollection
-      console.log('Overpass features', geojson.features.length)
-
-      const newPois: Poi[] = []
-      for (const f of geojson.features) {
-        if (f.geometry.type === 'Point') {
-          const [lon, lat] = f.geometry.coordinates as [number, number]
-          const props = f.properties as Record<string, unknown>
-          if (props.railway === 'station' || props.public_transport === 'station') {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'station' })
-          } else if (props.harbour != null) {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'port' })
-          } else if (props.aeroway === 'aerodrome') {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'airport' })
-          }
-        }
-      }
-      setPois(newPois)
-
-      if (glMapRef.current.getSource('overpass')) {
-        ;(glMapRef.current.getSource('overpass') as maplibregl.GeoJSONSource).setData(geojson)
-      } else {
-        glMapRef.current.addSource('overpass', { type: 'geojson', data: geojson })
-        glMapRef.current.addLayer({
-          id: 'highways',
-          type: 'line',
-          source: 'overpass',
-          filter: ['match', ['get', 'highway'], ['motorway', 'trunk'], true, false],
-          minzoom: 0,
-          paint: {
-            'line-color': '#0000ff',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2, 8, 4, 12, 8, 16, 10],
-          },
-        })
-      }
+      overpassCache.current.set(bbox, { data: geojson, ts: now })
+      applyOverpassData(geojson)
     } catch (err) {
       console.error('Overpass fetch failed', err)
     }
@@ -177,7 +191,7 @@ export default function MapView() {
       if (bbox === lastBbox.current) return
       lastBbox.current = bbox
       fetchOverpassData(bbox)
-    }, 300)
+    }, 1000)
   }, [fetchOverpassData])
 
   useEffect(() => {

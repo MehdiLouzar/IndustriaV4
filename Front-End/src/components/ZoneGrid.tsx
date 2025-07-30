@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -122,9 +123,11 @@ export default function ZoneGrid() {
         {displayedZones.map((zone) => (
           <Card key={zone.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
             <div className="relative">
-              <img
+              <Image
                 src={zone.image}
                 alt={zone.name}
+                width={400}
+                height={192}
                 className="w-full h-48 object-cover"
               />
               <div className="absolute top-3 left-3">
