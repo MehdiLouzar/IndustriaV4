@@ -1,0 +1,9 @@
+# Étape 1 : builder pour curl
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS builder
+RUN microdnf install -y curl && microdnf clean all
+
+# Étape 2 : image Keycloak officielle
+FROM quay.io/keycloak/keycloak:23.0.7
+USER root
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+USER 1000

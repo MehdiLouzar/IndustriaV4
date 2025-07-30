@@ -1,72 +1,231 @@
 {
   "realm": "industria",
+  "id": "industria",
   "enabled": true,
+  "displayName": "Industria Platform",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginTheme": "keycloak",
+  "adminTheme": "keycloak",
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "defaultRoles": ["USER"],
+  "requiredCredentials": ["password"],
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpSupportedApplications": ["FreeOTP", "Google Authenticator"],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "smtpServer": {},
+  "eventsEnabled": false,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [],
+  "adminEventsEnabled": false,
+  "adminEventsDetailsEnabled": false,
+  "internationalizationEnabled": false,
+  "supportedLocales": [],
+  "defaultLocale": "",
   "clients": [
     {
       "clientId": "backend",
+      "name": "Backend Service",
+      "description": "Resource server for the backend API",
+      "enabled": true,
       "bearerOnly": true,
-      "protocol": "openid-connect"
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
     },
     {
       "clientId": "frontend",
+      "name": "Frontend Client",
+      "description": "Public client for the frontend application",
+      "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
-      "redirectUris": ["http://localhost:3000/*"]
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3000/api/auth/callback/keycloak"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ],
   "roles": {
     "realm": [
-      {"name": "USER"},
-      {"name": "ZONE_MANAGER"},
-      {"name": "CONTENT_MANAGER"},
-      {"name": "ADMIN"}
+      { "name": "USER", "description": "Standard user role", "composite": false },
+      { "name": "ZONE_MANAGER", "description": "Zone manager role", "composite": false },
+      { "name": "CONTENT_MANAGER", "description": "Content manager role", "composite": false },
+      { "name": "ADMIN", "description": "Administrator role", "composite": false }
     ]
   },
-  "users": [
+  "users": [],
+  "groups": [],
+  "authenticationFlows": [
     {
-      "username": "admin@zonespro.ma",
-      "email": "admin@zonespro.ma",
-      "enabled": true,
-      "firstName": "Admin",
-      "lastName": "ZonesPro",
-      "credentials": [
+      "alias": "browser",
+      "description": "browser based authentication",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
         {
-          "type": "password",
-          "value": "password123",
-          "temporary": false
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 0,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 1,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 2,
+          "userSetupAllowed": false
         }
-      ],
-      "realmRoles": ["ADMIN"]
+      ]
     },
     {
-      "username": "manager@zonespro.ma",
-      "email": "manager@zonespro.ma",
-      "enabled": true,
-      "firstName": "Manager",
-      "lastName": "ZonesPro",
-      "credentials": [
+      "alias": "registration",
+      "description": "registration flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
         {
-          "type": "password",
-          "value": "password123",
-          "temporary": false
+          "authenticator": "registration-page-form",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "userSetupAllowed": false
         }
-      ],
-      "realmRoles": ["ZONE_MANAGER"]
+      ]
     },
     {
-      "username": "demo@entreprise.ma",
-      "email": "demo@entreprise.ma",
-      "enabled": true,
-      "firstName": "Utilisateur",
-      "lastName": "Demo",
-      "credentials": [
+      "alias": "direct grant",
+      "description": "Direct grant flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
         {
-          "type": "password",
-          "value": "password123",
-          "temporary": false
+          "authenticator": "direct-grant-validate-username",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "direct-grant-validate-password",
+          "requirement": "REQUIRED",
+          "priority": 1,
+          "userSetupAllowed": false
         }
-      ],
-      "realmRoles": ["USER"]
+      ]
+    },
+    {
+      "alias": "reset credentials",
+      "description": "Reset credentials flow",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "reset-credentials-choose-user",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "reset-credential-email",
+          "requirement": "REQUIRED",
+          "priority": 1,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "reset-password",
+          "requirement": "REQUIRED",
+          "priority": 2,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "clients",
+      "description": "Base authentication for clients",
+      "providerId": "client-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "client-secret",
+          "requirement": "ALTERNATIVE",
+          "priority": 0,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "client-jwt",
+          "requirement": "ALTERNATIVE",
+          "priority": 1,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "docker auth",
+      "description": "Used by Docker clients to authenticate against the IDP",
+      "providerId": "client-flow",
+      "topLevel": true,
+      "builtIn": true,
+      "authenticationExecutions": [
+        {
+          "authenticator": "docker-authenticator",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "userSetupAllowed": false
+        }
+      ]
     }
-  ]
+  ],
+  "authenticatorConfig": [],
+  "requiredActions": [],
+  "browserFlow": "browser",
+  "registrationFlow": "registration",
+  "directGrantFlow": "direct grant",
+  "resetCredentialsFlow": "reset credentials",
+  "clientAuthenticationFlow": "clients",
+  "dockerAuthenticationFlow": "docker auth"
 }
