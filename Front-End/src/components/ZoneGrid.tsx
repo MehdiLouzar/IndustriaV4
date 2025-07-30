@@ -30,14 +30,16 @@ export default function ZoneGrid() {
   const searchParams = useSearchParams()
 
   interface ZoneResponse {
-    id: string;
-    name: string;
-    description?: string;
-    totalArea?: number;
-    price?: number;
-    status: string;
-    region?: { name: string };
-    amenities?: string[];
+    id: string
+    name: string
+    description?: string | null
+    address?: string | null
+    totalArea?: number | null
+    price?: number | null
+    status: string
+    regionId?: string | null
+    zoneTypeId?: string | null
+    amenityIds?: string[]
   }
 
   const mapStatus = (status: string): IndustrialZone['status'] => {
@@ -59,20 +61,26 @@ export default function ZoneGrid() {
       searchParams.forEach((v, k) => {
         qs.set(k, v)
       })
-      const data = await fetchApi<ZoneResponse[]>(`/api/zones?${qs.toString()}`)
+      const [data, regs, ams] = await Promise.all([
+        fetchApi<ZoneResponse[]>(`/api/zones?${qs.toString()}`),
+        fetchApi<{ id: string; name: string }[]>('/api/regions'),
+        fetchApi<{ id: string; name: string }[]>('/api/amenities'),
+      ])
       if (!data) return
+      const regionMap = regs ? Object.fromEntries(regs.map(r => [r.id, r.name])) : {}
+      const amenityMap = ams ? Object.fromEntries(ams.map(a => [a.id, a.name])) : {}
       const mapped: IndustrialZone[] = data.map((z) => ({
         id: z.id,
         name: z.name,
         description: z.description ?? '',
-        location: z.region?.name ?? '',
+        location: z.regionId ? regionMap[z.regionId] ?? '' : '',
         area: z.totalArea ? `${z.totalArea} m²` : '',
         price: z.price ? `${z.price} DH/m²` : '',
         type: 'Zone Industrielle',
         status: mapStatus(z.status),
         image: 'https://source.unsplash.com/featured/?industrial',
-        features: z.amenities ?? [],
-      }));
+        features: (z.amenityIds ?? []).map(id => amenityMap[id]).filter(Boolean),
+      }))
       setZones(mapped)
     }
     load()

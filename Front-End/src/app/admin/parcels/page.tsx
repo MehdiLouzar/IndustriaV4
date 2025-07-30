@@ -27,34 +27,17 @@ interface Parcel {
   id: string
   reference: string
   area?: number | null
-  price?: number | null
   status: string
-  isFree?: boolean | null
   isShowroom?: boolean | null
-  cos?: number | null
-  cus?: number | null
-  lambertX?: number | null
-  lambertY?: number | null
-  latitude?: number | null
-  longitude?: number | null
   zoneId: string
-  vertices?: Vertex[]
 }
 
 interface ParcelForm {
   id: string
   reference: string
   area: string
-  price: string
   status: string
-  isFree: boolean
   isShowroom: boolean
-  cos: string
-  cus: string
-  lambertX: string
-  lambertY: string
-  latitude: string
-  longitude: string
   zoneId: string
   vertices: { lambertX: string; lambertY: string }[]
 }
@@ -72,17 +55,8 @@ export default function ParcelsAdmin() {
     id: '',
     reference: '',
     area: '',
-    price: '',
     status: 'AVAILABLE',
-    isFree: true,
     isShowroom: false,
-    cos: '',
-    cus: '',
-
-    lambertX: '',
-    lambertY: '',
-    latitude: '',
-    longitude: '',
     zoneId: '',
     vertices: [],
   })
@@ -169,22 +143,9 @@ export default function ParcelsAdmin() {
     const body = {
       reference: form.reference,
       area: form.area ? parseFloat(form.area) : undefined,
-      price: form.price ? parseFloat(form.price) : undefined,
       status: form.status,
-      isFree: form.isFree,
       isShowroom: form.isShowroom,
-      cos: form.cos ? parseFloat(form.cos) : undefined,
-      cus: form.cus ? parseFloat(form.cus) : undefined,
-      lambertX: form.lambertX ? parseFloat(form.lambertX) : undefined,
-      lambertY: form.lambertY ? parseFloat(form.lambertY) : undefined,
-      latitude: form.latitude ? parseFloat(form.latitude) : undefined,
-      longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       zoneId: form.zoneId,
-      vertices: form.vertices.map((v, i) => ({
-        seq: i,
-        lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
-        lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
-      })),
     }
 
     if (form.id) {
@@ -205,16 +166,8 @@ export default function ParcelsAdmin() {
       id: '',
       reference: '',
       area: '',
-      price: '',
       status: 'AVAILABLE',
-      isFree: true,
       isShowroom: false,
-      cos: '',
-      cus: '',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
       zoneId: '',
       vertices: [],
     })
@@ -228,18 +181,10 @@ export default function ParcelsAdmin() {
       id: it.id,
       reference: it.reference,
       area: it.area?.toString() ?? '',
-      price: it.price?.toString() ?? '',
       status: it.status,
-      isFree: it.isFree ?? true,
       isShowroom: it.isShowroom ?? false,
-      cos: it.cos?.toString() ?? '',
-      cus: it.cus?.toString() ?? '',
-      lambertX: it.lambertX?.toString() ?? '',
-      lambertY: it.lambertY?.toString() ?? '',
-      latitude: it.latitude?.toString() ?? '',
-      longitude: it.longitude?.toString() ?? '',
       zoneId: it.zoneId,
-      vertices: it.vertices ? it.vertices.sort((a,b)=>a.seq-b.seq).map(v=>({
+      vertices: it.vertices ? it.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
         lambertX: v.lambertX.toString(),
         lambertY: v.lambertY.toString(),
       })) : [],
@@ -257,16 +202,8 @@ export default function ParcelsAdmin() {
       id: '',
       reference: '',
       area: '',
-      price: '',
       status: 'AVAILABLE',
-      isFree: true,
       isShowroom: false,
-      cos: '',
-      cus: '',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
       zoneId: '',
       vertices: [],
     })
@@ -334,50 +271,11 @@ export default function ParcelsAdmin() {
                 <Label htmlFor="area">Surface m²</Label>
                 <Input id="area" name="area" value={form.area} onChange={handleChange} />
               </div>
-              <div>
-                <Label htmlFor="price">Prix</Label>
-                <Input id="price" name="price" value={form.price} onChange={handleChange} />
-              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lambertX">Lambert X</Label>
-                <Input id="lambertX" name="lambertX" value={form.lambertX} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="lambertY">Lambert Y</Label>
-                <Input id="lambertY" name="lambertY" value={form.lambertY} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input id="latitude" name="latitude" value={form.latitude} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input id="longitude" name="longitude" value={form.longitude} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="isFree" name="isFree" checked={form.isFree} onChange={handleToggle} />
-                <Label htmlFor="isFree">Libre</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="isShowroom" name="isShowroom" checked={form.isShowroom} onChange={handleToggle} />
-                <Label htmlFor="isShowroom">Showroom</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="cos">CoS</Label>
-                <Input id="cos" name="cos" value={form.cos} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="cus">CuS</Label>
-                <Input id="cus" name="cus" value={form.cus} onChange={handleChange} />
-              </div>
+            
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="isShowroom" name="isShowroom" checked={form.isShowroom} onChange={handleToggle} />
+              <Label htmlFor="isShowroom">Showroom</Label>
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
