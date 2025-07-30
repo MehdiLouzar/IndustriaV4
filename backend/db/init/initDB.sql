@@ -49,6 +49,11 @@ BEGIN
     RAISE NOTICE 'All required tables found. Proceeding with data insertion...';
 END $$;
 
+-- S'assurer que le type de construction accepte toutes les valeurs attendues
+ALTER TABLE zone DROP CONSTRAINT IF EXISTS zone_construction_type_check;
+ALTER TABLE zone ADD CONSTRAINT zone_construction_type_check
+    CHECK (construction_type IN ('CUSTOM_BUILD','OWNER_BUILT','LAND_LEASE_ONLY','TURNKEY'));
+
 -- Insertion des données seulement si les tables sont vides
 -- Users (avec gestion des conflits)
 INSERT INTO users (
