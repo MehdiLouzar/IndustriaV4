@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Link from 'next/link'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
@@ -164,6 +164,62 @@ export default function MapView() {
     []
   )
 
+  const ZoneMarker = React.memo(function ZoneMarker({ zone }: { zone: ZoneFeature }) {
+    return (
+      <Marker position={zone.geometry.coordinates}>
+        <Popup>
+          <div className="space-y-1 text-sm p-1">
+            <strong className="block mb-1">{zone.properties.name}</strong>
+            <div>Statut: {zone.properties.status}</div>
+            <div>Parcelles disponibles: {zone.properties.availableParcels}</div>
+            <div>
+              Lat: {zone.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
+              {zone.geometry.coordinates[1].toFixed(5)}
+            </div>
+            {zone.properties.activityIcons.length > 0 && (
+              <div className="flex gap-1 text-xl">
+                {zone.properties.activityIcons.map((ic, i) => (
+                  <DynamicIcon key={i} name={ic} className="w-5 h-5" />
+                ))}
+              </div>
+            )}
+            {zone.properties.amenityIcons.length > 0 && (
+              <div className="flex gap-1 text-xl">
+                {zone.properties.amenityIcons.map((ic, i) => (
+                  <DynamicIcon key={i} name={ic} className="w-5 h-5" />
+                ))}
+              </div>
+            )}
+            <Link href={`/zones/${zone.properties.id}`} className="text-blue-600 underline block mt-1">
+              Voir la zone
+            </Link>
+          </div>
+        </Popup>
+      </Marker>
+    )
+  })
+
+  const ParcelMarker = React.memo(function ParcelMarker({ parcel }: { parcel: ParcelFeature }) {
+    return (
+      <Marker
+        position={parcel.geometry.coordinates}
+        icon={parcel.properties.isShowroom ? ICONS.showroom : ICONS.parcel}
+      >
+        <Popup>
+          <div className="space-y-1 text-sm">
+            <strong>{parcel.properties.reference}</strong>
+            <div>Statut: {parcel.properties.status}</div>
+            <div>
+              Lat: {parcel.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
+              {parcel.geometry.coordinates[1].toFixed(5)}
+            </div>
+            {parcel.properties.isShowroom && <div>Showroom</div>}
+          </div>
+        </Popup>
+      </Marker>
+    )
+  })
+
   const visibleZones = useMemo(() => {
     if (!mapRef.current || zones.length < 100) return zones
     try {
@@ -264,7 +320,7 @@ export default function MapView() {
     debounce(() => {
       if (!mapRef.current || !glMapRef.current || !glLoaded.current) return
       const zoom = mapRef.current.getZoom()
-      if (zoom < 8) return
+      if (zoom < 11) return
       const b = mapRef.current.getBounds()
       const bbox = `${b.getSouth().toFixed(2)},${b.getWest().toFixed(2)},${b.getNorth().toFixed(2)},${b.getEast().toFixed(2)}`
       if (bbox === lastBbox.current) return
@@ -275,7 +331,7 @@ export default function MapView() {
         return
       }
       fetchOverpassData(bbox, zoom)
-    }, 1000),
+    }, 5000),
     [fetchOverpassData, applyOverpassData]
   ) as ReturnType<typeof debounce>
 
@@ -412,43 +468,8 @@ export default function MapView() {
         showCoverageOnHover={false}
         chunkedLoading
       >
-        {visibleZones.map(z => (
-          <Marker
-            key={z.properties.id}
-            position={z.geometry.coordinates}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm p-1">
-                <strong className="block mb-1">{z.properties.name}</strong>
-                <div>Statut: {z.properties.status}</div>
-                <div>Parcelles disponibles: {z.properties.availableParcels}</div>
-                <div>
-                  Lat: {z.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
-                  {z.geometry.coordinates[1].toFixed(5)}
-                </div>
-                {z.properties.activityIcons.length > 0 && (
-                  <div className="flex gap-1 text-xl">
-                    {z.properties.activityIcons.map((ic, i) => (
-                      <DynamicIcon key={i} name={ic} className="w-5 h-5" />
-                    ))}
-                  </div>
-                )}
-                {z.properties.amenityIcons.length > 0 && (
-                  <div className="flex gap-1 text-xl">
-                    {z.properties.amenityIcons.map((ic, i) => (
-                      <DynamicIcon key={i} name={ic} className="w-5 h-5" />
-                    ))}
-                  </div>
-                )}
-                <Link
-                  href={`/zones/${z.properties.id}`}
-                  className="text-blue-600 underline block mt-1"
-                >
-                  Voir la zone
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
+        {visibleZones.map((z) => (
+          <ZoneMarker key={z.properties.id} zone={z} />
         ))}
       </MarkerClusterGroup>
       {/* Cluster séparé pour parcelles */}
@@ -458,24 +479,8 @@ export default function MapView() {
         showCoverageOnHover={false}
         chunkedLoading
       >
-        {visibleParcels.map(p => (
-          <Marker
-            key={p.properties.id}
-            position={p.geometry.coordinates}
-            icon={p.properties.isShowroom ? ICONS.showroom : ICONS.parcel}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm">
-                <strong>{p.properties.reference}</strong>
-                <div>Statut: {p.properties.status}</div>
-                <div>
-                  Lat: {p.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
-                  {p.geometry.coordinates[1].toFixed(5)}
-                </div>
-                {p.properties.isShowroom && <div>Showroom</div>}
-              </div>
-            </Popup>
-          </Marker>
+        {visibleParcels.map((p) => (
+          <ParcelMarker key={p.properties.id} parcel={p} />
         ))}
       </MarkerClusterGroup>
       {/* Points d'intérêt sans clustering */}

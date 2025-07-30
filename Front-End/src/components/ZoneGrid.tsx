@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchApi } from '@/lib/utils';
+
+function debounce<Args extends unknown[]>(fn: (...args: Args) => void, delay: number) {
+  let t: NodeJS.Timeout;
+  const debounced = (...args: Args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+  debounced.cancel = () => clearTimeout(t);
+  return debounced;
+}
 
 interface IndustrialZone {
   id: string;
@@ -29,6 +39,69 @@ export default function ZoneGrid() {
   const itemsPerPage = 12
   const [zones, setZones] = useState<IndustrialZone[]>([])
   const searchParams = useSearchParams()
+
+  const processedZones = useMemo(() => zones.slice(0, 50), [zones])
+
+  const ZoneCard = ({ zone }: { zone: IndustrialZone }) => (
+    <Card key={zone.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+      <div className="relative">
+        <Image
+          src={zone.image}
+          alt={zone.name}
+          width={400}
+          height={192}
+          className="w-full h-48 object-cover"
+          loading="lazy"
+        />
+        <div className="absolute top-3 left-3">
+          <Badge className={getStatusColor(zone.status)}>{zone.status}</Badge>
+        </div>
+        {zone.deliveryDate && (
+          <div className="absolute top-3 right-3">
+            <Badge variant="secondary" className="bg-white/90 text-gray-700">
+              Livraison {zone.deliveryDate}
+            </Badge>
+          </div>
+        )}
+      </div>
+      <CardHeader className="pb-3">
+        <h3 className="font-bold text-lg leading-tight text-gray-900 hover:text-red-600 transition-colors">
+          {zone.name}
+        </h3>
+        <p className="text-sm text-gray-600 line-clamp-2">{zone.description}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <MapPin className="w-4 h-4 text-red-600" />
+            <span>{zone.location}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Ruler className="w-4 h-4 text-red-600" />
+            <span>{zone.area}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Factory className="w-4 h-4 text-red-600" />
+            <span>{zone.type}</span>
+          </div>
+        </div>
+        <div className="pt-2 border-t">
+          <p className="font-semibold text-gray-900">{zone.price}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild size="sm" className="flex-1 header-red text-white hover:opacity-90">
+            <Link href={`/zones/${zone.id}`}> <Eye className="w-4 h-4 mr-1" /> Voir </Link>
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1">
+            <Phone className="w-4 h-4 mr-1" />
+            Contact
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const MemoizedZoneCard = React.memo(ZoneCard)
 
   interface ZoneResponse {
     id: string
@@ -84,14 +157,16 @@ export default function ZoneGrid() {
       }))
       setZones(mapped)
     }
-    load()
+    const debouncedLoad = debounce(load, 1000)
+    debouncedLoad()
+    return () => debouncedLoad.cancel()
   }, [searchParams])
 
-  const totalPages = Math.ceil(zones.length / itemsPerPage);
+  const totalPages = Math.ceil(processedZones.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const displayedZones = zones.slice(startIndex, startIndex + itemsPerPage);
+  const displayedZones = processedZones.slice(startIndex, startIndex + itemsPerPage);
 
-  const getStatusColor = (status: string) => {
+  function getStatusColor(status: string) {
     switch (status) {
       case 'Disponible':
         return 'bg-green-100 text-green-800';
@@ -104,86 +179,24 @@ export default function ZoneGrid() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
       {/* Results header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">
-          {zones.length} zones industrielles disponibles
+          {processedZones.length} zones industrielles disponibles
         </h2>
         <p className="text-gray-600">
-          Il y a {zones.length} zones qui correspondent à votre recherche
+          Il y a {processedZones.length} zones qui correspondent à votre recherche
         </p>
       </div>
 
       {/* Zone grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {displayedZones.map((zone) => (
-          <Card key={zone.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-            <div className="relative">
-              <Image
-                src={zone.image}
-                alt={zone.name}
-                width={400}
-                height={192}
-                className="w-full h-48 object-cover"
-              />
-              <div className="absolute top-3 left-3">
-                <Badge className={getStatusColor(zone.status)}>
-                  {zone.status}
-                </Badge>
-              </div>
-              {zone.deliveryDate && (
-                <div className="absolute top-3 right-3">
-                  <Badge variant="secondary" className="bg-white/90 text-gray-700">
-                    Livraison {zone.deliveryDate}
-                  </Badge>
-                </div>
-              )}
-            </div>
-
-            <CardHeader className="pb-3">
-              <h3 className="font-bold text-lg leading-tight text-gray-900 hover:text-red-600 transition-colors">
-                {zone.name}
-              </h3>
-              <p className="text-sm text-gray-600 line-clamp-2">
-                {zone.description}
-              </p>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 text-red-600" />
-                  <span>{zone.location}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Ruler className="w-4 h-4 text-red-600" />
-                  <span>{zone.area}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Factory className="w-4 h-4 text-red-600" />
-                  <span>{zone.type}</span>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t">
-                <p className="font-semibold text-gray-900">{zone.price}</p>
-              </div>
-
-              <div className="flex gap-2">
-                <Button asChild size="sm" className="flex-1 header-red text-white hover:opacity-90">
-                  <Link href={`/zones/${zone.id}`}> <Eye className="w-4 h-4 mr-1" /> Voir </Link>
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Phone className="w-4 h-4 mr-1" />
-                  Contact
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <MemoizedZoneCard key={zone.id} zone={zone} />
         ))}
       </div>
 

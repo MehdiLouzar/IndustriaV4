@@ -15,10 +15,10 @@ export function getBaseUrl() {
 // Memory-safe cache with strict limits and TTL
 class SecureApiCache {
   private cache = new Map<string, { data: unknown; timestamp: number; size: number }>()
-  private readonly MAX_SIZE = 30
-  private readonly TTL = 180000 // 3 minutes
+  private readonly MAX_SIZE = 15
+  private readonly TTL = 600000 // 10 minutes
   private totalSize = 0
-  private readonly MAX_TOTAL_SIZE = 20 * 1024 * 1024 // 20MB
+  private readonly MAX_TOTAL_SIZE = 8 * 1024 * 1024 // 8MB
 
   private estimateSize(data: unknown): number {
     try {
