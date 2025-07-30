@@ -19,28 +19,39 @@ interface Parcel {
   id: string;
   reference: string;
   status: string;
-  latitude?: number;
-  longitude?: number;
+  isShowroom?: boolean
   area?: number | null;
-  price?: number | null;
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  zoneId?: string | null
+}
+
+interface ZoneResponse {
+  id: string
+  name: string
+  description?: string | null
+  address?: string | null
+  status: string
+  totalArea?: number | null
+  price?: number | null
+  regionId?: string | null
+  zoneTypeId?: string | null
+  activityIds?: string[]
+  amenityIds?: string[]
+  vertices?: { seq: number; lambertX: number; lambertY: number }[]
 }
 
 interface Zone {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  latitude?: number;
-  longitude?: number;
-  totalArea?: number | null;
-  price?: number | null;
-  region?: { name: string } | null;
-  zoneType?: { name: string } | null;
-  activities?: { activity: { name: string } }[];
-  amenities?: string[];
-  parcels?: Parcel[];
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  id: string
+  name: string
+  description?: string | null
+  status: string
+  totalArea?: number | null
+  price?: number | null
+  region?: { name: string } | null
+  zoneType?: { name: string } | null
+  activities?: { activity: { name: string } }[]
+  amenities?: string[]
+  parcels?: Parcel[]
+  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
 }
 
 export default function ZonePage() {
@@ -50,10 +61,39 @@ export default function ZonePage() {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    fetchApi<Zone>(`/api/zones/${id}`)
-      .then((z) => z && setZone(z))
-      .catch(console.error);
-  }, [id]);
+    async function load() {
+      const [z, regs, types, acts, ams, parcels] = await Promise.all([
+        fetchApi<ZoneResponse>(`/api/zones/${id}`),
+        fetchApi<{ id: string; name: string }[]>('/api/regions'),
+        fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
+        fetchApi<{ id: string; name: string }[]>('/api/activities'),
+        fetchApi<{ id: string; name: string }[]>('/api/amenities'),
+        fetchApi<Parcel[]>('/api/parcels'),
+      ])
+      if (!z) return
+      const regionMap = regs ? Object.fromEntries(regs.map(r => [r.id, r.name])) : {}
+      const typeMap = types ? Object.fromEntries(types.map(t => [t.id, t.name])) : {}
+      const actMap = acts ? Object.fromEntries(acts.map(a => [a.id, a.name])) : {}
+      const amenityMap = ams ? Object.fromEntries(ams.map(a => [a.id, a.name])) : {}
+      const pList = parcels ? parcels.filter(p => p.zoneId === z.id) : []
+      const zone: Zone = {
+        id: z.id,
+        name: z.name,
+        description: z.description ?? null,
+        status: z.status,
+        totalArea: z.totalArea ?? null,
+        price: z.price ?? null,
+        region: z.regionId ? { name: regionMap[z.regionId] || '' } : null,
+        zoneType: z.zoneTypeId ? { name: typeMap[z.zoneTypeId] || '' } : null,
+        activities: (z.activityIds ?? []).map(id => ({ activity: { name: actMap[id] || id } })),
+        amenities: (z.amenityIds ?? []).map(id => amenityMap[id] || id),
+        parcels: pList,
+        vertices: z.vertices,
+      }
+      setZone(zone)
+    }
+    load()
+  }, [id])
 
   if (!zone) return <p className="p-4">Chargement...</p>;
 

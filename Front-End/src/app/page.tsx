@@ -6,6 +6,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchApi } from '@/lib/utils';
 import ZoneGrid from '@/components/ZoneGrid';
+import { Suspense } from 'react';
 import Footer from '@/components/Footer';
 
 export const dynamic = 'force-dynamic';
@@ -84,7 +85,9 @@ export default function Home() {
       {/* Zones grid section */}
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
-          <ZoneGrid />
+          <Suspense fallback={<div>Chargement...</div>}>
+            <ZoneGrid />
+          </Suspense>
         </div>
       </section>
 

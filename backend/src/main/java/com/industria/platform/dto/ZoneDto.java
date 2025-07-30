@@ -5,11 +5,12 @@ import java.util.List;
 public record ZoneDto(String id,
                       String name,
                       String description,
+                      String address,
                       Double totalArea,
                       Double price,
                       String status,
-                      RegionDto region,
-                      ZoneTypeDto zoneType,
-                      List<String> amenities,
+                      String regionId,
+                      String zoneTypeId,
                       List<String> activityIds,
-                      List<String> amenityIds) {}
+                      List<String> amenityIds,
+                      List<VertexDto> vertices) {}

@@ -49,6 +49,11 @@ BEGIN
     RAISE NOTICE 'All required tables found. Proceeding with data insertion...';
 END $$;
 
+-- S'assurer que le type de construction accepte toutes les valeurs attendues
+ALTER TABLE zone DROP CONSTRAINT IF EXISTS zone_construction_type_check;
+ALTER TABLE zone ADD CONSTRAINT zone_construction_type_check
+    CHECK (construction_type IN ('CUSTOM_BUILD','OWNER_BUILT','LAND_LEASE_ONLY','TURNKEY'));
+
 -- Insertion des données seulement si les tables sont vides
 -- Users (avec gestion des conflits)
 INSERT INTO users (
@@ -209,11 +214,11 @@ INSERT INTO appointment (
 SELECT * FROM (VALUES
     ('appt-1', 'Ahmed Benali', 'a.benali@entreprise.ma', '+212 6 12 34 56 78',
      'Industries Benali', 'Intéressé par une parcelle pour activité automobile',
-     '2024-02-15T10:00:00Z', NULL, 'PENDING', NULL,
+     '2024-02-15 10:00:00'::timestamp, NULL, 'PENDING', NULL,
      NOW(), NOW(), 'parcel-1', 'user-manager'),
     ('appt-2', 'Fatima Alaoui', 'f.alaoui@logistics.ma', '+212 6 87 65 43 21',
      'Logistics Pro', 'Recherche espace pour entrepôt logistique',
-     '2024-02-20T14:30:00Z', '2024-02-20T14:30:00Z', 'CONFIRMED', 'RDV confirmé par téléphone',
+     '2024-02-20 14:30:00'::timestamp, '2024-02-20 14:30:00'::timestamp, 'CONFIRMED', 'RDV confirmé par téléphone',
      NOW(), NOW(), 'parcel-2', 'user-manager')
 ) AS data(id, contact_name, contact_email, contact_phone, company_name, message, requested_date, confirmed_date, status, notes, created_at, updated_at, parcel_id, managed_by)
 WHERE NOT EXISTS (SELECT 1 FROM appointment);
@@ -223,18 +228,18 @@ DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notification_template') THEN
         INSERT INTO notification_template (
-            id, name, subject, content, type, created_at, updated_at
+            id, type, subject, html_body, text_body, created_at, updated_at
         )
         SELECT * FROM (VALUES
-            ('tmpl-appointment-confirm', 'Confirmation RDV', 
-             'Confirmation de votre rendez-vous', 
-             'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.', 
-             'EMAIL', NOW(), NOW()),
-            ('tmpl-parcel-available', 'Parcelle disponible', 
-             'Nouvelle parcelle disponible', 
-             'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.', 
-             'EMAIL', NOW(), NOW())
-        ) AS data(id, name, subject, content, type, created_at, updated_at)
+            ('tmpl-appointment-confirm', 'APPOINTMENT_CONFIRMED',
+             'Confirmation de votre rendez-vous',
+             'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.',
+             NULL, NOW(), NOW()),
+            ('tmpl-parcel-available', 'SYSTEM_NOTIFICATION',
+             'Nouvelle parcelle disponible',
+             'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.',
+             NULL, NOW(), NOW())
+        ) AS data(id, type, subject, html_body, text_body, created_at, updated_at)
         WHERE NOT EXISTS (SELECT 1 FROM notification_template);
     END IF;
 END $$;
@@ -253,4 +258,4 @@ BEGIN
     RAISE NOTICE '   - Activities: % records', (SELECT count(*) FROM activity);
     RAISE NOTICE '   - Amenities: % records', (SELECT count(*) FROM amenity);
     RAISE NOTICE '   - Appointments: % records', (SELECT count(*) FROM appointment);
-END $$;
+END $$
