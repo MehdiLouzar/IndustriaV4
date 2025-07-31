@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import {
   Select,
@@ -64,6 +65,7 @@ export default function ZonesAdmin() {
   const router = useRouter()
   const [zones, setZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
@@ -86,17 +88,18 @@ export default function ZonesAdmin() {
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
-  async function load() {
+  async function load(page = currentPage) {
     const [z, t, r, a, m] = await Promise.all([
-      fetchApi<Zone[]>('/api/zones'),
+      fetchApi<ListResponse<Zone>>(`/api/zones?page=${page}&limit=${itemsPerPage}`),
       fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
       fetchApi<{ id: string; name: string }[]>('/api/regions'),
       fetchApi<{ id: string; name: string }[]>('/api/activities'),
       fetchApi<{ id: string; name: string }[]>('/api/amenities'),
     ])
     if (z) {
-      setZones(z)
-      setCurrentPage(1)
+      setZones(z.items)
+      setTotalPages(z.totalPages)
+      setCurrentPage(z.page)
     }
     if (t) setZoneTypes(t)
     if (r) setRegions(r)
@@ -112,8 +115,9 @@ export default function ZonesAdmin() {
         return
       }
     }
-    load()
-  }, [])
+    load(currentPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -243,7 +247,7 @@ export default function ZonesAdmin() {
     })
     setImages([])
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   async function edit(z: Zone) {
@@ -270,7 +274,7 @@ export default function ZonesAdmin() {
 
   async function del(id: string) {
     await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -310,9 +314,7 @@ export default function ZonesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {zones
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((zone) => (
+              {zones.map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
@@ -331,7 +333,7 @@ export default function ZonesAdmin() {
       </Card>
 
       <Pagination
-        totalItems={zones.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

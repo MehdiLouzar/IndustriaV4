@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import {
   Select,
@@ -48,6 +49,7 @@ export default function ParcelsAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Parcel[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [zones, setZones] = useState<{ id: string; name: string }[]>([])
@@ -63,18 +65,20 @@ export default function ParcelsAdmin() {
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
 
-  async function load() {
+  async function load(page = currentPage) {
     const [p, z] = await Promise.all([
-      fetchApi<Parcel[]>('/api/parcels'),
+      fetchApi<ListResponse<Parcel>>(`/api/parcels?page=${page}&limit=${itemsPerPage}`),
       fetchApi<{ id: string; name: string }[]>('/api/zones'),
     ])
     if (p) {
-      setItems(p)
-      setCurrentPage(1)
+      setItems(p.items)
+      setTotalPages(p.totalPages)
+      setCurrentPage(p.page)
     }
     if (z) setZones(z)
   }
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -173,7 +177,7 @@ export default function ParcelsAdmin() {
     })
     setImages([])
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Parcel) {
@@ -194,7 +198,7 @@ export default function ParcelsAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/parcels/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -229,9 +233,7 @@ export default function ParcelsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((p) => (
+              {items.map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{p.reference}</td>
                   <td className="p-2 align-top">{p.zoneId}</td>
@@ -250,7 +252,7 @@ export default function ParcelsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

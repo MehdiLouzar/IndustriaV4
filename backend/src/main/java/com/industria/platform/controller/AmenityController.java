@@ -1,9 +1,11 @@
 package com.industria.platform.controller;
 
 import com.industria.platform.dto.AmenityDto;
+import com.industria.platform.dto.ListResponse;
 import com.industria.platform.entity.Amenity;
 import com.industria.platform.repository.AmenityRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -15,10 +17,15 @@ public class AmenityController {
     public AmenityController(AmenityRepository repo) { this.repo = repo; }
 
     @GetMapping
-    public List<AmenityDto> all() {
-        return repo.findAll().stream()
+    public ListResponse<AmenityDto> all(@RequestParam(defaultValue = "1") int page,
+                                        @RequestParam(defaultValue = "10") int limit) {
+        int p = Math.max(1, page);
+        int l = Math.min(Math.max(1, limit), 100);
+        var res = repo.findAll(PageRequest.of(p - 1, l));
+        var items = res.getContent().stream()
                 .map(a -> new AmenityDto(a.getId(), a.getName(), a.getDescription(), a.getIcon(), a.getCategory()))
                 .toList();
+        return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
     @GetMapping("/{id}")

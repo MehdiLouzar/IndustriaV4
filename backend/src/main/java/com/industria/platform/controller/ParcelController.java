@@ -11,6 +11,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import com.industria.platform.dto.ListResponse;
 
 @RestController
 @RequestMapping("/api/parcels")
@@ -29,8 +31,17 @@ public class ParcelController {
     }
 
     @GetMapping
-    public List<ParcelDto> all() {
-        return parcelRepository.findAll().stream().map(this::toDto).toList();
+    public ListResponse<ParcelDto> all(@RequestParam(required = false) String zoneId,
+                                       @RequestParam(defaultValue = "1") int page,
+                                       @RequestParam(defaultValue = "10") int limit) {
+        int p = Math.max(1, page);
+        int l = Math.min(Math.max(1, limit), 100);
+        var pageable = PageRequest.of(p - 1, l);
+        var res = zoneId != null ?
+                parcelRepository.findByZoneId(zoneId, pageable) :
+                parcelRepository.findAll(pageable);
+        var items = res.getContent().stream().map(this::toDto).toList();
+        return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
     @GetMapping("/{id}")

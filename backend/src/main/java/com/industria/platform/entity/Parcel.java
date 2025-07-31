@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
+@Table(indexes = {@Index(columnList = "zone_id")})
 @Getter
 @Setter
 @NoArgsConstructor

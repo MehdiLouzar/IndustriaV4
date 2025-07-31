@@ -7,6 +7,8 @@ import com.industria.platform.repository.*;
 import com.industria.platform.service.StatusService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageRequest;
+import com.industria.platform.dto.ListResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,8 +51,13 @@ public class ZoneController {
     }
 
     @GetMapping
-    public List<ZoneDto> all() {
-        return zoneRepository.findAll().stream().map(this::toDto).toList();
+    public ListResponse<ZoneDto> all(@RequestParam(defaultValue = "1") int page,
+                                     @RequestParam(defaultValue = "10") int limit) {
+        int p = Math.max(1, page);
+        int l = Math.min(Math.max(1, limit), 100);
+        var res = zoneRepository.findAll(PageRequest.of(p - 1, l));
+        var items = res.getContent().stream().map(this::toDto).toList();
+        return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
     @GetMapping("/{id}")
