@@ -24,7 +24,7 @@ interface IndustrialZone {
   type: string
   status: string
   deliveryDate?: string
-  image: string
+  image?: string
 }
 
 function getStatusColor(status: string) {
@@ -93,14 +93,18 @@ export default function ZoneGrid() {
       <div style={{ ...style, padding: 8 }}>
         <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300">
           <div className="relative">
-            <Image
-              src={zone.image}
-              alt={zone.name}
-              width={400}
-              height={192}
-              className="w-full h-48 object-cover"
-              loading="lazy"
-            />
+            {zone.image ? (
+              <Image
+                src={zone.image}
+                alt={zone.name}
+                width={400}
+                height={192}
+                className="w-full h-48 object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-48 bg-gray-200" />
+            )}
             <div className="absolute top-3 left-3">
               <Badge className={getStatusColor(zone.status)}>{zone.status}</Badge>
             </div>
