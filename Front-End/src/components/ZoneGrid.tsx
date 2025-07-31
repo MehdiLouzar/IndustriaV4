@@ -1,243 +1,200 @@
-'use client';
+"use client"
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import Image from 'next/image'
-import { useSearchParams } from 'next/navigation'
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
-import { fetchApi } from '@/lib/utils';
+import Link from 'next/link'
+import { FixedSizeGrid as Grid, GridChildComponentProps } from 'react-window'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { MapPin, Ruler, Factory, Phone, Eye } from 'lucide-react'
+import { fetchApi } from '@/lib/utils'
 
-function debounce<Args extends unknown[]>(fn: (...args: Args) => void, delay: number) {
-  let t: NodeJS.Timeout;
-  const debounced = (...args: Args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), delay);
-  };
-  debounced.cancel = () => clearTimeout(t);
-  return debounced;
-}
+const CARD_WIDTH = 300
+const CARD_HEIGHT = 360
+const ZONES_PER_PAGE = 20
 
 interface IndustrialZone {
-  id: string;
-  name: string;
-  description: string;
-  location: string;
-  area: string;
-  price: string;
-  type: string;
-  status: 'Disponible' | 'Réservé' | 'En cours' | 'Nouveau';
-  deliveryDate?: string;
-  image: string;
-  features: string[];
+  id: string
+  name: string
+  description: string
+  location: string
+  area: string
+  price: string
+  type: string
+  status: string
+  deliveryDate?: string
+  image: string
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'Disponible':
+      return 'bg-green-100 text-green-800'
+    case 'Showroom':
+      return 'bg-blue-100 text-blue-800'
+    case 'Occupé':
+      return 'bg-gray-100 text-gray-800'
+    case 'Réservé':
+      return 'bg-orange-100 text-orange-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
 }
 
 export default function ZoneGrid() {
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 12
   const [zones, setZones] = useState<IndustrialZone[]>([])
-  const searchParams = useSearchParams()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(1200)
 
-  const processedZones = useMemo(() => zones.slice(0, 50), [zones])
-
-  const ZoneCard = ({ zone }: { zone: IndustrialZone }) => (
-    <Card key={zone.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-      <div className="relative">
-        <Image
-          src={zone.image}
-          alt={zone.name}
-          width={400}
-          height={192}
-          className="w-full h-48 object-cover"
-          loading="lazy"
-        />
-        <div className="absolute top-3 left-3">
-          <Badge className={getStatusColor(zone.status)}>{zone.status}</Badge>
-        </div>
-        {zone.deliveryDate && (
-          <div className="absolute top-3 right-3">
-            <Badge variant="secondary" className="bg-white/90 text-gray-700">
-              Livraison {zone.deliveryDate}
-            </Badge>
-          </div>
-        )}
-      </div>
-      <CardHeader className="pb-3">
-        <h3 className="font-bold text-lg leading-tight text-gray-900 hover:text-red-600 transition-colors">
-          {zone.name}
-        </h3>
-        <p className="text-sm text-gray-600 line-clamp-2">{zone.description}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4 text-red-600" />
-            <span>{zone.location}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Ruler className="w-4 h-4 text-red-600" />
-            <span>{zone.area}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Factory className="w-4 h-4 text-red-600" />
-            <span>{zone.type}</span>
-          </div>
-        </div>
-        <div className="pt-2 border-t">
-          <p className="font-semibold text-gray-900">{zone.price}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild size="sm" className="flex-1 header-red text-white hover:opacity-90">
-            <Link href={`/zones/${zone.id}`}> <Eye className="w-4 h-4 mr-1" /> Voir </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1">
-            <Phone className="w-4 h-4 mr-1" />
-            Contact
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-
-  const MemoizedZoneCard = React.memo(ZoneCard)
-
-  interface ZoneResponse {
-    id: string
-    name: string
-    description?: string | null
-    address?: string | null
-    totalArea?: number | null
-    price?: number | null
-    status: string
-    regionId?: string | null
-    zoneTypeId?: string | null
-    amenityIds?: string[]
+  const loadZones = async (page: number) => {
+    setLoading(true)
+    try {
+      const response = await fetchApi<{ zones: IndustrialZone[]; totalPages: number }>(
+        `/api/zones?page=${page}&limit=${ZONES_PER_PAGE}`
+      )
+      if (response) {
+        setZones(response.zones || (response as unknown as IndustrialZone[]))
+        setTotalPages(response.totalPages || 1)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const mapStatus = (status: string): IndustrialZone['status'] => {
-    switch (status) {
-      case 'RESERVED':
-        return 'Réservé';
-      case 'OCCUPIED':
-        return 'Occupé';
-      case 'SHOWROOM':
-        return 'Showroom';
-      default:
-        return 'Disponible';
-    }
-  };
+  useEffect(() => {
+    loadZones(currentPage)
+  }, [currentPage])
 
   useEffect(() => {
-    async function load() {
-      const qs = new URLSearchParams()
-      searchParams.forEach((v, k) => {
-        qs.set(k, v)
-      })
-      const [data, regs, ams] = await Promise.all([
-        fetchApi<ZoneResponse[]>(`/api/zones?${qs.toString()}`),
-        fetchApi<{ id: string; name: string }[]>('/api/regions'),
-        fetchApi<{ id: string; name: string }[]>('/api/amenities'),
-      ])
-      if (!data) return
-      const regionMap = regs ? Object.fromEntries(regs.map(r => [r.id, r.name])) : {}
-      const amenityMap = ams ? Object.fromEntries(ams.map(a => [a.id, a.name])) : {}
-      const mapped: IndustrialZone[] = data.map((z) => ({
-        id: z.id,
-        name: z.name,
-        description: z.description ?? '',
-        location: z.regionId ? regionMap[z.regionId] ?? '' : '',
-        area: z.totalArea ? `${z.totalArea} m²` : '',
-        price: z.price ? `${z.price} DH/m²` : '',
-        type: 'Zone Industrielle',
-        status: mapStatus(z.status),
-        image: 'https://source.unsplash.com/featured/?industrial',
-        features: (z.amenityIds ?? []).map(id => amenityMap[id]).filter(Boolean),
-      }))
-      setZones(mapped)
+    const update = () => {
+      const w = containerRef.current?.offsetWidth || window.innerWidth
+      setWidth(w)
     }
-    const debouncedLoad = debounce(load, 1000)
-    debouncedLoad()
-    return () => debouncedLoad.cancel()
-  }, [searchParams])
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
-  const totalPages = Math.ceil(processedZones.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const displayedZones = processedZones.slice(startIndex, startIndex + itemsPerPage);
+  const columnCount = Math.max(1, Math.floor((width - 64) / CARD_WIDTH))
+  const rowCount = Math.ceil(zones.length / columnCount)
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'Disponible':
-        return 'bg-green-100 text-green-800';
-      case 'Showroom':
-        return 'bg-blue-100 text-blue-800';
-      case 'Occupé':
-        return 'bg-gray-100 text-gray-800';
-      case 'Réservé':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const itemData = useMemo(() => ({ zones, columnCount }), [zones, columnCount])
+
+  const Cell = ({ columnIndex, rowIndex, style, data }: GridChildComponentProps) => {
+    const { zones, columnCount } = data as { zones: IndustrialZone[]; columnCount: number }
+    const index = rowIndex * columnCount + columnIndex
+    const zone = zones[index]
+    if (!zone) return <div style={style} />
+    return (
+      <div style={{ ...style, padding: 8 }}>
+        <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300">
+          <div className="relative">
+            <Image
+              src={zone.image}
+              alt={zone.name}
+              width={400}
+              height={192}
+              className="w-full h-48 object-cover"
+              loading="lazy"
+            />
+            <div className="absolute top-3 left-3">
+              <Badge className={getStatusColor(zone.status)}>{zone.status}</Badge>
+            </div>
+            {zone.deliveryDate && (
+              <div className="absolute top-3 right-3">
+                <Badge variant="secondary" className="bg-white/90 text-gray-700">
+                  Livraison {zone.deliveryDate}
+                </Badge>
+              </div>
+            )}
+          </div>
+          <CardHeader className="pb-3">
+            <h3 className="font-bold text-lg leading-tight text-gray-900 hover:text-red-600 transition-colors">
+              {zone.name}
+            </h3>
+            <p className="text-sm text-gray-600 line-clamp-2">{zone.description}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <MapPin className="w-4 h-4 text-red-600" />
+                <span>{zone.location}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Ruler className="w-4 h-4 text-red-600" />
+                <span>{zone.area}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Factory className="w-4 h-4 text-red-600" />
+                <span>{zone.type}</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="font-semibold text-gray-900">{zone.price}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild size="sm" className="flex-1 header-red text-white hover:opacity-90">
+                <Link href={`/zones/${zone.id}`}>
+                  <Eye className="w-4 h-4 mr-1" /> Voir
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" className="flex-1">
+                <Phone className="w-4 h-4 mr-1" /> Contact
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <div className="text-center py-8">Chargement...</div>
   }
 
   return (
     <div className="space-y-6">
-      {/* Results header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">
-          {processedZones.length} zones industrielles disponibles
-        </h2>
-        <p className="text-gray-600">
-          Il y a {processedZones.length} zones qui correspondent à votre recherche
-        </p>
+      <div className="text-center">
+        <h2 className="text-2xl font-bold">{zones.length} zones industrielles</h2>
       </div>
 
-      {/* Zone grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {displayedZones.map((zone) => (
-          <MemoizedZoneCard key={zone.id} zone={zone} />
-        ))}
+      <div ref={containerRef} style={{ height: 800, width: '100%' }}>
+        <Grid
+          columnCount={columnCount}
+          columnWidth={CARD_WIDTH}
+          height={800}
+          rowCount={rowCount}
+          rowHeight={CARD_HEIGHT}
+          width={width}
+          itemData={itemData}
+        >
+          {Cell}
+        </Grid>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-2 pt-8">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Page précédente
-          </Button>
-
-          <div className="flex space-x-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <Button
-                key={page}
-                variant={page === currentPage ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentPage(page)}
-                className={page === currentPage ? "header-red text-white" : ""}
-              >
-                {page}
-              </Button>
-            ))}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Page suivante
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-center space-x-2">
+        <button
+          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+        >
+          Précédent
+        </button>
+        <span className="px-4 py-2">
+          Page {currentPage} / {totalPages}
+        </span>
+        <button
+          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+        >
+          Suivant
+        </button>
+      </div>
     </div>
-  );
+  )
 }
