@@ -25,17 +25,12 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain publicApi(HttpSecurity http) throws Exception {
         http
-            // ← on ne passe QUE le pattern d’URL ici
-            .securityMatcher("/api/**")    
+            // cette chaîne ne s'applique qu'aux requêtes GET sur /api/**
+            .securityMatcher(HttpMethod.GET, "/api/**")
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                // on autorise seulement les GET
-                .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
-                // on refuse toute autre méthode (POST, PUT…) sur /api/**
-                .anyRequest().denyAll()
-            )
-            .sessionManagement(sess -> 
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .sessionManagement(sess ->
                 sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
         return http.build();
@@ -46,6 +41,7 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
+            .securityMatcher("/api/**")
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
