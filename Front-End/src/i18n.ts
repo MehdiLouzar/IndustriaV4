@@ -13,8 +13,9 @@ i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 })
 
-// Non blocking language preference loading
-if (typeof window !== 'undefined') {
+// Function to change language once the client is ready
+export function setupClientI18n() {
+  if (typeof window === 'undefined') return
   const savedLang =
     localStorage.getItem('lng') ||
     document.cookie.match(/(?:^|; )lng=([^;]*)/i)?.[1] ||
