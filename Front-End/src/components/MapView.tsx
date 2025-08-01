@@ -93,22 +93,9 @@ type ZoneFeatureResp = {
   amenityIcons: string[]
 }
 
-type ParcelFeature = {
-  geometry: { type: string; coordinates: [number, number] }
-  properties: { id: string; reference: string; isShowroom: boolean; status: string }
-}
-
-type ParcelFeatureResp = {
-  coordinates: [number, number]
-  id: string
-  reference: string
-  isShowroom: boolean
-  status: string
-}
 
 export default function MapView() {
   const [zones, setZones] = useState<ZoneFeature[]>([])
-  const [parcels, setParcels] = useState<ParcelFeature[]>([])
   type Poi = { id: string; coordinates: [number, number]; type: 'station' | 'port' | 'airport' }
   const [pois, setPois] = useState<Poi[]>([])
   const mapRef = useRef<L.Map | null>(null)
@@ -130,18 +117,6 @@ export default function MapView() {
 
   const ICONS = useMemo(
     () => ({
-      parcel: L.divIcon({
-        html: '<div style="background:#3388ff;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
-        className: '',
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
-      }),
-      showroom: L.divIcon({
-        html: '<div style="background:#e53e3e;border-radius:50%;width:12px;height:12px;border:2px solid white"></div>',
-        className: '',
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
-      }),
       station: L.divIcon({
         html: renderToStaticMarkup(<TrainFront width={16} height={16} stroke="#0066ff" />),
         className: '',
@@ -199,27 +174,6 @@ export default function MapView() {
     )
   })
 
-  const ParcelMarker = React.memo(function ParcelMarker({ parcel }: { parcel: ParcelFeature }) {
-    return (
-      <Marker
-        position={parcel.geometry.coordinates}
-        icon={parcel.properties.isShowroom ? ICONS.showroom : ICONS.parcel}
-      >
-        <Popup>
-          <div className="space-y-1 text-sm">
-            <strong>{parcel.properties.reference}</strong>
-            <div>Statut: {parcel.properties.status}</div>
-            <div>
-              Lat: {parcel.geometry.coordinates[0].toFixed(5)}, Lon:{' '}
-              {parcel.geometry.coordinates[1].toFixed(5)}
-            </div>
-            {parcel.properties.isShowroom && <div>Showroom</div>}
-          </div>
-        </Popup>
-      </Marker>
-    )
-  })
-
   const visibleZones = useMemo(() => {
     if (!mapRef.current || zones.length < 100) return zones
     try {
@@ -232,17 +186,6 @@ export default function MapView() {
     }
   }, [zones])
 
-  const visibleParcels = useMemo(() => {
-    if (!mapRef.current || parcels.length < 100) return parcels
-    try {
-      const b = mapRef.current.getBounds()
-      return parcels.filter((p) =>
-        b.contains(L.latLng(p.geometry.coordinates[0], p.geometry.coordinates[1]))
-      )
-    } catch {
-      return parcels
-    }
-  }, [parcels])
 
   const applyOverpassData = useCallback(
     (geojson: FeatureCollection) => {
@@ -353,21 +296,6 @@ export default function MapView() {
         setZones(conv)
       })
       .catch(console.error)
-    fetchApi<{ features: ParcelFeatureResp[] }>("/api/map/parcels")
-      .then((d) => {
-        if (!d) return
-        const conv: ParcelFeature[] = d.features.map((f) => ({
-          geometry: { type: "Point", coordinates: [f.coordinates[0], f.coordinates[1]] },
-          properties: {
-            id: f.id,
-            reference: f.reference,
-            isShowroom: f.isShowroom,
-            status: f.status,
-          },
-        }))
-        setParcels(conv)
-      })
-      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -470,17 +398,6 @@ export default function MapView() {
       >
         {visibleZones.map((z) => (
           <ZoneMarker key={z.properties.id} zone={z} />
-        ))}
-      </MarkerClusterGroup>
-      {/* Cluster séparé pour parcelles */}
-      <MarkerClusterGroup
-        maxClusterRadius={30}
-        disableClusteringAtZoom={16}
-        showCoverageOnHover={false}
-        chunkedLoading
-      >
-        {visibleParcels.map((p) => (
-          <ParcelMarker key={p.properties.id} parcel={p} />
         ))}
       </MarkerClusterGroup>
       {/* Points d'intérêt sans clustering */}
