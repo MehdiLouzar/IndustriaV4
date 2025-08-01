@@ -209,11 +209,11 @@ INSERT INTO appointment (
 SELECT * FROM (VALUES
     ('appt-1', 'Ahmed Benali', 'a.benali@entreprise.ma', '+212 6 12 34 56 78',
      'Industries Benali', 'Intéressé par une parcelle pour activité automobile',
-     '2024-02-15T10:00:00Z', NULL, 'PENDING', NULL,
+     TIMESTAMP '2024-02-15 10:00:00', NULL, 'PENDING', NULL,
      NOW(), NOW(), 'parcel-1', 'user-manager'),
     ('appt-2', 'Fatima Alaoui', 'f.alaoui@logistics.ma', '+212 6 87 65 43 21',
      'Logistics Pro', 'Recherche espace pour entrepôt logistique',
-     '2024-02-20T14:30:00Z', '2024-02-20T14:30:00Z', 'CONFIRMED', 'RDV confirmé par téléphone',
+     TIMESTAMP '2024-02-20 14:30:00', TIMESTAMP '2024-02-20 14:30:00', 'CONFIRMED', 'RDV confirmé par téléphone',
      NOW(), NOW(), 'parcel-2', 'user-manager')
 ) AS data(id, contact_name, contact_email, contact_phone, company_name, message, requested_date, confirmed_date, status, notes, created_at, updated_at, parcel_id, managed_by)
 WHERE NOT EXISTS (SELECT 1 FROM appointment);
@@ -223,18 +223,20 @@ DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notification_template') THEN
         INSERT INTO notification_template (
-            id, name, subject, content, type, created_at, updated_at
+            id, type, subject, html_body, text_body, created_at, updated_at
         )
         SELECT * FROM (VALUES
-            ('tmpl-appointment-confirm', 'Confirmation RDV', 
-             'Confirmation de votre rendez-vous', 
-             'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.', 
-             'EMAIL', NOW(), NOW()),
-            ('tmpl-parcel-available', 'Parcelle disponible', 
-             'Nouvelle parcelle disponible', 
-             'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.', 
-             'EMAIL', NOW(), NOW())
-        ) AS data(id, name, subject, content, type, created_at, updated_at)
+            ('tmpl-appointment-confirm', 'EMAIL',
+             'Confirmation RDV',
+             'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.',
+             'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.',
+             NOW(), NOW()),
+            ('tmpl-parcel-available', 'EMAIL',
+             'Parcelle disponible',
+             'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.',
+             'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.',
+             NOW(), NOW())
+        ) AS data(id, type, subject, html_body, text_body, created_at, updated_at)
         WHERE NOT EXISTS (SELECT 1 FROM notification_template);
     END IF;
 END $$;
