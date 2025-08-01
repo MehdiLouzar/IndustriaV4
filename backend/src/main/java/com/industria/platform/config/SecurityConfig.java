@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -26,7 +27,7 @@ public class SecurityConfig {
     public SecurityFilterChain publicApi(HttpSecurity http) throws Exception {
         http
             // cette chaîne ne s'applique qu'aux requêtes GET sur /api/**
-            .securityMatcher(HttpMethod.GET, "/api/**")
+            .securityMatcher(new AntPathRequestMatcher("/api/**", HttpMethod.GET.name()))
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
