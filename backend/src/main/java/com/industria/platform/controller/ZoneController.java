@@ -89,6 +89,7 @@ public class ZoneController {
     public void delete(@PathVariable String id) { zoneRepository.deleteById(id); }
 
     private ZoneDto toDto(Zone z) {
+        double[] centroid = parseCentroid(z.getGeometry());
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -101,7 +102,9 @@ public class ZoneController {
                 z.getZoneType() == null ? null : z.getZoneType().getId(),
                 z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getId()).toList(),
                 z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getId()).toList(),
-                parseGeometry(z.getGeometry())
+                parseGeometry(z.getGeometry()),
+                centroid[1],
+                centroid[0]
         );
     }
 
@@ -166,6 +169,20 @@ public class ZoneController {
             verts.add(new VertexDto(i / 2, Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
         }
         return verts;
+    }
+
+    private double[] parseCentroid(String wkt) {
+        if (wkt == null) return new double[]{0, 0};
+        String numbers = wkt.replaceAll("[^0-9.\\- ]", " ");
+        String[] parts = numbers.trim().split(" +");
+        double sumX = 0, sumY = 0; int count = 0;
+        for (int i = 0; i + 1 < parts.length; i += 2) {
+            sumX += Double.parseDouble(parts[i]);
+            sumY += Double.parseDouble(parts[i + 1]);
+            count++;
+        }
+        if (count == 0) return new double[]{0, 0};
+        return new double[]{sumX / count, sumY / count};
     }
 
     private String buildGeometry(List<VertexDto> verts) {

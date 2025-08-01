@@ -37,6 +37,8 @@ interface ZoneResponse {
   activityIds?: string[]
   amenityIds?: string[]
   vertices?: { seq: number; lambertX: number; lambertY: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 interface Zone {
@@ -52,6 +54,8 @@ interface Zone {
   amenities?: string[]
   parcels?: Parcel[]
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export default function ZonePage() {
@@ -86,6 +90,8 @@ export default function ZonePage() {
         amenities: amenities.map(a => a?.name || ''),
         parcels: parcels || [],
         vertices: z.vertices,
+        latitude: z.latitude ?? null,
+        longitude: z.longitude ?? null,
       }
       setZone(zone)
     }
