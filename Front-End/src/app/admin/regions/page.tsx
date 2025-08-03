@@ -110,7 +110,7 @@ export default function RegionsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
@@ -131,7 +131,7 @@ export default function RegionsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -158,10 +158,10 @@ export default function RegionsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allCountries.length === 0 ? (
+                  {(allCountries ?? []).length === 0 ? (
                     <SelectItem value="" disabled>Aucun pays trouvé</SelectItem>
                   ) : (
-                    allCountries.map((c) => (
+                    (allCountries ?? []).map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))
                   )}

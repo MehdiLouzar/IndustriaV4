@@ -118,7 +118,7 @@ export default function ActivitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items.map((a) => (
+              {(items ?? []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.description}</td>
@@ -141,12 +141,12 @@ export default function ActivitiesAdmin() {
         value={selectedActivityId}
         onChange={e => setSelectedActivityId(e.target.value)}
       >
-        {allActivities.length === 0 ? (
+        {(allActivities ?? []).length === 0 ? (
           <option value="">Aucune activité trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une activité --</option>
-            {allActivities.map(a => (
+            {(allActivities ?? []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>

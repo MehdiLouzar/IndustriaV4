@@ -122,7 +122,7 @@ export default function AmenitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items.map((a) => (
+              {(items ?? []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.category}</td>
@@ -145,12 +145,12 @@ export default function AmenitiesAdmin() {
         value={selectedAmenityId}
         onChange={e => setSelectedAmenityId(e.target.value)}
       >
-        {allAmenities.length === 0 ? (
+        {(allAmenities ?? []).length === 0 ? (
           <option value="">Aucun équipement trouvé</option>
         ) : (
           <>
             <option value="">-- Sélectionnez un équipement --</option>
-            {allAmenities.map(a => (
+            {(allAmenities ?? []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>

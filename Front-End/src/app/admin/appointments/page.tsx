@@ -171,7 +171,7 @@ export default function AppointmentsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
@@ -192,7 +192,7 @@ export default function AppointmentsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -235,10 +235,10 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allParcels.length === 0 ? (
+                  {(allParcels ?? []).length === 0 ? (
                     <SelectItem value="" disabled>Aucune parcelle trouvée</SelectItem>
                   ) : (
-                    allParcels.map((p) => (
+                    (allParcels ?? []).map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
                     ))
                   )}

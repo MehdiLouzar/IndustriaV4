@@ -338,7 +338,7 @@ export default function ZonesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {zones.map((zone) => (
+              {(zones ?? []).map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
@@ -361,12 +361,12 @@ export default function ZonesAdmin() {
         value={selectedZoneId}
         onChange={e => setSelectedZoneId(e.target.value)}
       >
-        {allZones.length === 0 ? (
+        {(allZones ?? []).length === 0 ? (
           <option value="">Aucune zone trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une zone --</option>
-            {allZones.map(a => (
+            {(allZones ?? []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>
@@ -410,7 +410,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
+              {(form.vertices ?? []).map((v, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
                   <Input
                     placeholder="X"
@@ -451,10 +451,10 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allZoneTypes.length === 0 ? (
+                  {(allZoneTypes ?? []).length === 0 ? (
                     <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
                   ) : (
-                    allZoneTypes.map((t) => (
+                    (allZoneTypes ?? []).map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))
                   )}
@@ -468,10 +468,10 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allRegions.length === 0 ? (
+                  {(allRegions ?? []).length === 0 ? (
                     <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
                   ) : (
-                    allRegions.map((r) => (
+                    (allRegions ?? []).map((r) => (
                       <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))
                   )}
@@ -481,7 +481,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Activités</Label>
               <div className="flex flex-wrap gap-2">
-                {allActivities.map((a) => (
+                {(allActivities ?? []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -496,7 +496,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Équipements</Label>
               <div className="flex flex-wrap gap-2">
-                {allAmenities.map((a) => (
+                {(allAmenities ?? []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -512,7 +512,7 @@ export default function ZonesAdmin() {
               <Label>Photos</Label>
               <Input type="file" multiple onChange={handleFiles} />
               <div className="flex flex-wrap gap-2 mt-2">
-                {images.map((img, idx) => (
+                {(images ?? []).map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img.url} className="w-24 h-24 object-cover rounded" />
                     <button

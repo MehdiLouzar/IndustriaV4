@@ -245,7 +245,7 @@ export default function ParcelsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items.map((p) => (
+              {(items ?? []).map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{p.reference}</td>
                   <td className="p-2 align-top">{p.zoneId}</td>
@@ -268,12 +268,12 @@ export default function ParcelsAdmin() {
         value={selectedParcelId}
         onChange={e => setSelectedParcelId(e.target.value)}
       >
-        {allParcels.length === 0 ? (
+        {(allParcels ?? []).length === 0 ? (
           <option value="">Aucune parcelle trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une parcelle --</option>
-            {allParcels.map(a => (
+            {(allParcels ?? []).map(a => (
               <option key={a.id} value={a.id}>{a.reference}</option>
             ))}
           </>
@@ -310,7 +310,7 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
+              {(form.vertices ?? []).map((v, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
                   <Input
                     placeholder="X"
@@ -338,10 +338,10 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allZones.length === 0 ? (
+                  {(allZones ?? []).length === 0 ? (
                     <SelectItem value="" disabled>Aucune zone trouvée</SelectItem>
                   ) : (
-                    allZones.map((z) => (
+                    (allZones ?? []).map((z) => (
                       <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
                     ))
                   )}
@@ -365,7 +365,7 @@ export default function ParcelsAdmin() {
               <Label>Photos</Label>
               <Input type="file" multiple onChange={handleFiles} />
               <div className="flex flex-wrap gap-2 mt-2">
-                {images.map((img, idx) => (
+                {(images ?? []).map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img.url} className="w-24 h-24 object-cover rounded" />
                     <button
