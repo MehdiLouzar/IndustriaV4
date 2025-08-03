@@ -28,6 +28,14 @@ public class AmenityController {
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
+    @GetMapping("/all")
+    public List<AmenityDto> allAmenities() {
+        return repo.findAll()
+                .stream()
+                .map(a -> new AmenityDto(a.getId(), a.getName(), a.getDescription(), a.getIcon(), a.getCategory()))
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public AmenityDto get(@PathVariable String id) {
         Amenity a = repo.findById(id).orElseThrow();

@@ -28,6 +28,14 @@ public class ActivityController {
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
+    @GetMapping("/all")
+    public List<ActivityDto> allActivities() {
+        return repo.findAll()
+                .stream()
+                .map(a -> new ActivityDto(a.getId(), a.getName(), a.getDescription(), a.getIcon(), a.getCategory()))
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public ActivityDto get(@PathVariable String id) {
         Activity a = repo.findById(id).orElseThrow();

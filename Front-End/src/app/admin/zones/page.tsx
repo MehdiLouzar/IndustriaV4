@@ -64,14 +64,15 @@ const statuses = [
 export default function ZonesAdmin() {
   const router = useRouter()
   const [zones, setZones] = useState<Zone[]>([])
+  const [allZones, setAllZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
-  const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
-  const [activities, setActivities] = useState<{ id: string; name: string }[]>([])
-  const [amenities, setAmenities] = useState<{ id: string; name: string }[]>([])
+  const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
+  const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
+  const [allActivities, setAllActivities] = useState<{ id: string; name: string }[]>([])
+  const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
     id: '',
     name: '',
@@ -87,24 +88,17 @@ export default function ZonesAdmin() {
     vertices: [],
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
+  const [selectedZoneId, setSelectedZoneId] = useState('')
 
   async function load(page = currentPage) {
-    const [z, t, r, a, m] = await Promise.all([
-      fetchApi<ListResponse<Zone>>(`/api/zones?page=${page}&limit=${itemsPerPage}`),
-      fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
-      fetchApi<{ id: string; name: string }[]>('/api/regions'),
-      fetchApi<{ id: string; name: string }[]>('/api/activities'),
-      fetchApi<{ id: string; name: string }[]>('/api/amenities'),
-    ])
+    const z = await fetchApi<ListResponse<Zone>>(
+      `/api/zones?page=${page}&limit=${itemsPerPage}`
+    )
     if (z) {
       setZones(z.items)
       setTotalPages(z.totalPages)
       setCurrentPage(z.page)
     }
-    if (t) setZoneTypes(t)
-    if (r) setRegions(r)
-    if (a) setActivities(a)
-    if (m) setAmenities(m)
   }
 
   useEffect(() => {
@@ -118,6 +112,36 @@ export default function ZonesAdmin() {
     load(currentPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
+
+  useEffect(() => {
+    fetchApi<Zone[]>("/api/zones/all")
+      .then(setAllZones)
+      .catch(() => setAllZones([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/zone-types/all")
+      .then(setAllZoneTypes)
+      .catch(() => setAllZoneTypes([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/regions/all")
+      .then(setAllRegions)
+      .catch(() => setAllRegions([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/activities/all")
+      .then(setAllActivities)
+      .catch(() => setAllActivities([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/amenities/all")
+      .then(setAllAmenities)
+      .catch(() => setAllAmenities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -332,6 +356,23 @@ export default function ZonesAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedZoneId}
+        onChange={e => setSelectedZoneId(e.target.value)}
+      >
+        {allZones.length === 0 ? (
+          <option value="">Aucune zone trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une zone --</option>
+            {allZones.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
         totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
@@ -410,9 +451,13 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zoneTypes.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
+                  {allZoneTypes.length === 0 ? (
+                    <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
+                  ) : (
+                    allZoneTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -423,16 +468,20 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regions.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                  ))}
+                  {allRegions.length === 0 ? (
+                    <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
+                  ) : (
+                    allRegions.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Activités</Label>
               <div className="flex flex-wrap gap-2">
-                {activities.map((a) => (
+                {allActivities.map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -447,7 +496,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Équipements</Label>
               <div className="flex flex-wrap gap-2">
-                {amenities.map((a) => (
+                {allAmenities.map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"

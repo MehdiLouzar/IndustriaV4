@@ -21,6 +21,8 @@ interface Activity {
 export default function ActivitiesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Activity[]>([])
+  const [allActivities, setAllActivities] = useState<Activity[]>([])
+  const [selectedActivityId, setSelectedActivityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
@@ -43,6 +45,12 @@ export default function ActivitiesAdmin() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<Activity[]>("/api/activities/all")
+      .then(setAllActivities)
+      .catch(() => setAllActivities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -127,6 +135,23 @@ export default function ActivitiesAdmin() {
           </table>
         </CardContent>
       </Card>
+
+      <select
+        className="border p-2"
+        value={selectedActivityId}
+        onChange={e => setSelectedActivityId(e.target.value)}
+      >
+        {allActivities.length === 0 ? (
+          <option value="">Aucune activité trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une activité --</option>
+            {allActivities.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
 
       <Pagination
         totalItems={totalPages * itemsPerPage}
