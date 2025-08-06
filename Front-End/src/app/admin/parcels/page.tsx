@@ -362,7 +362,7 @@ export default function ParcelsAdmin() {
                     -- Sélectionnez une zone --
                   </SelectItem>
                   {(Array.isArray(zones) ? zones : [])
-                    .filter((z) => Boolean(z.id))
+                    .filter((z) => z.id != null && z.id !== "")
                     .map((z) => (
                       <SelectItem key={z.id} value={z.id}>
                         {z.name}
@@ -382,7 +382,7 @@ export default function ParcelsAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => Boolean(s))
+                    .filter((s) => s !== "")
                     .map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}

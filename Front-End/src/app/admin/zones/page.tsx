@@ -503,7 +503,7 @@ export default function ZonesAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => Boolean(s))
+                    .filter((s) => s !== "")
                     .map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
@@ -521,7 +521,7 @@ export default function ZonesAdmin() {
                     -- Sélectionnez un type --
                   </SelectItem>
                   {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
-                    .filter((t) => Boolean(t.id))
+                    .filter((t) => t.id != null && t.id !== "")
                     .map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))}
@@ -539,7 +539,7 @@ export default function ZonesAdmin() {
                     -- Sélectionnez une région --
                   </SelectItem>
                   {(Array.isArray(allRegions) ? allRegions : [])
-                    .filter((r) => Boolean(r.id))
+                    .filter((r) => r.id != null && r.id !== "")
                     .map((r) => (
                       <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))}
