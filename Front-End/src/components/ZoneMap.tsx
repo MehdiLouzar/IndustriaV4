@@ -34,7 +34,17 @@ interface Zone {
 
 export default function ZoneMap({ zone }: { zone: Zone }) {
   const [selected, setSelected] = useState<Parcel | null>(null);
+  const [_zone_parcels, setZoneParcels] = useState<Parcel[]>([]);
   const mapRef = useRef<L.Map | null>(null);
+
+  const isParcelWrapper = (data: unknown): data is { items: Parcel[] } =>
+    typeof data === 'object' && data !== null && Array.isArray((data as { items?: unknown }).items);
+
+  useEffect(() => {
+    if (Array.isArray(zone.parcels)) setZoneParcels(zone.parcels);
+    else if (isParcelWrapper(zone.parcels)) setZoneParcels(zone.parcels.items);
+    else setZoneParcels([]);
+  }, [zone.parcels]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -152,7 +162,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
             </div>
           </Popup>
         </Polygon>
-        {zone.parcels?.map(
+        {(Array.isArray(_zone_parcels) ? _zone_parcels : []).map(
           (p) =>
             (p.lambertX != null && p.lambertY != null) && (
               <Polygon
