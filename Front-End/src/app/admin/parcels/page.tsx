@@ -31,6 +31,12 @@ interface Parcel {
   status: string
   isShowroom?: boolean | null
   zoneId: string
+  vertices?: Vertex[]
+}
+
+interface ZoneDto {
+  id: string
+  name: string
 }
 
 interface ParcelForm {
@@ -54,7 +60,7 @@ export default function ParcelsAdmin() {
   const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [allZones, setAllZones] = useState<{ id: string; name: string }[]>([])
+  const [zones, setZones] = useState<ZoneDto[]>([])
   const [form, setForm] = useState<ParcelForm>({
     id: '',
     reference: '',
@@ -70,26 +76,41 @@ export default function ParcelsAdmin() {
   async function load(page = currentPage) {
     const p = await fetchApi<ListResponse<Parcel>>(
       `/api/parcels?page=${page}&limit=${itemsPerPage}`
-    )
+    ).catch(() => null)
     if (p) {
-      setItems(p.items)
-      setTotalPages(p.totalPages)
-      setCurrentPage(p.page)
+      const arr = Array.isArray(p.items) ? p.items : []
+      setItems(arr)
+      setTotalPages(p.totalPages || 1)
+      setCurrentPage(p.page || 1)
+    } else {
+      setItems([])
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
 
   useEffect(() => {
-    fetchApi<Parcel[]>("/api/parcels/all")
-      .then(setAllParcels)
+    fetchApi<ListResponse<Parcel>>("/api/parcels/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllParcels(arr)
+      })
       .catch(() => setAllParcels([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/zones/all")
-      .then(setAllZones)
-      .catch(() => setAllZones([]))
+    fetchApi<ListResponse<ZoneDto>>("/api/zones/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setZones(arr)
+      })
+      .catch(() => setZones([]))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,7 +266,7 @@ export default function ParcelsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? []).map((p) => (
+              {(Array.isArray(items) ? items : []).map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{p.reference}</td>
                   <td className="p-2 align-top">{p.zoneId}</td>
@@ -263,22 +284,23 @@ export default function ParcelsAdmin() {
         </CardContent>
       </Card>
 
-      <select
-        className="border p-2"
-        value={selectedParcelId}
-        onChange={e => setSelectedParcelId(e.target.value)}
+      <Select
+        value={selectedParcelId || undefined}
+        onValueChange={(value) => setSelectedParcelId(value)}
       >
-        {(allParcels ?? []).length === 0 ? (
-          <option value="">Aucune parcelle trouvée</option>
-        ) : (
-          <>
-            <option value="">-- Sélectionnez une parcelle --</option>
-            {(allParcels ?? []).map(a => (
-              <option key={a.id} value={a.id}>{a.reference}</option>
+        <SelectTrigger>
+          <SelectValue placeholder="-- Sélectionnez une parcelle --" />
+        </SelectTrigger>
+        <SelectContent>
+          {(Array.isArray(allParcels) ? allParcels : [])
+            .filter((parcel) => Boolean(parcel.id))
+            .map((parcel) => (
+              <SelectItem key={parcel.id} value={parcel.id}>
+                {parcel.reference}
+              </SelectItem>
             ))}
-          </>
-        )}
-      </select>
+        </SelectContent>
+      </Select>
 
       <Pagination
         totalItems={totalPages * itemsPerPage}
@@ -335,16 +357,16 @@ export default function ParcelsAdmin() {
               <Label htmlFor="zoneId">Zone</Label>
               <Select value={form.zoneId || undefined} onValueChange={handleZone}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allZones ?? []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucune zone trouvée</SelectItem>
-                  ) : (
-                    (allZones ?? []).map((z) => (
-                      <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
-                    ))
-                  )}
+                  {(Array.isArray(zones) ? zones : [])
+                    .filter((z) => z.id && String(z.id).trim() !== "")
+                    .map((z) => (
+                      <SelectItem key={z.id} value={String(z.id)}>
+                        {z.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -352,12 +374,14 @@ export default function ParcelsAdmin() {
               <Label htmlFor="status">Statut</Label>
               <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  {statuses
+                    .filter((s) => s && s.trim() !== "")
+                    .map((s) => (
+                      <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

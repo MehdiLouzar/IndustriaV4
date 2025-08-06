@@ -4,6 +4,8 @@ import com.industria.platform.dto.ZoneTypeDto;
 import com.industria.platform.entity.ZoneType;
 import com.industria.platform.repository.ZoneTypeRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -19,6 +21,13 @@ public class ZoneTypeController {
         return repo.findAll().stream()
                 .map(t -> new ZoneTypeDto(t.getId(), t.getName()))
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    public ZoneTypeDto getById(@PathVariable String id) {
+        var zt = repo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ZoneType not found"));
+        return new ZoneTypeDto(zt.getId(), zt.getName());
     }
 
     @PostMapping

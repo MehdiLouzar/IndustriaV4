@@ -6,6 +6,8 @@ import com.industria.platform.entity.Region;
 import com.industria.platform.repository.CountryRepository;
 import com.industria.platform.repository.RegionRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -26,6 +28,14 @@ public class RegionController {
                 .map(r -> new RegionDto(r.getId(), r.getName(), r.getCode(),
                         r.getCountry() != null ? r.getCountry().getId() : null))
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    public RegionDto getById(@PathVariable String id) {
+        var region = repo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Region not found"));
+        return new RegionDto(region.getId(), region.getName(), region.getCode(),
+                region.getCountry() != null ? region.getCountry().getId() : null);
     }
 
     @PostMapping

@@ -39,6 +39,11 @@ interface Zone {
   vertices?: Vertex[]
 }
 
+interface ActivityDto {
+  id: string
+  name: string
+}
+
 interface ZoneForm {
   id: string
   name: string
@@ -71,7 +76,7 @@ export default function ZonesAdmin() {
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
   const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
-  const [allActivities, setAllActivities] = useState<{ id: string; name: string }[]>([])
+  const [activities, setActivities] = useState<ActivityDto[]>([])
   const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
     id: '',
@@ -90,15 +95,21 @@ export default function ZonesAdmin() {
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
   const [selectedZoneId, setSelectedZoneId] = useState('')
 
-  async function load(page = currentPage) {
-    const z = await fetchApi<ListResponse<Zone>>(
+  async function loadZones(page = currentPage) {
+    const response = await fetchApi<ListResponse<Zone>>(
       `/api/zones?page=${page}&limit=${itemsPerPage}`
-    )
-    if (z) {
-      setZones(z.items)
-      setTotalPages(z.totalPages)
-      setCurrentPage(z.page)
+    ).catch(() => null)
+    let zonesData: Zone[] = []
+    if (response && Array.isArray(response.items)) {
+      zonesData = response.items
+    } else if (Array.isArray(response)) {
+      zonesData = response as unknown as Zone[]
+    } else if (response) {
+      console.warn('⚠️ Format de données inattendu:', response)
     }
+    setZones(zonesData)
+    setTotalPages(response?.totalPages ?? 1)
+    setCurrentPage(response?.page ?? 1)
   }
 
   useEffect(() => {
@@ -109,37 +120,87 @@ export default function ZonesAdmin() {
         return
       }
     }
-    load(currentPage)
+    loadZones(currentPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
 
   useEffect(() => {
-    fetchApi<Zone[]>("/api/zones/all")
-      .then(setAllZones)
+    fetchApi<ListResponse<Zone>>("/api/zones/all")
+      .then((response) => {
+        let arr: Zone[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as Zone[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
+        }
+        setAllZones(arr)
+      })
       .catch(() => setAllZones([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/zone-types/all")
-      .then(setAllZoneTypes)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/zone-types/all")
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
+        }
+        setAllZoneTypes(arr)
+      })
       .catch(() => setAllZoneTypes([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/regions/all")
-      .then(setAllRegions)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/regions/all")
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
+        }
+        setAllRegions(arr)
+      })
       .catch(() => setAllRegions([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/activities/all")
-      .then(setAllActivities)
-      .catch(() => setAllActivities([]))
+    fetchApi<ListResponse<ActivityDto>>("/api/activities")
+      .then((response) => {
+        let arr: ActivityDto[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as ActivityDto[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
+        }
+        setActivities(arr)
+      })
+      .catch(() => setActivities([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/amenities/all")
-      .then(setAllAmenities)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
+        }
+        setAllAmenities(arr)
+      })
       .catch(() => setAllAmenities([]))
   }, [])
 
@@ -271,7 +332,7 @@ export default function ZonesAdmin() {
     })
     setImages([])
     setOpen(false)
-    load(currentPage)
+    loadZones(currentPage)
   }
 
   async function edit(z: Zone) {
@@ -285,7 +346,7 @@ export default function ZonesAdmin() {
       status: z.status,
       zoneTypeId: z.zoneTypeId || '',
       regionId: z.regionId || '',
-      activityIds: z.activities ? z.activities.map(a => a.activityId) : [],
+      activityIds: Array.isArray(z.activities) ? z.activities.map(a => a.activityId) : [],
       amenityIds: z.amenities ? z.amenities.map(a => a.amenityId) : [],
       vertices: z.vertices ? z.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
         lambertX: v.lambertX.toString(),
@@ -298,7 +359,7 @@ export default function ZonesAdmin() {
 
   async function del(id: string) {
     await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    loadZones(currentPage)
   }
 
   function addNew() {
@@ -338,7 +399,7 @@ export default function ZonesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(zones ?? []).map((zone) => (
+              {(Array.isArray(zones) ? zones : []).map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
@@ -361,12 +422,12 @@ export default function ZonesAdmin() {
         value={selectedZoneId}
         onChange={e => setSelectedZoneId(e.target.value)}
       >
-        {(allZones ?? []).length === 0 ? (
+        {(Array.isArray(allZones) ? allZones.length : 0) === 0 ? (
           <option value="">Aucune zone trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une zone --</option>
-            {(allZones ?? []).map(a => (
+            {(Array.isArray(allZones) ? allZones : []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>
@@ -435,12 +496,14 @@ export default function ZonesAdmin() {
               <Label htmlFor="status">Statut</Label>
               <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  {statuses
+                    .filter((s) => s && s.trim() !== "")
+                    .map((s) => (
+                      <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -448,16 +511,14 @@ export default function ZonesAdmin() {
               <Label htmlFor="zoneTypeId">Type</Label>
               <Select value={form.zoneTypeId || undefined} onValueChange={handleZoneType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un type --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allZoneTypes ?? []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
-                  ) : (
-                    (allZoneTypes ?? []).map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))
-                  )}
+                  {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
+                    .filter((t) => t.id && String(t.id).trim() !== "")
+                    .map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -465,23 +526,21 @@ export default function ZonesAdmin() {
               <Label htmlFor="regionId">Région</Label>
               <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une région --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allRegions ?? []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
-                  ) : (
-                    (allRegions ?? []).map((r) => (
-                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                    ))
-                  )}
+                  {(Array.isArray(allRegions) ? allRegions : [])
+                    .filter((r) => r.id && String(r.id).trim() !== "")
+                    .map((r) => (
+                      <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Activités</Label>
               <div className="flex flex-wrap gap-2">
-                {(allActivities ?? []).map((a) => (
+                {(Array.isArray(activities) ? activities : []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -496,7 +555,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Équipements</Label>
               <div className="flex flex-wrap gap-2">
-                {(allAmenities ?? []).map((a) => (
+                {(Array.isArray(allAmenities) ? allAmenities : []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"

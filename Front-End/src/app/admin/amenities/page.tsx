@@ -38,19 +38,32 @@ export default function AmenitiesAdmin() {
 
 
   async function load(page = currentPage) {
-    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`)
+    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
     if (res) {
-      setItems(res.items)
-      setTotalPages(res.totalPages)
-      setCurrentPage(res.page)
+      const arr = Array.isArray(res.items) ? res.items : []
+      setItems(arr)
+      setTotalPages(res.totalPages || 1)
+      setCurrentPage(res.page || 1)
+    } else {
+      setItems([])
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
 
   useEffect(() => {
-    fetchApi<Amenity[]>("/api/amenities/all")
-      .then(setAllAmenities)
+    fetchApi<ListResponse<Amenity>>("/api/amenities/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
+            : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllAmenities(arr)
+      })
       .catch(() => setAllAmenities([]))
   }, [])
 
@@ -122,7 +135,7 @@ export default function AmenitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? []).map((a) => (
+              {(Array.isArray(items) ? items : []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.category}</td>
@@ -145,12 +158,12 @@ export default function AmenitiesAdmin() {
         value={selectedAmenityId}
         onChange={e => setSelectedAmenityId(e.target.value)}
       >
-        {(allAmenities ?? []).length === 0 ? (
+        {(Array.isArray(allAmenities) ? allAmenities.length : 0) === 0 ? (
           <option value="">Aucun équipement trouvé</option>
         ) : (
           <>
             <option value="">-- Sélectionnez un équipement --</option>
-            {(allAmenities ?? []).map(a => (
+            {(Array.isArray(allAmenities) ? allAmenities : []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>

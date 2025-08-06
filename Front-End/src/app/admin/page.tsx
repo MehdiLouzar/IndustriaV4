@@ -19,20 +19,22 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const emptyStats = {
+  totalUsers: 0,
+  totalZones: 0,
+  availableParcels: 0,
+  totalParcels: 0,
+  pendingAppointments: 0,
+  totalAppointments: 0,
+  recentActivities: [] as unknown[],
+};
+
 async function getAdminStats() {
-  const data = await fetchApi('/api/admin/stats');
-  if (!data) {
-    return {
-      totalUsers: 0,
-      totalZones: 0,
-      availableParcels: 0,
-      totalParcels: 0,
-      pendingAppointments: 0,
-      totalAppointments: 0,
-      recentActivities: []
-    };
+  if (typeof window !== 'undefined') {
+    return emptyStats;
   }
-  return data;
+  const data = await fetchApi('/api/admin/stats').catch(() => null);
+  return data || emptyStats;
 }
 
 export default async function AdminDashboard() {
@@ -195,10 +197,10 @@ export default async function AdminDashboard() {
 
         {/* Actions d'administration */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {(filteredCards ?? []).map((card, index) => {
+          {(Array.isArray(filteredCards) ? filteredCards : []).map((card, index) => {
             const IconComponent = card.icon;
             return (
-              <Link key={index} href={card.href}>
+              <Link key={index} href={card.href} prefetch={false}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                   <CardHeader>
                     <div className="flex items-center gap-3">
@@ -227,7 +229,7 @@ export default async function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(stats.recentActivities ?? []).map((activity, index) => (
+              {(Array.isArray(stats.recentActivities) ? stats.recentActivities : []).map((activity, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b last:border-b-0">
                   <div>
                     <p className="text-sm font-medium">{activity.action}</p>
@@ -243,7 +245,7 @@ export default async function AdminDashboard() {
                   </div>
                 </div>
               ))}
-              {(stats.recentActivities ?? []).length === 0 && (
+              {(Array.isArray(stats.recentActivities) ? stats.recentActivities.length : 0) === 0 && (
                 <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
               )}
             </div>

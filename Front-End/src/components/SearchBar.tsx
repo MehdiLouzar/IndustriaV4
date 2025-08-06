@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Search, MapPin, Factory } from 'lucide-react'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 
 interface Filters {
   regionId: string
@@ -58,11 +59,27 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
   useEffect(() => {
     async function load() {
       const [r, t] = await Promise.all([
-        fetchApi<{ id: string; name: string }[]>('/api/regions'),
-        fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
+        fetchApi<ListResponse<{ id: string; name: string }>>('/api/regions'),
+        fetchApi<ListResponse<{ id: string; name: string }>>('/api/zone-types'),
       ])
-      if (r) setRegions(r)
-      if (t) setZoneTypes(t)
+      if (r) {
+        const arr = Array.isArray(r.items) ? r.items : []
+        if (!Array.isArray(r.items) && !Array.isArray(r)) {
+          console.warn('⚠️ Format de données inattendu:', r)
+        }
+        setRegions(arr)
+      } else {
+        setRegions([])
+      }
+      if (t) {
+        const arr = Array.isArray(t.items) ? t.items : []
+        if (!Array.isArray(t.items) && !Array.isArray(t)) {
+          console.warn('⚠️ Format de données inattendu:', t)
+        }
+        setZoneTypes(arr)
+      } else {
+        setZoneTypes([])
+      }
     }
     load()
   }, [])
@@ -104,7 +121,7 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
           <Select value={filters.regionId} onValueChange={(v) => setFilters({ ...filters, regionId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>
             <SelectContent>
-              {regions.map((r) => (
+              {(Array.isArray(regions) ? regions : []).map((r) => (
                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
               ))}
             </SelectContent>
@@ -118,7 +135,7 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
           <Select value={filters.zoneTypeId} onValueChange={(v) => setFilters({ ...filters, zoneTypeId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>
             <SelectContent>
-              {zoneTypes.map((t) => (
+              {(Array.isArray(zoneTypes) ? zoneTypes : []).map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
               ))}
             </SelectContent>

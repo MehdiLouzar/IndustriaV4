@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -49,10 +50,13 @@ export default function UsersAdmin() {
 
 
   const load = useCallback(async () => {
-    const users = await fetchApi<User[]>('/api/users')
+    const users = await fetchApi<ListResponse<User>>('/api/users').catch(() => null)
     if (users) {
-      setItems(users)
+      const arr = Array.isArray(users.items) ? users.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }, [])
   useEffect(() => { load() }, [load])
@@ -132,7 +136,7 @@ export default function UsersAdmin() {
   }, [])
 
   const paginatedItems = useMemo(
-    () => (items ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    () => (Array.isArray(items) ? items : []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
     [items, currentPage]
   )
 
@@ -155,7 +159,7 @@ export default function UsersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(paginatedItems ?? []).map((u) => (
+              {(Array.isArray(paginatedItems) ? paginatedItems : []).map((u) => (
                 <tr key={u.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{u.email}</td>
                   <td className="p-2 align-top">{u.role}</td>
@@ -175,7 +179,7 @@ export default function UsersAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -205,9 +209,9 @@ export default function UsersAdmin() {
             </div>
             <div>
               <Label htmlFor="role">Rôle</Label>
-              <Select value={form.role || undefined} onValueChange={handleRole}>
+              <Select value={form.role} onValueChange={handleRole}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="Choisir un rôle" />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (

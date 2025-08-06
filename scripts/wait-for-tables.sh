@@ -6,6 +6,7 @@ DB_HOST=${DB_HOST:-db}
 DB_NAME=${DB_NAME:-industria}
 DB_USER=${DB_USER:-postgres}
 DB_PASSWORD=${DB_PASSWORD:-postgres}
+export PGPASSWORD="$DB_PASSWORD"
 
 echo "🔍 Waiting for Hibernate to create tables..."
 
@@ -24,7 +25,7 @@ REQUIRED_TABLES=(
 
 check_table_exists() {
     local table_name=$1
-    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -tAc \
+    psql -h $DB_HOST -U $DB_USER -d $DB_NAME -tAc \
         "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$table_name'" 2>/dev/null || echo ""
 }
 
@@ -60,7 +61,7 @@ wait_for_all_tables() {
 
 # Attendre d'abord que PostgreSQL soit accessible
 echo "🔌 Checking PostgreSQL connection..."
-while ! PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c '\q' 2>/dev/null; do
+while ! psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c '\q' 2>/dev/null; do
     echo "   Waiting for PostgreSQL connection..."
     sleep 2
 done

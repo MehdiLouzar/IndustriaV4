@@ -145,6 +145,46 @@ const SelectSeparator = React.forwardRef<
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelectFieldProps {
+  options: SelectOption[]
+  placeholder: string
+  value?: string
+  onValueChange?: (value: string) => void
+}
+
+function SelectField({
+  options,
+  placeholder,
+  value,
+  onValueChange,
+}: SelectFieldProps) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="" disabled>
+          {placeholder}
+        </SelectItem>
+        {options
+          .filter((opt) => opt.value && opt.value.trim() !== "")
+          .map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+
 export {
   Select,
   SelectGroup,
@@ -156,4 +196,5 @@ export {
   SelectSeparator,
   SelectScrollUpButton,
   SelectScrollDownButton,
+  SelectField,
 }

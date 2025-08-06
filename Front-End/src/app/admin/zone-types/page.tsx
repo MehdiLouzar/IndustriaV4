@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 
 interface ZoneType {
   id: string
@@ -24,10 +25,13 @@ export default function ZoneTypesAdmin() {
   const [form, setForm] = useState<ZoneType>({ id: '', name: '' })
 
   async function load() {
-    const items = await fetchApi<ZoneType[]>('/api/zone-types')
+    const items = await fetchApi<ListResponse<ZoneType>>('/api/zone-types').catch(() => null)
     if (items) {
-      setItems(items)
+      const arr = Array.isArray(items.items) ? items.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }
   useEffect(() => { load() }, [])
@@ -87,7 +91,7 @@ export default function ZoneTypesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? [])
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((t) => (
                 <tr key={t.id} className="border-b last:border-0">
@@ -106,7 +110,7 @@ export default function ZoneTypesAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

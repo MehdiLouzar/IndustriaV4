@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -35,17 +36,26 @@ export default function RegionsAdmin() {
 
 
   async function load() {
-    const r = await fetchApi<Region[]>('/api/regions')
+    const r = await fetchApi<ListResponse<Region>>('/api/regions').catch(() => null)
     if (r) {
-      setItems(r)
+      const arr = Array.isArray(r.items) ? r.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/countries/all")
-      .then(setAllCountries)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/countries/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllCountries(arr)
+      })
       .catch(() => setAllCountries([]))
   }, [])
 
@@ -110,7 +120,7 @@ export default function RegionsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? [])
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
@@ -131,7 +141,7 @@ export default function RegionsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -155,16 +165,14 @@ export default function RegionsAdmin() {
               <Label htmlFor="countryId">Pays</Label>
               <Select value={form.countryId || undefined} onValueChange={handleCountry}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un pays --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allCountries ?? []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucun pays trouvé</SelectItem>
-                  ) : (
-                    (allCountries ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))
-                  )}
+                  {(Array.isArray(allCountries) ? allCountries : [])
+                    .filter((c) => c.id && String(c.id).trim() !== "")
+                    .map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
