@@ -283,22 +283,26 @@ export default function ParcelsAdmin() {
         </CardContent>
       </Card>
 
-      <select
-        className="border p-2"
-        value={selectedParcelId}
-        onChange={e => setSelectedParcelId(e.target.value)}
+      <Select
+        value={selectedParcelId || undefined}
+        onValueChange={(value) => setSelectedParcelId(value)}
       >
-        {(Array.isArray(allParcels) ? allParcels.length : 0) === 0 ? (
-          <option value="">Aucune parcelle trouvée</option>
-        ) : (
-          <>
-            <option value="">-- Sélectionnez une parcelle --</option>
-            {(Array.isArray(allParcels) ? allParcels : []).map(a => (
-              <option key={a.id} value={a.id}>{a.reference}</option>
+        <SelectTrigger>
+          <SelectValue placeholder="Choisir" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="" disabled>
+            -- Sélectionnez une parcelle --
+          </SelectItem>
+          {(Array.isArray(allParcels) ? allParcels : [])
+            .filter((parcel) => Boolean(parcel.id))
+            .map((parcel) => (
+              <SelectItem key={parcel.id} value={parcel.id}>
+                {parcel.reference}
+              </SelectItem>
             ))}
-          </>
-        )}
-      </select>
+        </SelectContent>
+      </Select>
 
       <Pagination
         totalItems={totalPages * itemsPerPage}
