@@ -95,18 +95,21 @@ export default function ZonesAdmin() {
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
   const [selectedZoneId, setSelectedZoneId] = useState('')
 
-  async function load(page = currentPage) {
-    const z = await fetchApi<ListResponse<Zone>>(
+  async function loadZones(page = currentPage) {
+    const response = await fetchApi<ListResponse<Zone>>(
       `/api/zones?page=${page}&limit=${itemsPerPage}`
     ).catch(() => null)
-    if (z) {
-      const arr = Array.isArray(z.items) ? z.items : []
-      setZones(arr)
-      setTotalPages(z.totalPages || 1)
-      setCurrentPage(z.page || 1)
-    } else {
-      setZones([])
+    let zonesData: Zone[] = []
+    if (response && Array.isArray(response.items)) {
+      zonesData = response.items
+    } else if (Array.isArray(response)) {
+      zonesData = response as unknown as Zone[]
+    } else if (response) {
+      console.warn('⚠️ Format de données inattendu:', response)
     }
+    setZones(zonesData)
+    setTotalPages(response?.totalPages ?? 1)
+    setCurrentPage(response?.page ?? 1)
   }
 
   useEffect(() => {
@@ -117,16 +120,20 @@ export default function ZonesAdmin() {
         return
       }
     }
-    load(currentPage)
+    loadZones(currentPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
 
   useEffect(() => {
     fetchApi<ListResponse<Zone>>("/api/zones/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
+      .then((response) => {
+        let arr: Zone[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as Zone[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
         }
         setAllZones(arr)
       })
@@ -135,10 +142,14 @@ export default function ZonesAdmin() {
 
   useEffect(() => {
     fetchApi<ListResponse<{ id: string; name: string }>>("/api/zone-types/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
         }
         setAllZoneTypes(arr)
       })
@@ -147,10 +158,14 @@ export default function ZonesAdmin() {
 
   useEffect(() => {
     fetchApi<ListResponse<{ id: string; name: string }>>("/api/regions/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
         }
         setAllRegions(arr)
       })
@@ -159,10 +174,14 @@ export default function ZonesAdmin() {
 
   useEffect(() => {
     fetchApi<ListResponse<ActivityDto>>("/api/activities")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
+      .then((response) => {
+        let arr: ActivityDto[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as ActivityDto[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
         }
         setActivities(arr)
       })
@@ -171,10 +190,14 @@ export default function ZonesAdmin() {
 
   useEffect(() => {
     fetchApi<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
+      .then((response) => {
+        let arr: { id: string; name: string }[] = []
+        if (response && Array.isArray(response.items)) {
+          arr = response.items
+        } else if (Array.isArray(response)) {
+          arr = response as unknown as { id: string; name: string }[]
+        } else if (response) {
+          console.warn('⚠️ Format de données inattendu:', response)
         }
         setAllAmenities(arr)
       })
@@ -309,7 +332,7 @@ export default function ZonesAdmin() {
     })
     setImages([])
     setOpen(false)
-    load(currentPage)
+    loadZones(currentPage)
   }
 
   async function edit(z: Zone) {
@@ -336,7 +359,7 @@ export default function ZonesAdmin() {
 
   async function del(id: string) {
     await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    loadZones(currentPage)
   }
 
   function addNew() {
