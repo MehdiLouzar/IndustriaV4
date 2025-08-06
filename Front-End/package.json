@@ -25,6 +25,7 @@
     "lucide-react": "^0.475.0",
     "maplibre-gl": "^5.6.1",
     "next": "15.3.2",
+    "next-auth": "^4.24.11",
     "osmtogeojson": "^3.0.0-beta.5",
     "proj4": "^2.9.1",
     "react": "^19.0.0",
@@ -39,6 +40,7 @@
     "zod": "^4.0.5"
   },
   "devDependencies": {
+    "@types/next-auth": "^3.15.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

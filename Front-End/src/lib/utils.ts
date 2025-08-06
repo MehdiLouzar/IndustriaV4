@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { getSession } from 'next-auth/react'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -105,7 +104,8 @@ if (typeof window !== 'undefined') {
 
 export async function fetchApi<T>(
   path: string,
-  init?: RequestInit & { signal?: AbortSignal }
+  init?: RequestInit & { signal?: AbortSignal },
+  token?: string
 ): Promise<T | null> {
   let abortController: AbortController | null = null
   try {
@@ -127,19 +127,15 @@ export async function fetchApi<T>(
       if (cached) return cached as T
     }
 
-    if (typeof window !== 'undefined') {
-      const session = await getSession()
-      const token = session?.accessToken as string | undefined
-      const isProtected =
-        path.startsWith('/api/admin') ||
-        (path.startsWith('/api') && !path.startsWith('/api/public'))
+    const isProtected =
+      path.startsWith('/api/admin') ||
+      (path.startsWith('/api') && !path.startsWith('/api/public'))
 
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`)
-      } else if (isProtected) {
-        window.location.href = '/auth/login'
-        return Promise.reject(new Error('Missing auth token'))
-      }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    } else if (isProtected && typeof window !== 'undefined') {
+      window.location.href = '/auth/login'
+      return Promise.reject(new Error('Missing auth token'))
     }
 
     const res = await fetch(url.toString(), { credentials: 'include', ...init, headers })
