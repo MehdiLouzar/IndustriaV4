@@ -6,11 +6,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -21,39 +19,24 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    // 1) Chaîne publique : seuls les GET sur /api/** sont autorisés
     @Bean
-    @Order(1)
-    public SecurityFilterChain publicApi(HttpSecurity http) throws Exception {
-        http
-            // cette chaîne ne s'applique qu'aux requêtes GET sur /api/**
-            .securityMatcher(new AntPathRequestMatcher("/api/**", HttpMethod.GET.name()))
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-            .sessionManagement(sess ->
-                sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            );
-        return http.build();
-    }
-
-    // 2) Chaîne JWT : toutes les autres requêtes sur /api/** doivent être authentifiées
-    @Bean
-    @Order(2)
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
             .securityMatcher("/api/**")
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // si vous avez d’autres endpoints publics, spécifiez-les ici
-                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN","ZONE_MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+                .requestMatchers("/api/auth/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             )
-            .sessionManagement(sess -> 
+            .sessionManagement(sess ->
                 sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
         return http.build();
