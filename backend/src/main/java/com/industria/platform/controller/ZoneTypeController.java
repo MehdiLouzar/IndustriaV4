@@ -23,6 +23,13 @@ public class ZoneTypeController {
                 .toList();
     }
 
+    @GetMapping("/all")
+    public List<ZoneTypeDto> getAll() {
+        return repo.findAll().stream()
+                .map(t -> new ZoneTypeDto(t.getId(), t.getName()))
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public ZoneTypeDto getById(@PathVariable String id) {
         var zt = repo.findById(id)

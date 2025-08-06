@@ -115,6 +115,9 @@ export async function fetchApi<T>(
 
     const url = new URL(path, getBaseUrl())
     const headers = new Headers(init?.headers)
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json')
+    }
     const method = init?.method?.toUpperCase() || 'GET'
     const cacheKey = `${method}:${url}`
 
@@ -130,7 +133,7 @@ export async function fetchApi<T>(
       }
     }
 
-    const res = await fetch(url.toString(), { ...init, headers })
+    const res = await fetch(url.toString(), { credentials: 'include', ...init, headers })
     if (init.signal?.aborted) return null
     if (!res.ok) {
       if (res.status === 401 && typeof window !== 'undefined') {

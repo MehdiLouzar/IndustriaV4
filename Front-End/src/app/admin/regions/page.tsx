@@ -10,13 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
+import { SelectField } from '@/components/ui/select'
 
 interface Region {
   id: string
@@ -48,15 +42,10 @@ export default function RegionsAdmin() {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    fetchApi<ListResponse<{ id: string; name: string }>>("/api/countries/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
-        }
-        setAllCountries(arr)
-      })
-      .catch(() => setAllCountries([]))
+    fetchApi<{ id: string; name: string }[]>(
+      '/api/countries/all',
+      { credentials: 'include' }
+    ).then(setAllCountries)
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,18 +152,15 @@ export default function RegionsAdmin() {
             </div>
             <div>
               <Label htmlFor="countryId">Pays</Label>
-              <Select value={form.countryId || undefined} onValueChange={handleCountry}>
-                <SelectTrigger>
-                  <SelectValue placeholder="-- Sélectionnez un pays --" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(allCountries) ? allCountries : [])
-                    .filter((c) => c.id && String(c.id).trim() !== "")
-                    .map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <SelectField
+                options={[
+                  { value: '', label: '-- Sélectionnez --' },
+                  ...allCountries.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder="-- Sélectionnez un pays --"
+                value={form.countryId}
+                onValueChange={handleCountry}
+              />
             </div>
             <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
           </form>

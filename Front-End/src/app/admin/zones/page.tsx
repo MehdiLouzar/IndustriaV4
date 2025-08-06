@@ -16,6 +16,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  SelectField,
 } from '@/components/ui/select'
 
 interface Vertex {
@@ -125,7 +126,7 @@ export default function ZonesAdmin() {
   }, [currentPage, router])
 
   useEffect(() => {
-    fetchApi<ListResponse<Zone>>("/api/zones/all")
+    fetchApi<ListResponse<Zone>>('/api/zones/all')
       .then((response) => {
         let arr: Zone[] = []
         if (response && Array.isArray(response.items)) {
@@ -141,35 +142,11 @@ export default function ZonesAdmin() {
   }, [])
 
   useEffect(() => {
-    fetchApi<ListResponse<{ id: string; name: string }>>("/api/zone-types/all")
-      .then((response) => {
-        let arr: { id: string; name: string }[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as { id: string; name: string }[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setAllZoneTypes(arr)
-      })
-      .catch(() => setAllZoneTypes([]))
+    fetchApi<{ id: string; name: string }[]>('/api/zone-types/all').then(setAllZoneTypes)
   }, [])
 
   useEffect(() => {
-    fetchApi<ListResponse<{ id: string; name: string }>>("/api/regions/all")
-      .then((response) => {
-        let arr: { id: string; name: string }[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as { id: string; name: string }[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setAllRegions(arr)
-      })
-      .catch(() => setAllRegions([]))
+    fetchApi<{ id: string; name: string }[]>('/api/regions/all').then(setAllRegions)
   }, [])
 
   useEffect(() => {
@@ -509,33 +486,27 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneTypeId">Type</Label>
-              <Select value={form.zoneTypeId || undefined} onValueChange={handleZoneType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="-- Sélectionnez un type --" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
-                    .filter((t) => t.id && String(t.id).trim() !== "")
-                    .map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <SelectField
+                options={[
+                  { value: '', label: '-- Sélectionnez --' },
+                  ...allZoneTypes.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+                placeholder="-- Sélectionnez un type --"
+                value={form.zoneTypeId}
+                onValueChange={handleZoneType}
+              />
             </div>
             <div>
               <Label htmlFor="regionId">Région</Label>
-              <Select value={form.regionId || undefined} onValueChange={handleRegion}>
-                <SelectTrigger>
-                  <SelectValue placeholder="-- Sélectionnez une région --" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(allRegions) ? allRegions : [])
-                    .filter((r) => r.id && String(r.id).trim() !== "")
-                    .map((r) => (
-                      <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <SelectField
+                options={[
+                  { value: '', label: '-- Sélectionnez --' },
+                  ...allRegions.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+                placeholder="-- Sélectionnez une région --"
+                value={form.regionId}
+                onValueChange={handleRegion}
+              />
             </div>
             <div>
               <Label>Activités</Label>

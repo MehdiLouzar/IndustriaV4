@@ -3,6 +3,7 @@ package com.industria.platform.controller;
 import com.industria.platform.dto.CountryDto;
 import com.industria.platform.entity.Country;
 import com.industria.platform.repository.CountryRepository;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +17,14 @@ public class CountryController {
 
     @GetMapping
     public List<CountryDto> all() {
+        return repo.findAll().stream()
+                .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
+                .toList();
+    }
+
+    @GetMapping("/all")
+    @PermitAll
+    public List<CountryDto> getAll() {
         return repo.findAll().stream()
                 .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
                 .toList();

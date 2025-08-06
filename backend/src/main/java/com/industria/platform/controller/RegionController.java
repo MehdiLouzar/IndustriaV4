@@ -30,6 +30,14 @@ public class RegionController {
                 .toList();
     }
 
+    @GetMapping("/all")
+    public List<RegionDto> getAll() {
+        return repo.findAll().stream()
+                .map(r -> new RegionDto(r.getId(), r.getName(), r.getCode(),
+                        r.getCountry() != null ? r.getCountry().getId() : null))
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public RegionDto getById(@PathVariable String id) {
         var region = repo.findById(id)
