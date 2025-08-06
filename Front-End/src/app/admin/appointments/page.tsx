@@ -254,9 +254,9 @@ export default function AppointmentsAdmin() {
                     -- Sélectionnez une parcelle --
                   </SelectItem>
                   {(Array.isArray(parcels) ? parcels : [])
-                    .filter((p) => p.id != null && p.id !== "")
+                    .filter((p) => p.id && String(p.id).trim() !== "")
                     .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
+                      <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
@@ -272,9 +272,9 @@ export default function AppointmentsAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => s !== "")
+                    .filter((s) => s && s.trim() !== "")
                     .map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                      <SelectItem key={s} value={String(s)}>{s}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>

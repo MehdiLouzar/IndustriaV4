@@ -172,9 +172,9 @@ export default function RegionsAdmin() {
                     -- Sélectionnez un pays --
                   </SelectItem>
                   {(Array.isArray(allCountries) ? allCountries : [])
-                    .filter((c) => c.id != null && c.id !== "")
+                    .filter((c) => c.id && String(c.id).trim() !== "")
                     .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>

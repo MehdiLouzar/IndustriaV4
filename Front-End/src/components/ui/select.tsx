@@ -173,7 +173,7 @@ function SelectField({
           {placeholder}
         </SelectItem>
         {options
-          .filter((opt) => opt.value != null && opt.value !== "")
+          .filter((opt) => opt.value && opt.value.trim() !== "")
           .map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}

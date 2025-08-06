@@ -218,9 +218,9 @@ export default function UsersAdmin() {
                     -- Sélectionnez un rôle --
                   </SelectItem>
                   {roles
-                    .filter((r) => r !== "")
+                    .filter((r) => r && r.trim() !== "")
                     .map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                      <SelectItem key={r} value={String(r)}>{r}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>

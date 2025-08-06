@@ -503,9 +503,9 @@ export default function ZonesAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => s !== "")
+                    .filter((s) => s && s.trim() !== "")
                     .map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                      <SelectItem key={s} value={String(s)}>{s}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
@@ -521,9 +521,9 @@ export default function ZonesAdmin() {
                     -- Sélectionnez un type --
                   </SelectItem>
                   {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
-                    .filter((t) => t.id != null && t.id !== "")
+                    .filter((t) => t.id && String(t.id).trim() !== "")
                     .map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
@@ -539,9 +539,9 @@ export default function ZonesAdmin() {
                     -- Sélectionnez une région --
                   </SelectItem>
                   {(Array.isArray(allRegions) ? allRegions : [])
-                    .filter((r) => r.id != null && r.id !== "")
+                    .filter((r) => r.id && String(r.id).trim() !== "")
                     .map((r) => (
-                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
                     ))}
                 </SelectContent>
               </Select>
