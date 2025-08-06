@@ -128,7 +128,7 @@ export async function fetchApi<T>(
 
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token')
-      if (token && method !== 'GET') {
+      if (token) {
         headers.set('Authorization', `Bearer ${token}`)
       }
     }
