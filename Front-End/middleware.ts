@@ -1,10 +1,16 @@
-import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default withAuth({
-  pages: { signIn: '/auth/login' },
-  callbacks: {
-    authorized: ({ token }) => !!token,
-  },
-})
+export function middleware(req: NextRequest) {
+  // Allow public pages
+  if (req.nextUrl.pathname.startsWith('/admin')) {
+    const token = req.cookies.get('token')
+    if (!token) {
+      return NextResponse.redirect(new URL('/auth/login', req.url))
+    }
+  }
+  return NextResponse.next()
+}
 
 export const config = { matcher: ['/admin/:path*'] }
+

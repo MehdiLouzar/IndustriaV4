@@ -42,6 +42,7 @@ export default function LoginPage() {
       }
       const data = await res.json()
       localStorage.setItem('token', data.access_token)
+      document.cookie = `token=${data.access_token}; path=/;`
       router.push('/')
     } catch (error) {
       setError(
