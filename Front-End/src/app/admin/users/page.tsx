@@ -132,7 +132,7 @@ export default function UsersAdmin() {
   }, [])
 
   const paginatedItems = useMemo(
-    () => items.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    () => (items ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
     [items, currentPage]
   )
 
@@ -155,7 +155,7 @@ export default function UsersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {paginatedItems.map((u) => (
+              {(paginatedItems ?? []).map((u) => (
                 <tr key={u.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{u.email}</td>
                   <td className="p-2 align-top">{u.role}</td>
@@ -175,7 +175,7 @@ export default function UsersAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

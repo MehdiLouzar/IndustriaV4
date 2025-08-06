@@ -30,22 +30,24 @@ export default function RegionsAdmin() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [countries, setCountries] = useState<{ id: string; name: string }[]>([])
+  const [allCountries, setAllCountries] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<Region>({ id: '', name: '', code: '', countryId: '' })
 
 
   async function load() {
-    const [r, c] = await Promise.all([
-      fetchApi<Region[]>('/api/regions'),
-      fetchApi<{ id: string; name: string }[]>('/api/countries'),
-    ])
+    const r = await fetchApi<Region[]>('/api/regions')
     if (r) {
       setItems(r)
       setCurrentPage(1)
     }
-    if (c) setCountries(c)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/countries/all")
+      .then(setAllCountries)
+      .catch(() => setAllCountries([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -108,7 +110,7 @@ export default function RegionsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
@@ -129,7 +131,7 @@ export default function RegionsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -156,9 +158,13 @@ export default function RegionsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {countries.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
+                  {(allCountries ?? []).length === 0 ? (
+                    <SelectItem value="" disabled>Aucun pays trouvé</SelectItem>
+                  ) : (
+                    (allCountries ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

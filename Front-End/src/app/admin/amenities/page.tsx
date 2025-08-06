@@ -22,6 +22,8 @@ interface Amenity {
 export default function AmenitiesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Amenity[]>([])
+  const [allAmenities, setAllAmenities] = useState<Amenity[]>([])
+  const [selectedAmenityId, setSelectedAmenityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
@@ -45,6 +47,12 @@ export default function AmenitiesAdmin() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<Amenity[]>("/api/amenities/all")
+      .then(setAllAmenities)
+      .catch(() => setAllAmenities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -114,7 +122,7 @@ export default function AmenitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items.map((a) => (
+              {(items ?? []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.category}</td>
@@ -131,6 +139,23 @@ export default function AmenitiesAdmin() {
           </table>
         </CardContent>
       </Card>
+
+      <select
+        className="border p-2"
+        value={selectedAmenityId}
+        onChange={e => setSelectedAmenityId(e.target.value)}
+      >
+        {(allAmenities ?? []).length === 0 ? (
+          <option value="">Aucun équipement trouvé</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez un équipement --</option>
+            {(allAmenities ?? []).map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
 
       <Pagination
         totalItems={totalPages * itemsPerPage}

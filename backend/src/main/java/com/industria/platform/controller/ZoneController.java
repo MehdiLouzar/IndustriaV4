@@ -60,6 +60,11 @@ public class ZoneController {
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
+    @GetMapping("/all")
+    public List<ZoneDto> allZones() {
+        return zoneRepository.findAll().stream().map(this::toDto).toList();
+    }
+
     @GetMapping("/{id}")
     public ZoneDto get(@PathVariable String id) {
         Zone z = zoneRepository.findById(id).orElseThrow();

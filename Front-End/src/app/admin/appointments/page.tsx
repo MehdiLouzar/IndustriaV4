@@ -37,7 +37,7 @@ export default function AppointmentsAdmin() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [parcels, setParcels] = useState<{ id: string; reference: string }[]>([])
+  const [allParcels, setAllParcels] = useState<{ id: string; reference: string }[]>([])
   const [form, setForm] = useState<Appointment>({
     id: '',
     contactName: '',
@@ -52,17 +52,19 @@ export default function AppointmentsAdmin() {
 
 
   async function load() {
-    const [a, p] = await Promise.all([
-      fetchApi<Appointment[]>('/api/appointments'),
-      fetchApi<{ id: string; reference: string }[]>('/api/parcels'),
-    ])
+    const a = await fetchApi<Appointment[]>('/api/appointments')
     if (a) {
       setItems(a)
       setCurrentPage(1)
     }
-    if (p) setParcels(p)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; reference: string }[]>("/api/parcels/all")
+      .then(setAllParcels)
+      .catch(() => setAllParcels([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -169,7 +171,7 @@ export default function AppointmentsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
@@ -190,7 +192,7 @@ export default function AppointmentsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -233,9 +235,13 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {parcels.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
-                  ))}
+                  {(allParcels ?? []).length === 0 ? (
+                    <SelectItem value="" disabled>Aucune parcelle trouvée</SelectItem>
+                  ) : (
+                    (allParcels ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

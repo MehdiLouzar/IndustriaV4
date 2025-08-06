@@ -44,6 +44,14 @@ public class ParcelController {
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
 
+    @GetMapping("/all")
+    public List<ParcelDto> allParcels() {
+        return parcelRepository.findAll()
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public ParcelDto get(@PathVariable String id) {
         return parcelRepository.findById(id).map(this::toDto).orElse(null);

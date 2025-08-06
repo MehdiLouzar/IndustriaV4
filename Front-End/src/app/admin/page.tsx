@@ -195,7 +195,7 @@ export default async function AdminDashboard() {
 
         {/* Actions d'administration */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {filteredCards.map((card, index) => {
+          {(filteredCards ?? []).map((card, index) => {
             const IconComponent = card.icon;
             return (
               <Link key={index} href={card.href}>
@@ -227,7 +227,7 @@ export default async function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.recentActivities.map((activity, index) => (
+              {(stats.recentActivities ?? []).map((activity, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b last:border-b-0">
                   <div>
                     <p className="text-sm font-medium">{activity.action}</p>
@@ -243,7 +243,7 @@ export default async function AdminDashboard() {
                   </div>
                 </div>
               ))}
-              {stats.recentActivities.length === 0 && (
+              {(stats.recentActivities ?? []).length === 0 && (
                 <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
               )}
             </div>
