@@ -476,9 +476,6 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un statut --
-                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (

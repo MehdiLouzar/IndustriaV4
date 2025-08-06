@@ -169,9 +169,6 @@ function SelectField({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="" disabled>
-          {placeholder}
-        </SelectItem>
         {options
           .filter((opt) => opt.value != null && opt.value.trim() !== "")
           .map((opt) => (

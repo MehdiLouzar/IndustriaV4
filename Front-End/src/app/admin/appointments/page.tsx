@@ -249,9 +249,6 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="-- Sélectionnez une parcelle --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez une parcelle --
-                  </SelectItem>
                   {(Array.isArray(parcels) ? parcels : [])
                     .filter((p) => p.id && String(p.id).trim() !== "")
                     .map((p) => (
@@ -267,9 +264,6 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un statut --
-                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (

@@ -214,9 +214,6 @@ export default function UsersAdmin() {
                   <SelectValue placeholder="-- Sélectionnez un rôle --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un rôle --
-                  </SelectItem>
                   {roles
                     .filter((r) => r && r.trim() !== "")
                     .map((r) => (
