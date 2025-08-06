@@ -476,6 +476,9 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un statut --
+                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (
@@ -487,10 +490,7 @@ export default function ZonesAdmin() {
             <div>
               <Label htmlFor="zoneTypeId">Type</Label>
               <SelectField
-                options={[
-                  { value: '', label: '-- Sélectionnez --' },
-                  ...allZoneTypes.map((t) => ({ value: t.id, label: t.name })),
-                ]}
+                options={allZoneTypes.map((t) => ({ value: t.id, label: t.name }))}
                 placeholder="-- Sélectionnez un type --"
                 value={form.zoneTypeId}
                 onValueChange={handleZoneType}
@@ -499,10 +499,7 @@ export default function ZonesAdmin() {
             <div>
               <Label htmlFor="regionId">Région</Label>
               <SelectField
-                options={[
-                  { value: '', label: '-- Sélectionnez --' },
-                  ...allRegions.map((r) => ({ value: r.id, label: r.name })),
-                ]}
+                options={allRegions.map((r) => ({ value: r.id, label: r.name }))}
                 placeholder="-- Sélectionnez une région --"
                 value={form.regionId}
                 onValueChange={handleRegion}

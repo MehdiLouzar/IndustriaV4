@@ -292,10 +292,13 @@ export default function ParcelsAdmin() {
           <SelectValue placeholder="-- Sélectionnez une parcelle --" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="" disabled>
+            -- Sélectionnez une parcelle --
+          </SelectItem>
           {(Array.isArray(allParcels) ? allParcels : [])
-            .filter((parcel) => Boolean(parcel.id))
+            .filter((parcel) => parcel.id && String(parcel.id).trim() !== "")
             .map((parcel) => (
-              <SelectItem key={parcel.id} value={parcel.id}>
+              <SelectItem key={parcel.id} value={String(parcel.id)}>
                 {parcel.reference}
               </SelectItem>
             ))}
@@ -360,6 +363,9 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez une zone --
+                  </SelectItem>
                   {(Array.isArray(zones) ? zones : [])
                     .filter((z) => z.id && String(z.id).trim() !== "")
                     .map((z) => (
@@ -377,6 +383,9 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un statut --
+                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (

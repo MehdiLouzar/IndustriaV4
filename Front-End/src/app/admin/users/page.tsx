@@ -211,12 +211,17 @@ export default function UsersAdmin() {
               <Label htmlFor="role">Rôle</Label>
               <Select value={form.role} onValueChange={handleRole}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir un rôle" />
+                  <SelectValue placeholder="-- Sélectionnez un rôle --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un rôle --
+                  </SelectItem>
+                  {roles
+                    .filter((r) => r && r.trim() !== "")
+                    .map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

@@ -153,10 +153,7 @@ export default function RegionsAdmin() {
             <div>
               <Label htmlFor="countryId">Pays</Label>
               <SelectField
-                options={[
-                  { value: '', label: '-- Sélectionnez --' },
-                  ...allCountries.map((c) => ({ value: c.id, label: c.name })),
-                ]}
+                options={allCountries.map((c) => ({ value: c.id, label: c.name }))}
                 placeholder="-- Sélectionnez un pays --"
                 value={form.countryId}
                 onValueChange={handleCountry}
