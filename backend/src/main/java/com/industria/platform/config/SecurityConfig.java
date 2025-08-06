@@ -22,10 +22,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/api/**")
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET, "/", "/zones/**", "/parcels/**", "/reservations/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/countries/all", "/api/zone-types/all", "/api/regions/all").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN","ZONE_MANAGER")
                 .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")

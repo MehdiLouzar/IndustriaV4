@@ -128,9 +128,13 @@ export async function fetchApi<T>(
 
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token')
+      const isProtected =
+        path.startsWith('/api/admin') ||
+        (path.startsWith('/api') && !path.startsWith('/api/public'))
+
       if (token) {
         headers.set('Authorization', `Bearer ${token}`)
-      } else {
+      } else if (isProtected) {
         window.location.href = '/login'
         return Promise.reject(new Error('Missing auth token'))
       }
