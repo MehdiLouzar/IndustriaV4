@@ -36,7 +36,7 @@ export default function ActivitiesAdmin() {
 
 
   async function load(page = currentPage) {
-    const res = await fetchApi<ListResponse<Activity>>(`/api/activities?page=${page}&limit=${itemsPerPage}`)
+    const res = await fetchApi<ListResponse<Activity>>(`/api/activities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
     if (res) {
       setItems(res.items)
       setTotalPages(res.totalPages)

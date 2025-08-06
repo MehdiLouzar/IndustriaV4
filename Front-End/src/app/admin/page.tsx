@@ -19,20 +19,22 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+const emptyStats = {
+  totalUsers: 0,
+  totalZones: 0,
+  availableParcels: 0,
+  totalParcels: 0,
+  pendingAppointments: 0,
+  totalAppointments: 0,
+  recentActivities: [] as unknown[],
+};
+
 async function getAdminStats() {
-  const data = await fetchApi('/api/admin/stats');
-  if (!data) {
-    return {
-      totalUsers: 0,
-      totalZones: 0,
-      availableParcels: 0,
-      totalParcels: 0,
-      pendingAppointments: 0,
-      totalAppointments: 0,
-      recentActivities: []
-    };
+  if (typeof window !== 'undefined') {
+    return emptyStats;
   }
-  return data;
+  const data = await fetchApi('/api/admin/stats').catch(() => null);
+  return data || emptyStats;
 }
 
 export default async function AdminDashboard() {
@@ -198,7 +200,7 @@ export default async function AdminDashboard() {
           {(filteredCards ?? []).map((card, index) => {
             const IconComponent = card.icon;
             return (
-              <Link key={index} href={card.href}>
+              <Link key={index} href={card.href} prefetch={false}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer">
                   <CardHeader>
                     <div className="flex items-center gap-3">

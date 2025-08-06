@@ -49,7 +49,7 @@ export default function UsersAdmin() {
 
 
   const load = useCallback(async () => {
-    const users = await fetchApi<User[]>('/api/users')
+    const users = await fetchApi<User[]>('/api/users').catch(() => null)
     if (users) {
       setItems(users)
       setCurrentPage(1)

@@ -24,7 +24,7 @@ export default function ZoneTypesAdmin() {
   const [form, setForm] = useState<ZoneType>({ id: '', name: '' })
 
   async function load() {
-    const items = await fetchApi<ZoneType[]>('/api/zone-types')
+    const items = await fetchApi<ZoneType[]>('/api/zone-types').catch(() => null)
     if (items) {
       setItems(items)
       setCurrentPage(1)

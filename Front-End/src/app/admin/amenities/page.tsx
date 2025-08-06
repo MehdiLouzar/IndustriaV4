@@ -38,7 +38,7 @@ export default function AmenitiesAdmin() {
 
 
   async function load(page = currentPage) {
-    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`)
+    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
     if (res) {
       setItems(res.items)
       setTotalPages(res.totalPages)

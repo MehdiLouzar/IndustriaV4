@@ -178,12 +178,12 @@ INSERT INTO notification_template (
     id, type, subject, html_body, text_body, created_at, updated_at
 )
 SELECT * FROM (VALUES
-    ('tmpl-appointment-confirm', 'EMAIL',
+    ('tmpl-appointment-confirm', 'email',
      'Confirmation RDV',
      'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.',
      'Votre rendez-vous pour la parcelle {parcel_reference} est confirmé pour le {date}.',
      NOW(), NOW()),
-    ('tmpl-parcel-available', 'EMAIL',
+    ('tmpl-parcel-available', 'email',
      'Parcelle disponible',
      'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.',
      'Une nouvelle parcelle correspondant à vos critères est disponible : {parcel_reference}.',

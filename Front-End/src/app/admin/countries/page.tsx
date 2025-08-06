@@ -25,7 +25,7 @@ export default function CountriesAdmin() {
   const [form, setForm] = useState<Country>({ id: '', name: '', code: '' })
 
   async function load() {
-    const items = await fetchApi<Country[]>('/api/countries')
+    const items = await fetchApi<Country[]>('/api/countries').catch(() => null)
     if (items) {
       setItems(items)
       setCurrentPage(1)

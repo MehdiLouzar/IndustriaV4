@@ -39,6 +39,11 @@ interface Zone {
   vertices?: Vertex[]
 }
 
+interface ActivityDto {
+  id: string
+  name: string
+}
+
 interface ZoneForm {
   id: string
   name: string
@@ -71,7 +76,7 @@ export default function ZonesAdmin() {
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
   const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
-  const [allActivities, setAllActivities] = useState<{ id: string; name: string }[]>([])
+  const [activities, setActivities] = useState<ActivityDto[]>([])
   const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
     id: '',
@@ -93,7 +98,7 @@ export default function ZonesAdmin() {
   async function load(page = currentPage) {
     const z = await fetchApi<ListResponse<Zone>>(
       `/api/zones?page=${page}&limit=${itemsPerPage}`
-    )
+    ).catch(() => null)
     if (z) {
       setZones(z.items)
       setTotalPages(z.totalPages)
@@ -132,9 +137,9 @@ export default function ZonesAdmin() {
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/activities/all")
-      .then(setAllActivities)
-      .catch(() => setAllActivities([]))
+    fetchApi<ListResponse<ActivityDto>>("/api/activities")
+      .then((data) => setActivities(data.items))
+      .catch(() => setActivities([]))
   }, [])
 
   useEffect(() => {
@@ -285,7 +290,7 @@ export default function ZonesAdmin() {
       status: z.status,
       zoneTypeId: z.zoneTypeId || '',
       regionId: z.regionId || '',
-      activityIds: z.activities ? z.activities.map(a => a.activityId) : [],
+      activityIds: Array.isArray(z.activities) ? z.activities.map(a => a.activityId) : [],
       amenityIds: z.amenities ? z.amenities.map(a => a.amenityId) : [],
       vertices: z.vertices ? z.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
         lambertX: v.lambertX.toString(),
@@ -481,7 +486,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Activités</Label>
               <div className="flex flex-wrap gap-2">
-                {(allActivities ?? []).map((a) => (
+                {(Array.isArray(activities) ? activities : []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"

@@ -29,6 +29,11 @@ interface Appointment {
   status: string
 }
 
+interface ParcelDto {
+  id: string
+  reference: string
+}
+
 const statuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']
 
 export default function AppointmentsAdmin() {
@@ -37,7 +42,7 @@ export default function AppointmentsAdmin() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [allParcels, setAllParcels] = useState<{ id: string; reference: string }[]>([])
+  const [parcels, setParcels] = useState<ParcelDto[]>([])
   const [form, setForm] = useState<Appointment>({
     id: '',
     contactName: '',
@@ -52,7 +57,7 @@ export default function AppointmentsAdmin() {
 
 
   async function load() {
-    const a = await fetchApi<Appointment[]>('/api/appointments')
+    const a = await fetchApi<Appointment[]>('/api/appointments').catch(() => null)
     if (a) {
       setItems(a)
       setCurrentPage(1)
@@ -61,9 +66,9 @@ export default function AppointmentsAdmin() {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; reference: string }[]>("/api/parcels/all")
-      .then(setAllParcels)
-      .catch(() => setAllParcels([]))
+    fetchApi<{ items: ParcelDto[] }>("/api/parcels/all")
+      .then((data) => setParcels(data.items))
+      .catch(() => setParcels([]))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,10 +240,10 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allParcels ?? []).length === 0 ? (
+                  {(Array.isArray(parcels) ? parcels : []).length === 0 ? (
                     <SelectItem value="" disabled>Aucune parcelle trouvée</SelectItem>
                   ) : (
-                    (allParcels ?? []).map((p) => (
+                    (Array.isArray(parcels) ? parcels : []).map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
                     ))
                   )}

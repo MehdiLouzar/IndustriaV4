@@ -35,7 +35,7 @@ export default function RegionsAdmin() {
 
 
   async function load() {
-    const r = await fetchApi<Region[]>('/api/regions')
+    const r = await fetchApi<Region[]>('/api/regions').catch(() => null)
     if (r) {
       setItems(r)
       setCurrentPage(1)

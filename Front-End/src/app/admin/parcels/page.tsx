@@ -33,6 +33,11 @@ interface Parcel {
   zoneId: string
 }
 
+interface ZoneDto {
+  id: string
+  name: string
+}
+
 interface ParcelForm {
   id: string
   reference: string
@@ -54,7 +59,7 @@ export default function ParcelsAdmin() {
   const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [allZones, setAllZones] = useState<{ id: string; name: string }[]>([])
+  const [zones, setZones] = useState<ZoneDto[]>([])
   const [form, setForm] = useState<ParcelForm>({
     id: '',
     reference: '',
@@ -70,7 +75,7 @@ export default function ParcelsAdmin() {
   async function load(page = currentPage) {
     const p = await fetchApi<ListResponse<Parcel>>(
       `/api/parcels?page=${page}&limit=${itemsPerPage}`
-    )
+    ).catch(() => null)
     if (p) {
       setItems(p.items)
       setTotalPages(p.totalPages)
@@ -87,9 +92,9 @@ export default function ParcelsAdmin() {
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/zones/all")
-      .then(setAllZones)
-      .catch(() => setAllZones([]))
+    fetchApi<{ items: ZoneDto[] }>("/api/zones/all")
+      .then((data) => setZones(data.items))
+      .catch(() => setZones([]))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,11 +343,13 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allZones ?? []).length === 0 ? (
+                  {(Array.isArray(zones) ? zones : []).length === 0 ? (
                     <SelectItem value="" disabled>Aucune zone trouvée</SelectItem>
                   ) : (
-                    (allZones ?? []).map((z) => (
-                      <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                    (Array.isArray(zones) ? zones : []).map((z) => (
+                      <SelectItem key={z.id} value={z.id}>
+                        {z.name}
+                      </SelectItem>
                     ))
                   )}
                 </SelectContent>
