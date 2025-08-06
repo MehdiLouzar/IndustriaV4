@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 
 interface Activity {
   id: string
@@ -20,7 +21,10 @@ interface Activity {
 export default function ActivitiesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Activity[]>([])
+  const [allActivities, setAllActivities] = useState<Activity[]>([])
+  const [selectedActivityId, setSelectedActivityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Activity>({
@@ -31,14 +35,22 @@ export default function ActivitiesAdmin() {
   })
 
 
-  async function load() {
-    const items = await fetchApi<Activity[]>('/api/activities')
-    if (items) {
-      setItems(items)
-      setCurrentPage(1)
+  async function load(page = currentPage) {
+    const res = await fetchApi<ListResponse<Activity>>(`/api/activities?page=${page}&limit=${itemsPerPage}`)
+    if (res) {
+      setItems(res.items)
+      setTotalPages(res.totalPages)
+      setCurrentPage(res.page)
     }
   }
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<Activity[]>("/api/activities/all")
+      .then(setAllActivities)
+      .catch(() => setAllActivities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -66,7 +78,7 @@ export default function ActivitiesAdmin() {
     }
     setForm({ id: '', name: '', description: '', icon: '' })
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Activity) {
@@ -80,7 +92,7 @@ export default function ActivitiesAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/activities/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -106,9 +118,7 @@ export default function ActivitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((a) => (
+              {(items ?? []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.description}</td>
@@ -126,8 +136,25 @@ export default function ActivitiesAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedActivityId}
+        onChange={e => setSelectedActivityId(e.target.value)}
+      >
+        {(allActivities ?? []).length === 0 ? (
+          <option value="">Aucune activité trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une activité --</option>
+            {(allActivities ?? []).map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

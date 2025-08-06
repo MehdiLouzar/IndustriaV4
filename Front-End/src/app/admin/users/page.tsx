@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ interface User {
   company?: string
   phone?: string
   isActive?: boolean
+  zoneCount?: number
 }
 
 const roles = ['ADMIN', 'MANAGER', 'USER']
@@ -47,24 +48,24 @@ export default function UsersAdmin() {
   })
 
 
-  async function load() {
+  const load = useCallback(async () => {
     const users = await fetchApi<User[]>('/api/users')
     if (users) {
       setItems(users)
       setCurrentPage(1)
     }
-  }
-  useEffect(() => { load() }, [])
+  }, [])
+  useEffect(() => { load() }, [load])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
+  }, [])
 
-  const handleRole = (value: string) => {
-    setForm({ ...form, role: value })
-  }
+  const handleRole = useCallback((value: string) => {
+    setForm((f) => ({ ...f, role: value }))
+  }, [])
 
-  async function submit(e: React.FormEvent) {
+  const submit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     const body = {
       email: form.email,
@@ -96,9 +97,9 @@ export default function UsersAdmin() {
     })
     setOpen(false)
     load()
-  }
+  }, [form, load])
 
-  function edit(it: User) {
+  const edit = useCallback((it: User) => {
     setForm({
       id: it.id,
       email: it.email,
@@ -110,13 +111,13 @@ export default function UsersAdmin() {
       password: '',
     })
     setOpen(true)
-  }
-  async function del(id: string) {
+  }, [])
+  const del = useCallback(async (id: string) => {
     await fetchApi(`/api/users/${id}`, { method: 'DELETE' })
     load()
-  }
+  }, [load])
 
-  function addNew() {
+  const addNew = useCallback(() => {
     setForm({
       id: '',
       email: '',
@@ -128,7 +129,12 @@ export default function UsersAdmin() {
       password: '',
     })
     setOpen(true)
-  }
+  }, [])
+
+  const paginatedItems = useMemo(
+    () => (items ?? []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [items, currentPage]
+  )
 
   return (
     <div className="p-4 space-y-6">
@@ -144,17 +150,17 @@ export default function UsersAdmin() {
                 <th className="p-2">Email</th>
                 <th className="p-2">Rôle</th>
                 <th className="p-2">Société</th>
+                <th className="p-2">Zones</th>
                 <th className="p-2 w-32"></th>
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((u) => (
+              {(paginatedItems ?? []).map((u) => (
                 <tr key={u.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{u.email}</td>
                   <td className="p-2 align-top">{u.role}</td>
                   <td className="p-2 align-top">{u.company}</td>
+                  <td className="p-2 align-top">{u.zoneCount ?? 0}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(u)}>Éditer</Button>
                     <Button size="sm" variant="destructive" onClick={() => del(u.id)}>
@@ -169,7 +175,7 @@ export default function UsersAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -199,7 +205,7 @@ export default function UsersAdmin() {
             </div>
             <div>
               <Label htmlFor="role">Rôle</Label>
-              <Select value={form.role} onValueChange={handleRole}>
+              <Select value={form.role || undefined} onValueChange={handleRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>

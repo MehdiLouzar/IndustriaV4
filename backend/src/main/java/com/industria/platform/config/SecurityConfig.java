@@ -10,6 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,17 +26,12 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain publicApi(HttpSecurity http) throws Exception {
         http
-            // ← on ne passe QUE le pattern d’URL ici
-            .securityMatcher("/api/**")    
+            // cette chaîne ne s'applique qu'aux requêtes GET sur /api/**
+            .securityMatcher(new AntPathRequestMatcher("/api/**", HttpMethod.GET.name()))
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                // on autorise seulement les GET
-                .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
-                // on refuse toute autre méthode (POST, PUT…) sur /api/**
-                .anyRequest().denyAll()
-            )
-            .sessionManagement(sess -> 
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .sessionManagement(sess ->
                 sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
         return http.build();
@@ -46,6 +42,7 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
+            .securityMatcher("/api/**")
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth

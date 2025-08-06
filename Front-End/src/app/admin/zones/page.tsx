@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import {
   Select,
@@ -63,13 +64,15 @@ const statuses = [
 export default function ZonesAdmin() {
   const router = useRouter()
   const [zones, setZones] = useState<Zone[]>([])
+  const [allZones, setAllZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
-  const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
-  const [activities, setActivities] = useState<{ id: string; name: string }[]>([])
-  const [amenities, setAmenities] = useState<{ id: string; name: string }[]>([])
+  const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
+  const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
+  const [allActivities, setAllActivities] = useState<{ id: string; name: string }[]>([])
+  const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
     id: '',
     name: '',
@@ -85,23 +88,17 @@ export default function ZonesAdmin() {
     vertices: [],
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
+  const [selectedZoneId, setSelectedZoneId] = useState('')
 
-  async function load() {
-    const [z, t, r, a, m] = await Promise.all([
-      fetchApi<Zone[]>('/api/zones'),
-      fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
-      fetchApi<{ id: string; name: string }[]>('/api/regions'),
-      fetchApi<{ id: string; name: string }[]>('/api/activities'),
-      fetchApi<{ id: string; name: string }[]>('/api/amenities'),
-    ])
+  async function load(page = currentPage) {
+    const z = await fetchApi<ListResponse<Zone>>(
+      `/api/zones?page=${page}&limit=${itemsPerPage}`
+    )
     if (z) {
-      setZones(z)
-      setCurrentPage(1)
+      setZones(z.items)
+      setTotalPages(z.totalPages)
+      setCurrentPage(z.page)
     }
-    if (t) setZoneTypes(t)
-    if (r) setRegions(r)
-    if (a) setActivities(a)
-    if (m) setAmenities(m)
   }
 
   useEffect(() => {
@@ -112,7 +109,38 @@ export default function ZonesAdmin() {
         return
       }
     }
-    load()
+    load(currentPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, router])
+
+  useEffect(() => {
+    fetchApi<Zone[]>("/api/zones/all")
+      .then(setAllZones)
+      .catch(() => setAllZones([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/zone-types/all")
+      .then(setAllZoneTypes)
+      .catch(() => setAllZoneTypes([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/regions/all")
+      .then(setAllRegions)
+      .catch(() => setAllRegions([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/activities/all")
+      .then(setAllActivities)
+      .catch(() => setAllActivities([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/amenities/all")
+      .then(setAllAmenities)
+      .catch(() => setAllAmenities([]))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,7 +271,7 @@ export default function ZonesAdmin() {
     })
     setImages([])
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   async function edit(z: Zone) {
@@ -270,7 +298,7 @@ export default function ZonesAdmin() {
 
   async function del(id: string) {
     await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -310,9 +338,7 @@ export default function ZonesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {zones
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((zone) => (
+              {(zones ?? []).map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
@@ -330,8 +356,25 @@ export default function ZonesAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedZoneId}
+        onChange={e => setSelectedZoneId(e.target.value)}
+      >
+        {(allZones ?? []).length === 0 ? (
+          <option value="">Aucune zone trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une zone --</option>
+            {(allZones ?? []).map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
-        totalItems={zones.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -367,7 +410,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
+              {(form.vertices ?? []).map((v, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
                   <Input
                     placeholder="X"
@@ -390,7 +433,7 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -403,34 +446,42 @@ export default function ZonesAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneTypeId">Type</Label>
-              <Select value={form.zoneTypeId} onValueChange={handleZoneType}>
+              <Select value={form.zoneTypeId || undefined} onValueChange={handleZoneType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zoneTypes.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
+                  {(allZoneTypes ?? []).length === 0 ? (
+                    <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
+                  ) : (
+                    (allZoneTypes ?? []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="regionId">Région</Label>
-              <Select value={form.regionId} onValueChange={handleRegion}>
+              <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regions.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                  ))}
+                  {(allRegions ?? []).length === 0 ? (
+                    <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
+                  ) : (
+                    (allRegions ?? []).map((r) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Activités</Label>
               <div className="flex flex-wrap gap-2">
-                {activities.map((a) => (
+                {(allActivities ?? []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -445,7 +496,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Équipements</Label>
               <div className="flex flex-wrap gap-2">
-                {amenities.map((a) => (
+                {(allAmenities ?? []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"
@@ -461,7 +512,7 @@ export default function ZonesAdmin() {
               <Label>Photos</Label>
               <Input type="file" multiple onChange={handleFiles} />
               <div className="flex flex-wrap gap-2 mt-2">
-                {images.map((img, idx) => (
+                {(images ?? []).map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img.url} className="w-24 h-24 object-cover rounded" />
                     <button

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import {
   Select,
@@ -47,10 +48,13 @@ const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
 export default function ParcelsAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Parcel[]>([])
+  const [allParcels, setAllParcels] = useState<Parcel[]>([])
+  const [selectedParcelId, setSelectedParcelId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [zones, setZones] = useState<{ id: string; name: string }[]>([])
+  const [allZones, setAllZones] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ParcelForm>({
     id: '',
     reference: '',
@@ -63,18 +67,30 @@ export default function ParcelsAdmin() {
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
 
-  async function load() {
-    const [p, z] = await Promise.all([
-      fetchApi<Parcel[]>('/api/parcels'),
-      fetchApi<{ id: string; name: string }[]>('/api/zones'),
-    ])
+  async function load(page = currentPage) {
+    const p = await fetchApi<ListResponse<Parcel>>(
+      `/api/parcels?page=${page}&limit=${itemsPerPage}`
+    )
     if (p) {
-      setItems(p)
-      setCurrentPage(1)
+      setItems(p.items)
+      setTotalPages(p.totalPages)
+      setCurrentPage(p.page)
     }
-    if (z) setZones(z)
   }
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<Parcel[]>("/api/parcels/all")
+      .then(setAllParcels)
+      .catch(() => setAllParcels([]))
+  }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>("/api/zones/all")
+      .then(setAllZones)
+      .catch(() => setAllZones([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -173,7 +189,7 @@ export default function ParcelsAdmin() {
     })
     setImages([])
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Parcel) {
@@ -194,7 +210,7 @@ export default function ParcelsAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/parcels/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -229,9 +245,7 @@ export default function ParcelsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((p) => (
+              {(items ?? []).map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{p.reference}</td>
                   <td className="p-2 align-top">{p.zoneId}</td>
@@ -249,8 +263,25 @@ export default function ParcelsAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedParcelId}
+        onChange={e => setSelectedParcelId(e.target.value)}
+      >
+        {(allParcels ?? []).length === 0 ? (
+          <option value="">Aucune parcelle trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une parcelle --</option>
+            {(allParcels ?? []).map(a => (
+              <option key={a.id} value={a.id}>{a.reference}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -279,7 +310,7 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
+              {(form.vertices ?? []).map((v, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
                   <Input
                     placeholder="X"
@@ -302,20 +333,24 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneId">Zone</Label>
-              <Select value={form.zoneId} onValueChange={handleZone}>
+              <Select value={form.zoneId || undefined} onValueChange={handleZone}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zones.map((z) => (
-                    <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
-                  ))}
+                  {(allZones ?? []).length === 0 ? (
+                    <SelectItem value="" disabled>Aucune zone trouvée</SelectItem>
+                  ) : (
+                    (allZones ?? []).map((z) => (
+                      <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
@@ -330,7 +365,7 @@ export default function ParcelsAdmin() {
               <Label>Photos</Label>
               <Input type="file" multiple onChange={handleFiles} />
               <div className="flex flex-wrap gap-2 mt-2">
-                {images.map((img, idx) => (
+                {(images ?? []).map((img, idx) => (
                   <div key={idx} className="relative">
                     <img src={img.url} className="w-24 h-24 object-cover rounded" />
                     <button

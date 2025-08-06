@@ -89,7 +89,7 @@ export default function CountriesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((c) => (
                 <tr key={c.id} className="border-b last:border-0">
@@ -109,7 +109,7 @@ export default function CountriesAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

@@ -13,4 +13,6 @@ public record ZoneDto(String id,
                       String zoneTypeId,
                       List<String> activityIds,
                       List<String> amenityIds,
-                      List<VertexDto> vertices) {}
+                      List<VertexDto> vertices,
+                      Double latitude,
+                      Double longitude) {}

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 
 interface Amenity {
   id: string
@@ -21,7 +22,10 @@ interface Amenity {
 export default function AmenitiesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Amenity[]>([])
+  const [allAmenities, setAllAmenities] = useState<Amenity[]>([])
+  const [selectedAmenityId, setSelectedAmenityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Amenity>({
@@ -33,14 +37,22 @@ export default function AmenitiesAdmin() {
   })
 
 
-  async function load() {
-    const items = await fetchApi<Amenity[]>('/api/amenities')
-    if (items) {
-      setItems(items)
-      setCurrentPage(1)
+  async function load(page = currentPage) {
+    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`)
+    if (res) {
+      setItems(res.items)
+      setTotalPages(res.totalPages)
+      setCurrentPage(res.page)
     }
   }
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<Amenity[]>("/api/amenities/all")
+      .then(setAllAmenities)
+      .catch(() => setAllAmenities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -69,7 +81,7 @@ export default function AmenitiesAdmin() {
     }
     setForm({ id: '', name: '', description: '', icon: '', category: '' })
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Amenity) {
@@ -84,7 +96,7 @@ export default function AmenitiesAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/amenities/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -110,9 +122,7 @@ export default function AmenitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((a) => (
+              {(items ?? []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.category}</td>
@@ -130,8 +140,25 @@ export default function AmenitiesAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedAmenityId}
+        onChange={e => setSelectedAmenityId(e.target.value)}
+      >
+        {(allAmenities ?? []).length === 0 ? (
+          <option value="">Aucun équipement trouvé</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez un équipement --</option>
+            {(allAmenities ?? []).map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

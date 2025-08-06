@@ -37,6 +37,8 @@ interface ZoneResponse {
   activityIds?: string[]
   amenityIds?: string[]
   vertices?: { seq: number; lambertX: number; lambertY: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 interface Zone {
@@ -52,6 +54,8 @@ interface Zone {
   amenities?: string[]
   parcels?: Parcel[]
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export default function ZonePage() {
@@ -62,20 +66,17 @@ export default function ZonePage() {
 
   useEffect(() => {
     async function load() {
-      const [z, regs, types, acts, ams, parcels] = await Promise.all([
-        fetchApi<ZoneResponse>(`/api/zones/${id}`),
-        fetchApi<{ id: string; name: string }[]>('/api/regions'),
-        fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
-        fetchApi<{ id: string; name: string }[]>('/api/activities'),
-        fetchApi<{ id: string; name: string }[]>('/api/amenities'),
-        fetchApi<Parcel[]>('/api/parcels'),
-      ])
+      const z = await fetchApi<ZoneResponse>(`/api/zones/${id}`)
       if (!z) return
-      const regionMap = regs ? Object.fromEntries(regs.map(r => [r.id, r.name])) : {}
-      const typeMap = types ? Object.fromEntries(types.map(t => [t.id, t.name])) : {}
-      const actMap = acts ? Object.fromEntries(acts.map(a => [a.id, a.name])) : {}
-      const amenityMap = ams ? Object.fromEntries(ams.map(a => [a.id, a.name])) : {}
-      const pList = parcels ? parcels.filter(p => p.zoneId === z.id) : []
+
+      const [region, type, activities, amenities, parcels] = await Promise.all([
+        z.regionId ? fetchApi<{ name: string }>(`/api/regions/${z.regionId}`) : Promise.resolve(null),
+        z.zoneTypeId ? fetchApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : Promise.resolve(null),
+        Promise.all((z.activityIds || []).map(aid => fetchApi<{ name: string }>(`/api/activities/${aid}`))),
+        Promise.all((z.amenityIds || []).map(aid => fetchApi<{ name: string }>(`/api/amenities/${aid}`))),
+        fetchApi<Parcel[]>(`/api/parcels?zoneId=${id}`),
+      ])
+
       const zone: Zone = {
         id: z.id,
         name: z.name,
@@ -83,12 +84,14 @@ export default function ZonePage() {
         status: z.status,
         totalArea: z.totalArea ?? null,
         price: z.price ?? null,
-        region: z.regionId ? { name: regionMap[z.regionId] || '' } : null,
-        zoneType: z.zoneTypeId ? { name: typeMap[z.zoneTypeId] || '' } : null,
-        activities: (z.activityIds ?? []).map(id => ({ activity: { name: actMap[id] || id } })),
-        amenities: (z.amenityIds ?? []).map(id => amenityMap[id] || id),
-        parcels: pList,
+        region: region ? { name: region.name } : null,
+        zoneType: type ? { name: type.name } : null,
+        activities: activities.map(a => ({ activity: { name: a?.name || '' } })),
+        amenities: amenities.map(a => a?.name || ''),
+        parcels: parcels || [],
         vertices: z.vertices,
+        latitude: z.latitude ?? null,
+        longitude: z.longitude ?? null,
       }
       setZone(zone)
     }

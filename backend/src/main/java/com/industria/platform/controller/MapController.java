@@ -3,6 +3,7 @@ package com.industria.platform.controller;
 import com.industria.platform.dto.ParcelFeatureDto;
 import com.industria.platform.dto.ZoneFeatureDto;
 import com.industria.platform.entity.Parcel;
+import com.industria.platform.entity.ParcelStatus;
 import com.industria.platform.entity.Zone;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
@@ -28,7 +29,7 @@ public class MapController {
         List<ZoneFeatureDto> features = zoneRepository.findAll().stream().map(z ->
                 new ZoneFeatureDto(parseCentroid(z.getGeometry()), z.getId(), z.getName(),
                         z.getStatus().name(),
-                        z.getParcels() == null ? 0 : (int) z.getParcels().stream().filter(p -> p.getStatus().name().equals("LIBRE")).count(),
+                        parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE),
                         z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getIcon()).toList(),
                         z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getIcon()).toList())
         ).toList();

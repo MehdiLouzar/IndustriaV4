@@ -87,7 +87,7 @@ export default function ZoneTypesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(items ?? [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((t) => (
                 <tr key={t.id} className="border-b last:border-0">
@@ -106,7 +106,7 @@ export default function ZoneTypesAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={(items ?? []).length}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
