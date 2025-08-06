@@ -218,7 +218,7 @@ export default function UsersAdmin() {
                     -- Sélectionnez un rôle --
                   </SelectItem>
                   {roles
-                    .filter((r) => Boolean(r))
+                    .filter((r) => r !== "")
                     .map((r) => (
                       <SelectItem key={r} value={r}>{r}</SelectItem>
                     ))}

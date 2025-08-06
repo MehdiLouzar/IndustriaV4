@@ -503,7 +503,7 @@ export default function ZonesAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => Boolean(s))
+                    .filter((s) => s !== "")
                     .map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
