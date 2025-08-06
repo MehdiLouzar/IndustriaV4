@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 
 interface Country {
   id: string
@@ -25,10 +26,13 @@ export default function CountriesAdmin() {
   const [form, setForm] = useState<Country>({ id: '', name: '', code: '' })
 
   async function load() {
-    const items = await fetchApi<Country[]>('/api/countries').catch(() => null)
-    if (items) {
-      setItems(items)
+    const res = await fetchApi<ListResponse<Country>>('/api/countries').catch(() => null)
+    if (res) {
+      const arr = Array.isArray(res.items) ? res.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }
   useEffect(() => { load() }, [])
@@ -89,7 +93,7 @@ export default function CountriesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? [])
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((c) => (
                 <tr key={c.id} className="border-b last:border-0">
@@ -109,7 +113,7 @@ export default function CountriesAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

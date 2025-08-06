@@ -38,17 +38,30 @@ export default function ActivitiesAdmin() {
   async function load(page = currentPage) {
     const res = await fetchApi<ListResponse<Activity>>(`/api/activities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
     if (res) {
-      setItems(res.items)
-      setTotalPages(res.totalPages)
-      setCurrentPage(res.page)
+      const arr = Array.isArray(res.items) ? res.items : []
+      setItems(arr)
+      setTotalPages(res.totalPages || 1)
+      setCurrentPage(res.page || 1)
+    } else {
+      setItems([])
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
 
   useEffect(() => {
-    fetchApi<Activity[]>("/api/activities/all")
-      .then(setAllActivities)
+    fetchApi<ListResponse<Activity>>("/api/activities/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
+            : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllActivities(arr)
+      })
       .catch(() => setAllActivities([]))
   }, [])
 
@@ -118,7 +131,7 @@ export default function ActivitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? []).map((a) => (
+              {(Array.isArray(items) ? items : []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.description}</td>
@@ -141,12 +154,12 @@ export default function ActivitiesAdmin() {
         value={selectedActivityId}
         onChange={e => setSelectedActivityId(e.target.value)}
       >
-        {(allActivities ?? []).length === 0 ? (
+        {(Array.isArray(allActivities) ? allActivities.length : 0) === 0 ? (
           <option value="">Aucune activité trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une activité --</option>
-            {(allActivities ?? []).map(a => (
+            {(Array.isArray(allActivities) ? allActivities : []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>

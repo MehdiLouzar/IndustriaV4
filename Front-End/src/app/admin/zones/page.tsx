@@ -100,9 +100,12 @@ export default function ZonesAdmin() {
       `/api/zones?page=${page}&limit=${itemsPerPage}`
     ).catch(() => null)
     if (z) {
-      setZones(z.items)
-      setTotalPages(z.totalPages)
-      setCurrentPage(z.page)
+      const arr = Array.isArray(z.items) ? z.items : []
+      setZones(arr)
+      setTotalPages(z.totalPages || 1)
+      setCurrentPage(z.page || 1)
+    } else {
+      setZones([])
     }
   }
 
@@ -119,32 +122,62 @@ export default function ZonesAdmin() {
   }, [currentPage, router])
 
   useEffect(() => {
-    fetchApi<Zone[]>("/api/zones/all")
-      .then(setAllZones)
+    fetchApi<ListResponse<Zone>>("/api/zones/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllZones(arr)
+      })
       .catch(() => setAllZones([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/zone-types/all")
-      .then(setAllZoneTypes)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/zone-types/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllZoneTypes(arr)
+      })
       .catch(() => setAllZoneTypes([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/regions/all")
-      .then(setAllRegions)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/regions/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllRegions(arr)
+      })
       .catch(() => setAllRegions([]))
   }, [])
 
   useEffect(() => {
     fetchApi<ListResponse<ActivityDto>>("/api/activities")
-      .then((data) => setActivities(data.items))
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setActivities(arr)
+      })
       .catch(() => setActivities([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/amenities/all")
-      .then(setAllAmenities)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllAmenities(arr)
+      })
       .catch(() => setAllAmenities([]))
   }, [])
 
@@ -343,7 +376,7 @@ export default function ZonesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(zones ?? []).map((zone) => (
+              {(Array.isArray(zones) ? zones : []).map((zone) => (
                 <tr key={zone.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{zone.name}</td>
                   <td className="p-2 align-top">{zone.status}</td>
@@ -366,12 +399,12 @@ export default function ZonesAdmin() {
         value={selectedZoneId}
         onChange={e => setSelectedZoneId(e.target.value)}
       >
-        {(allZones ?? []).length === 0 ? (
+        {(Array.isArray(allZones) ? allZones.length : 0) === 0 ? (
           <option value="">Aucune zone trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une zone --</option>
-            {(allZones ?? []).map(a => (
+            {(Array.isArray(allZones) ? allZones : []).map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </>
@@ -456,10 +489,10 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allZoneTypes ?? []).length === 0 ? (
+                  {(Array.isArray(allZoneTypes) ? allZoneTypes.length : 0) === 0 ? (
                     <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
                   ) : (
-                    (allZoneTypes ?? []).map((t) => (
+                    (Array.isArray(allZoneTypes) ? allZoneTypes : []).map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))
                   )}
@@ -473,10 +506,10 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allRegions ?? []).length === 0 ? (
+                  {(Array.isArray(allRegions) ? allRegions.length : 0) === 0 ? (
                     <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
                   ) : (
-                    (allRegions ?? []).map((r) => (
+                    (Array.isArray(allRegions) ? allRegions : []).map((r) => (
                       <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))
                   )}
@@ -501,7 +534,7 @@ export default function ZonesAdmin() {
             <div>
               <Label>Équipements</Label>
               <div className="flex flex-wrap gap-2">
-                {(allAmenities ?? []).map((a) => (
+                {(Array.isArray(allAmenities) ? allAmenities : []).map((a) => (
                   <label key={a.id} className="flex items-center space-x-1">
                     <input
                       type="checkbox"

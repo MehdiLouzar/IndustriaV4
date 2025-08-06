@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -57,17 +58,26 @@ export default function AppointmentsAdmin() {
 
 
   async function load() {
-    const a = await fetchApi<Appointment[]>('/api/appointments').catch(() => null)
+    const a = await fetchApi<ListResponse<Appointment>>('/api/appointments').catch(() => null)
     if (a) {
-      setItems(a)
+      const arr = Array.isArray(a.items) ? a.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    fetchApi<{ items: ParcelDto[] }>("/api/parcels/all")
-      .then((data) => setParcels(data.items))
+    fetchApi<ListResponse<ParcelDto>>("/api/parcels/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setParcels(arr)
+      })
       .catch(() => setParcels([]))
   }, [])
 
@@ -176,7 +186,7 @@ export default function AppointmentsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? [])
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
@@ -197,7 +207,7 @@ export default function AppointmentsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

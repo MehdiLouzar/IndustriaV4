@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Ruler, Factory, Phone, Eye } from 'lucide-react'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 
 const ZONES_PER_PAGE = 12 // Réduit pour éviter surcharge
 
@@ -74,24 +75,21 @@ export default function ZoneGrid() {
     
     try {
       console.log(`🔍 Chargement zones page ${page}...`)
-      const response = await fetchApi<{ zones: IndustrialZone[]; totalPages: number }>(
+      const response = await fetchApi<ListResponse<IndustrialZone>>(
         `/api/zones?page=${page}&limit=${ZONES_PER_PAGE}`
       )
-      
+
       if (response) {
-        // ✅ Vérification plus robuste des données reçues
-        let zonesData: IndustrialZone[] = []
-        
-        if (response.zones && Array.isArray(response.zones)) {
-          zonesData = response.zones
-        } else if (Array.isArray(response)) {
-          // Si response est directement un tableau
-          zonesData = response as unknown as IndustrialZone[]
-        } else {
+        let zonesData: IndustrialZone[] = Array.isArray(response.items)
+          ? response.items
+          : Array.isArray(response)
+            ? (response as unknown as IndustrialZone[])
+            : []
+
+        if (!Array.isArray(response.items) && !Array.isArray(response)) {
           console.warn('⚠️ Format de données inattendu:', response)
-          zonesData = []
         }
-        
+
         console.log(`✅ ${zonesData.length} zones chargées`)
         setZones(zonesData)
         setTotalPages(response.totalPages || Math.ceil(zonesData.length / ZONES_PER_PAGE) || 1)

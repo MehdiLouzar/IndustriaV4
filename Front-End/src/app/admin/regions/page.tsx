@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -35,17 +36,26 @@ export default function RegionsAdmin() {
 
 
   async function load() {
-    const r = await fetchApi<Region[]>('/api/regions').catch(() => null)
+    const r = await fetchApi<ListResponse<Region>>('/api/regions').catch(() => null)
     if (r) {
-      setItems(r)
+      const arr = Array.isArray(r.items) ? r.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
   }
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>("/api/countries/all")
-      .then(setAllCountries)
+    fetchApi<ListResponse<{ id: string; name: string }>>("/api/countries/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllCountries(arr)
+      })
       .catch(() => setAllCountries([]))
   }, [])
 
@@ -110,7 +120,7 @@ export default function RegionsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? [])
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
@@ -131,7 +141,7 @@ export default function RegionsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={(items ?? []).length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -158,10 +168,10 @@ export default function RegionsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(allCountries ?? []).length === 0 ? (
+                  {(Array.isArray(allCountries) ? allCountries.length : 0) === 0 ? (
                     <SelectItem value="" disabled>Aucun pays trouvé</SelectItem>
                   ) : (
-                    (allCountries ?? []).map((c) => (
+                    (Array.isArray(allCountries) ? allCountries : []).map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))
                   )}

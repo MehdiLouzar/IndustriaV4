@@ -77,23 +77,38 @@ export default function ParcelsAdmin() {
       `/api/parcels?page=${page}&limit=${itemsPerPage}`
     ).catch(() => null)
     if (p) {
-      setItems(p.items)
-      setTotalPages(p.totalPages)
-      setCurrentPage(p.page)
+      const arr = Array.isArray(p.items) ? p.items : []
+      setItems(arr)
+      setTotalPages(p.totalPages || 1)
+      setCurrentPage(p.page || 1)
+    } else {
+      setItems([])
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
 
   useEffect(() => {
-    fetchApi<Parcel[]>("/api/parcels/all")
-      .then(setAllParcels)
+    fetchApi<ListResponse<Parcel>>("/api/parcels/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllParcels(arr)
+      })
       .catch(() => setAllParcels([]))
   }, [])
 
   useEffect(() => {
-    fetchApi<{ items: ZoneDto[] }>("/api/zones/all")
-      .then((data) => setZones(data.items))
+    fetchApi<ListResponse<ZoneDto>>("/api/zones/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setZones(arr)
+      })
       .catch(() => setZones([]))
   }, [])
 
@@ -250,7 +265,7 @@ export default function ParcelsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(items ?? []).map((p) => (
+              {(Array.isArray(items) ? items : []).map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{p.reference}</td>
                   <td className="p-2 align-top">{p.zoneId}</td>
@@ -273,12 +288,12 @@ export default function ParcelsAdmin() {
         value={selectedParcelId}
         onChange={e => setSelectedParcelId(e.target.value)}
       >
-        {(allParcels ?? []).length === 0 ? (
+        {(Array.isArray(allParcels) ? allParcels.length : 0) === 0 ? (
           <option value="">Aucune parcelle trouvée</option>
         ) : (
           <>
             <option value="">-- Sélectionnez une parcelle --</option>
-            {(allParcels ?? []).map(a => (
+            {(Array.isArray(allParcels) ? allParcels : []).map(a => (
               <option key={a.id} value={a.id}>{a.reference}</option>
             ))}
           </>
