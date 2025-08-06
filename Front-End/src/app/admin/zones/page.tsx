@@ -496,12 +496,9 @@ export default function ZonesAdmin() {
               <Label htmlFor="status">Statut</Label>
               <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un statut --
-                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (
@@ -514,12 +511,9 @@ export default function ZonesAdmin() {
               <Label htmlFor="zoneTypeId">Type</Label>
               <Select value={form.zoneTypeId || undefined} onValueChange={handleZoneType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un type --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un type --
-                  </SelectItem>
                   {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
                     .filter((t) => t.id && String(t.id).trim() !== "")
                     .map((t) => (
@@ -532,12 +526,9 @@ export default function ZonesAdmin() {
               <Label htmlFor="regionId">Région</Label>
               <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une région --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez une région --
-                  </SelectItem>
                   {(Array.isArray(allRegions) ? allRegions : [])
                     .filter((r) => r.id && String(r.id).trim() !== "")
                     .map((r) => (

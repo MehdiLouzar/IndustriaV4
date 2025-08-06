@@ -31,6 +31,7 @@ interface Parcel {
   status: string
   isShowroom?: boolean | null
   zoneId: string
+  vertices?: Vertex[]
 }
 
 interface ZoneDto {
@@ -288,12 +289,9 @@ export default function ParcelsAdmin() {
         onValueChange={(value) => setSelectedParcelId(value)}
       >
         <SelectTrigger>
-          <SelectValue placeholder="Choisir" />
+          <SelectValue placeholder="-- Sélectionnez une parcelle --" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="" disabled>
-            -- Sélectionnez une parcelle --
-          </SelectItem>
           {(Array.isArray(allParcels) ? allParcels : [])
             .filter((parcel) => Boolean(parcel.id))
             .map((parcel) => (
@@ -359,12 +357,9 @@ export default function ParcelsAdmin() {
               <Label htmlFor="zoneId">Zone</Label>
               <Select value={form.zoneId || undefined} onValueChange={handleZone}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez une zone --
-                  </SelectItem>
                   {(Array.isArray(zones) ? zones : [])
                     .filter((z) => z.id && String(z.id).trim() !== "")
                     .map((z) => (
@@ -379,12 +374,9 @@ export default function ParcelsAdmin() {
               <Label htmlFor="status">Statut</Label>
               <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un statut --
-                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (

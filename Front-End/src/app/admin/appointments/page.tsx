@@ -56,7 +56,6 @@ export default function AppointmentsAdmin() {
     status: 'PENDING',
   })
 
-
   async function load() {
     const a = await fetchApi<ListResponse<Appointment>>('/api/appointments').catch(() => null)
     if (a) {
@@ -247,12 +246,9 @@ export default function AppointmentsAdmin() {
               <Label htmlFor="parcelId">Parcelle</Label>
               <Select value={form.parcelId || undefined} onValueChange={handleParcel}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une parcelle --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez une parcelle --
-                  </SelectItem>
                   {(Array.isArray(parcels) ? parcels : [])
                     .filter((p) => p.id && String(p.id).trim() !== "")
                     .map((p) => (
@@ -265,12 +261,9 @@ export default function AppointmentsAdmin() {
               <Label htmlFor="status">Statut</Label>
               <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un statut --
-                  </SelectItem>
                   {statuses
                     .filter((s) => s && s.trim() !== "")
                     .map((s) => (

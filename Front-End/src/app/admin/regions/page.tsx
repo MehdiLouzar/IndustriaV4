@@ -165,12 +165,9 @@ export default function RegionsAdmin() {
               <Label htmlFor="countryId">Pays</Label>
               <Select value={form.countryId || undefined} onValueChange={handleCountry}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un pays --" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>
-                    -- Sélectionnez un pays --
-                  </SelectItem>
                   {(Array.isArray(allCountries) ? allCountries : [])
                     .filter((c) => c.id && String(c.id).trim() !== "")
                     .map((c) => (
