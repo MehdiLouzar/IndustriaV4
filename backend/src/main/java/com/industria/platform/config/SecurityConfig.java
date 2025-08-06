@@ -2,7 +2,6 @@ package com.industria.platform.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -25,16 +24,10 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/", "/zones/**", "/parcels/**", "/reservations/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/countries/all", "/api/zone-types/all", "/api/regions/all").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN","ZONE_MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/", "/zones/**", "/parcels/**", "/reservations/**", "/api/public/**").permitAll()
                 .anyRequest().authenticated()
             )
+            .oauth2Login(oauth2 -> oauth2.loginPage("/auth/login"))
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             )

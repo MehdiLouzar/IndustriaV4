@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { getSession } from 'next-auth/react'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -127,7 +128,8 @@ export async function fetchApi<T>(
     }
 
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
+      const session = await getSession()
+      const token = session?.accessToken as string | undefined
       const isProtected =
         path.startsWith('/api/admin') ||
         (path.startsWith('/api') && !path.startsWith('/api/public'))
@@ -135,7 +137,7 @@ export async function fetchApi<T>(
       if (token) {
         headers.set('Authorization', `Bearer ${token}`)
       } else if (isProtected) {
-        window.location.href = '/login'
+        window.location.href = '/auth/login'
         return Promise.reject(new Error('Missing auth token'))
       }
     }
@@ -144,7 +146,7 @@ export async function fetchApi<T>(
     if (init.signal?.aborted) return null
     if (!res.ok) {
       if (res.status === 401 && typeof window !== 'undefined') {
-        localStorage.removeItem('token')
+        window.location.href = '/auth/login'
       }
       return null
     }
