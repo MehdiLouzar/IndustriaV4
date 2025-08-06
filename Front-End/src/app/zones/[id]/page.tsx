@@ -70,9 +70,10 @@ export default function ZonePage() {
       const z = await fetchApi<ZoneResponse>(`/api/zones/${id}`)
       if (!z) return
 
-      const [region, type, activities, amenities, parcelsRes] = await Promise.all([
-        z.regionId ? fetchApi<{ name: string }>(`/api/regions/${z.regionId}`) : Promise.resolve(null),
-        z.zoneTypeId ? fetchApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : Promise.resolve(null),
+      const region = z.regionId ? await fetchApi<{ name: string }>(`/api/regions/${z.regionId}`) : null
+      const zoneType = z.zoneTypeId ? await fetchApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : null
+
+      const [activities, amenities, parcelsRes] = await Promise.all([
         Promise.all((z.activityIds || []).map(aid => fetchApi<{ name: string }>(`/api/activities/${aid}`))),
         Promise.all((z.amenityIds || []).map(aid => fetchApi<{ name: string }>(`/api/amenities/${aid}`))),
         fetchApi<ListResponse<Parcel>>(`/api/parcels?zoneId=${id}`),
@@ -91,7 +92,7 @@ export default function ZonePage() {
         totalArea: z.totalArea ?? null,
         price: z.price ?? null,
         region: region ? { name: region.name } : null,
-        zoneType: type ? { name: type.name } : null,
+        zoneType: zoneType ? { name: zoneType.name } : null,
         activities: Array.isArray(activities) ? activities.map(a => ({ activity: { name: a?.name || '' } })) : [],
         amenities: Array.isArray(amenities) ? amenities.map(a => a?.name || '') : [],
         parcels,
