@@ -358,15 +358,16 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(zones) ? zones : []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucune zone trouvée</SelectItem>
-                  ) : (
-                    (Array.isArray(zones) ? zones : []).map((z) => (
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez une zone --
+                  </SelectItem>
+                  {(Array.isArray(zones) ? zones : [])
+                    .filter((z) => Boolean(z.id))
+                    .map((z) => (
                       <SelectItem key={z.id} value={z.id}>
                         {z.name}
                       </SelectItem>
-                    ))
-                  )}
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -377,9 +378,14 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un statut --
+                  </SelectItem>
+                  {statuses
+                    .filter((s) => Boolean(s))
+                    .map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

@@ -168,13 +168,14 @@ export default function RegionsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(allCountries) ? allCountries.length : 0) === 0 ? (
-                    <SelectItem value="" disabled>Aucun pays trouvé</SelectItem>
-                  ) : (
-                    (Array.isArray(allCountries) ? allCountries : []).map((c) => (
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un pays --
+                  </SelectItem>
+                  {(Array.isArray(allCountries) ? allCountries : [])
+                    .filter((c) => Boolean(c.id))
+                    .map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))
-                  )}
+                    ))}
                 </SelectContent>
               </Select>
             </div>

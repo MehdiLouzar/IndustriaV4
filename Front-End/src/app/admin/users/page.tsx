@@ -214,9 +214,14 @@ export default function UsersAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un rôle --
+                  </SelectItem>
+                  {roles
+                    .filter((r) => Boolean(r))
+                    .map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

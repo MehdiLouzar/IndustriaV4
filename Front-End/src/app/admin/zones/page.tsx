@@ -476,9 +476,14 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un statut --
+                  </SelectItem>
+                  {statuses
+                    .filter((s) => Boolean(s))
+                    .map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -489,13 +494,14 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(allZoneTypes) ? allZoneTypes.length : 0) === 0 ? (
-                    <SelectItem value="" disabled>Aucun type trouvé</SelectItem>
-                  ) : (
-                    (Array.isArray(allZoneTypes) ? allZoneTypes : []).map((t) => (
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un type --
+                  </SelectItem>
+                  {(Array.isArray(allZoneTypes) ? allZoneTypes : [])
+                    .filter((t) => Boolean(t.id))
+                    .map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))
-                  )}
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -506,13 +512,14 @@ export default function ZonesAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(allRegions) ? allRegions.length : 0) === 0 ? (
-                    <SelectItem value="" disabled>Aucune région trouvée</SelectItem>
-                  ) : (
-                    (Array.isArray(allRegions) ? allRegions : []).map((r) => (
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez une région --
+                  </SelectItem>
+                  {(Array.isArray(allRegions) ? allRegions : [])
+                    .filter((r) => Boolean(r.id))
+                    .map((r) => (
                       <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                    ))
-                  )}
+                    ))}
                 </SelectContent>
               </Select>
             </div>

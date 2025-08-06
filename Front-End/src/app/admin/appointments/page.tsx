@@ -250,13 +250,14 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(parcels) ? parcels : []).length === 0 ? (
-                    <SelectItem value="" disabled>Aucune parcelle trouvée</SelectItem>
-                  ) : (
-                    (Array.isArray(parcels) ? parcels : []).map((p) => (
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez une parcelle --
+                  </SelectItem>
+                  {(Array.isArray(parcels) ? parcels : [])
+                    .filter((p) => Boolean(p.id))
+                    .map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
-                    ))
-                  )}
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -267,9 +268,14 @@ export default function AppointmentsAdmin() {
                   <SelectValue placeholder="Choisir" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>
+                    -- Sélectionnez un statut --
+                  </SelectItem>
+                  {statuses
+                    .filter((s) => Boolean(s))
+                    .map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
