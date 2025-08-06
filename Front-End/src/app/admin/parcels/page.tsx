@@ -382,7 +382,7 @@ export default function ParcelsAdmin() {
                     -- Sélectionnez un statut --
                   </SelectItem>
                   {statuses
-                    .filter((s) => s !== "")
+                    .filter((s) => Boolean(s))
                     .map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
