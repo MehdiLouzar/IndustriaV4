@@ -130,6 +130,9 @@ export async function fetchApi<T>(
       const token = localStorage.getItem('token')
       if (token) {
         headers.set('Authorization', `Bearer ${token}`)
+      } else {
+        window.location.href = '/login'
+        return Promise.reject(new Error('Missing auth token'))
       }
     }
 
