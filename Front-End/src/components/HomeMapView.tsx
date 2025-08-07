@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Link from 'next/link'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polygon } from 'react-leaflet'
 import L from 'leaflet'
 import MarkerClusterGroup from 'react-leaflet-markercluster'
 import 'leaflet/dist/leaflet.css'
@@ -13,7 +13,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
-import { fetchPublicApi, type PublicZonesResponse } from '@/lib/publicApi'
+import { fetchPublicApi } from '@/lib/publicApi'
 import DynamicIcon from '@/components/DynamicIcon'
 import { TrainFront, Ship, Plane, Factory, MapPin, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,8 @@ const DEMO_POIS = [
 ] as const
 
 type ZoneFeature = {
-  geometry: { type: string; coordinates: [number, number] }
+  polygon: [number, number][]
+  centroid: [number, number]
   properties: {
     id: string
     name: string
@@ -45,7 +46,7 @@ type ZoneFeature = {
 }
 
 type ZoneFeatureResp = {
-  coordinates: [number, number]
+  coordinates: [number, number][]
   id: string
   name: string
   status: string
@@ -91,7 +92,13 @@ const TYPE_LABELS = {
 // Données de fallback minimales pour éviter le lag
 const FALLBACK_ZONES: ZoneFeature[] = [
   {
-    geometry: { type: "Point", coordinates: [33.5731, -7.5898] },
+    polygon: [
+      [33.5831, -7.5998],
+      [33.5831, -7.5798],
+      [33.5631, -7.5798],
+      [33.5631, -7.5998],
+    ],
+    centroid: [33.5731, -7.5898],
     properties: {
       id: 'fallback-casa',
       name: 'Zone Demo Casablanca',
@@ -106,7 +113,13 @@ const FALLBACK_ZONES: ZoneFeature[] = [
     }
   },
   {
-    geometry: { type: "Point", coordinates: [34.0209, -6.8417] },
+    polygon: [
+      [34.0309, -6.8517],
+      [34.0309, -6.8317],
+      [34.0109, -6.8317],
+      [34.0109, -6.8517],
+    ],
+    centroid: [34.0209, -6.8417],
     properties: {
       id: 'fallback-rabat',
       name: 'Zone Demo Rabat',
@@ -129,8 +142,6 @@ export default function HomeMapView() {
   const [error, setError] = useState<string | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const lastLoadTime = useRef<number>(0)
-  const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
   // Styles des icônes pour les POI
   const ICONS = useMemo(
@@ -183,7 +194,7 @@ export default function HomeMapView() {
   const ZoneMarker = React.memo(function ZoneMarker({ zone }: { zone: ZoneFeature }) {
 
     return (
-      <Marker position={zone.geometry.coordinates} icon={ICONS.zone}>
+      <Marker position={zone.centroid} icon={ICONS.zone}>
         <Popup maxWidth={300} className="zone-popup">
           <div className="space-y-3 p-2">
             <div>
@@ -275,110 +286,93 @@ export default function HomeMapView() {
     )
   })
 
-  // Chargement optimisé des zones depuis l'API publique
-  const loadZones = useCallback(async (force = false) => {
-    // Cache simple pour éviter les rechargements fréquents
-    if (!force && lastLoadTime.current > 0 && (Date.now() - lastLoadTime.current) < CACHE_DURATION) {
+  const zoneCache = useRef(new Map<number, ZoneFeature[]>())
+  const precisionRef = useRef(-1)
+
+  const loadZones = useCallback(async (precision: number, force = false) => {
+    if (!force && zoneCache.current.has(precision)) {
+      setZones(zoneCache.current.get(precision) || [])
       setLoading(false)
       return
     }
-    
-    // Annuler la requête précédente si elle existe
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+
     abortControllerRef.current = new AbortController()
     setLoading(true)
     setError(null)
-    
+
     try {
-      // Essayer les deux APIs en parallèle pour réduire la latence
-      const [mapResponse, zonesResponse] = await Promise.allSettled([
-        fetchPublicApi<PublicZonesResponse>("/api/map/zones", { signal: abortControllerRef.current.signal }),
-        fetchPublicApi<PublicZonesResponse>("/api/zones", { signal: abortControllerRef.current.signal })
-      ])
-      
-      let response: PublicZonesResponse | null = null
-      
-      // Utiliser la première réponse valide
-      if (mapResponse.status === 'fulfilled' && mapResponse.value?.features) {
-        response = mapResponse.value
-      } else if (zonesResponse.status === 'fulfilled' && zonesResponse.value) {
-        response = zonesResponse.value
-      }
-      
+      const response = await fetchPublicApi<{ features: ZoneFeatureResp[] }>(
+        `/api/map/zones/simplified?zoom=${precision}`,
+        { signal: abortControllerRef.current.signal }
+      )
+
       if (response?.features) {
-        // Optimisation: traitement batch des données
-        const zonesData: ZoneFeature[] = response.features.map((f) => ({
-          geometry: { type: "Point", coordinates: [f.coordinates[0], f.coordinates[1]] },
-          properties: {
-            id: f.id,
-            name: f.name,
-            status: f.status,
-            availableParcels: f.availableParcels,
-            activityIcons: f.activityIcons || [],
-            amenityIcons: f.amenityIcons || [],
-            description: f.description,
-            price: f.price,
-            area: f.area,
-            location: f.location,
-          },
-        }))
+        const zonesData: ZoneFeature[] = response.features.map((f) => {
+          const poly = f.coordinates.map((c) => [c[0], c[1]] as [number, number])
+          const center = poly.reduce<[number, number]>((acc, cur) => [acc[0] + cur[0], acc[1] + cur[1]], [0, 0])
+          center[0] /= poly.length
+          center[1] /= poly.length
+          return {
+            polygon: poly,
+            centroid: center,
+            properties: {
+              id: f.id,
+              name: f.name,
+              status: f.status,
+              availableParcels: f.availableParcels,
+              activityIcons: f.activityIcons || [],
+              amenityIcons: f.amenityIcons || [],
+              description: f.description,
+              price: f.price,
+              area: f.area,
+              location: f.location,
+            },
+          }
+        })
+        zoneCache.current.set(precision, zonesData)
         setZones(zonesData)
-        lastLoadTime.current = Date.now()
-      } else if (response?.items) {
-        // Optimisation: filtrage et mapping en une seule passe
-        const zonesData: ZoneFeature[] = response.items
-          .reduce<ZoneFeature[]>((acc, zone) => {
-            if (!zone.coordinates) return acc // Skip sans coordonnées
-            acc.push({
-              geometry: { type: "Point", coordinates: zone.coordinates },
-              properties: {
-                id: zone.id,
-                name: zone.name,
-                status: zone.status,
-                availableParcels: 0,
-                activityIcons: zone.activityIcons || [],
-                amenityIcons: zone.amenityIcons || [],
-                description: zone.description,
-                price: zone.price,
-                area: zone.area,
-                location: zone.location,
-              },
-            })
-            return acc
-          }, [])
-        setZones(zonesData)
-        lastLoadTime.current = Date.now()
       } else {
-        // Données de démonstration minimal pour éviter le lag
         setZones(FALLBACK_ZONES)
-        lastLoadTime.current = Date.now()
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('Requête annulée')
-        return // Ne pas traiter les requêtes annulées
-      }
-      
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       console.error('Erreur lors du chargement des zones:', err)
       setError('Impossible de charger les zones. Affichage des données de démonstration.')
       setZones(FALLBACK_ZONES)
-      lastLoadTime.current = Date.now()
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadZones()
-    
-    // Nettoyage à la désinstallation du composant
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
+    const map = mapRef.current
+    if (!map) return
+
+    const precisionFromZoom = (z: number) => {
+      if (z >= 14) return 3
+      if (z >= 10) return 2
+      if (z >= 8) return 1
+      return 0
+    }
+
+    const handleZoom = () => {
+      const p = precisionFromZoom(map.getZoom())
+      if (precisionRef.current !== p) {
+        precisionRef.current = p
+        loadZones(p)
       }
+    }
+
+    map.on('zoomend', handleZoom)
+    handleZoom()
+
+    return () => {
+      map.off('zoomend', handleZoom)
+      if (abortControllerRef.current) abortControllerRef.current.abort()
     }
   }, [loadZones])
 
@@ -422,7 +416,15 @@ export default function HomeMapView() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        
+
+        {zones.map((z) => (
+          <Polygon
+            key={`poly-${z.properties.id}`}
+            positions={z.polygon}
+            pathOptions={{ color: '#B1936D', weight: 1, fillOpacity: 0.1 }}
+          />
+        ))}
+
         {/* Clustering optimisé pour les zones industrielles */}
         <MarkerClusterGroup
           maxClusterRadius={60}
