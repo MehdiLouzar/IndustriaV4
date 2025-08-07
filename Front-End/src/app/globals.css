@@ -2,60 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fix pour les dropdowns Select dans les Dialogs */
+@import '../styles/select-fix.css';
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 348 83% 47%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    /* Palette Industria */
+    --background: 0 0% 100%; /* #FFFFFF - Blanc */
+    --foreground: 0 0% 11%; /* #1C1C1C - Noir */
+    --card: 0 0% 100%; /* #FFFFFF - Blanc */
+    --card-foreground: 0 0% 11%; /* #1C1C1C - Noir */
+    --popover: 0 0% 100%; /* #FFFFFF - Blanc */
+    --popover-foreground: 0 0% 11%; /* #1C1C1C - Noir */
+    --primary: 38 50% 37%; /* #8C6B2F - Brun doré */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --secondary: 0 0% 96%; /* #F5F5F5 - Gris clair */
+    --secondary-foreground: 0 0% 11%; /* #1C1C1C - Noir */
+    --muted: 0 0% 96%; /* #F5F5F5 - Gris clair */
+    --muted-foreground: 0 0% 80%; /* #CCCCCC - Gris moyen */
+    --accent: 38 50% 37%; /* #8C6B2F - Brun doré */
+    --accent-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --destructive: 0 84.2% 60.2%; /* Rouge pour les erreurs */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 348 83% 47%;
+    --border: 0 0% 80%; /* #CCCCCC - Gris moyen */
+    --input: 0 0% 96%; /* #F5F5F5 - Gris clair */
+    --ring: 38 50% 37%; /* #8C6B2F - Brun doré */
     --radius: 0.5rem;
-    --chart-1: 348 83% 47%;
-    --chart-2: 200 75% 45%;
-    --chart-3: 160 60% 45%;
-    --chart-4: 30 80% 55%;
-    --chart-5: 270 55% 60%;
+    --chart-1: 38 50% 37%; /* #8C6B2F - Brun doré */
+    --chart-2: 42 38% 50%; /* #A79059 - Vert olive clair */
+    --chart-3: 43 45% 59%; /* #C9A956 - Jaune doré */
+    --chart-4: 0 0% 80%; /* #CCCCCC - Gris moyen */
+    --chart-5: 0 0% 11%; /* #1C1C1C - Noir */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 348 83% 47%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Mode sombre avec palette Industria */
+    --background: 0 0% 11%; /* #1C1C1C - Noir */
+    --foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --card: 0 0% 11%; /* #1C1C1C - Noir */
+    --card-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --popover: 0 0% 11%; /* #1C1C1C - Noir */
+    --popover-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --primary: 43 45% 59%; /* #C9A956 - Jaune doré (plus lumineux en dark) */
+    --primary-foreground: 0 0% 11%; /* #1C1C1C - Noir */
+    --secondary: 0 0% 20%; /* Plus sombre */
+    --secondary-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --muted: 0 0% 20%; /* Plus sombre */
+    --muted-foreground: 0 0% 80%; /* #CCCCCC - Gris moyen */
+    --accent: 42 38% 50%; /* #A79059 - Vert olive clair */
+    --accent-foreground: 0 0% 100%; /* #FFFFFF - Blanc */
+    --destructive: 0 62.8% 30.6%; /* Rouge pour les erreurs */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 348 83% 47%;
-    --chart-1: 348 83% 47%;
-    --chart-2: 200 75% 65%;
-    --chart-3: 160 60% 65%;
-    --chart-4: 30 80% 75%;
-    --chart-5: 270 55% 80%;
+    --border: 0 0% 30%; /* Plus sombre */
+    --input: 0 0% 20%; /* Plus sombre */
+    --ring: 43 45% 59%; /* #C9A956 - Jaune doré */
+    --chart-1: 43 45% 59%; /* #C9A956 - Jaune doré */
+    --chart-2: 42 38% 50%; /* #A79059 - Vert olive clair */
+    --chart-3: 38 50% 37%; /* #8C6B2F - Brun doré */
+    --chart-4: 0 0% 80%; /* #CCCCCC - Gris moyen */
+    --chart-5: 0 0% 100%; /* #FFFFFF - Blanc */
   }
 }
 
@@ -68,15 +73,28 @@
   }
 }
 
-/* Custom classes for Al Omrane inspired design */
-.header-red {
-  background: linear-gradient(135deg, #e70926 0%, #d40724 100%);
+/* Custom classes pour design Industria */
+.header-brown {
+  background: linear-gradient(135deg, #8C6B2F 0%, #A79059 100%);
 }
 
-.search-blue {
-  background: linear-gradient(135deg, #1dadfa 0%, #0d8fd9 100%);
+.header-gold {
+  background: linear-gradient(135deg, #C9A956 0%, #A79059 100%);
 }
 
 .text-outline {
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+  text-shadow: 1px 1px 0 rgba(28, 28, 28, 0.1);
+}
+
+.industria-shadow {
+  box-shadow: 0 4px 12px rgba(140, 107, 47, 0.15);
+}
+
+.industria-border {
+  border-color: #CCCCCC;
+}
+
+/* Classe de compatibilité pour les anciens composants */
+.header-red {
+  background: linear-gradient(135deg, #8C6B2F 0%, #A79059 100%);
 }

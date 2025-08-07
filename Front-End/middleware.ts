@@ -5,7 +5,7 @@ export function middleware(req: NextRequest) {
   // Allow public pages
   if (req.nextUrl.pathname.startsWith('/admin')) {
     const token = req.cookies.get('token')
-    if (!token) {
+    if (!token || !token.value) {
       return NextResponse.redirect(new URL('/auth/login', req.url))
     }
   }

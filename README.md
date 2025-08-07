@@ -67,8 +67,8 @@ When the container starts it imports `keycloak/realm-export.json` which defines
 demo users matching the accounts shown on the login page:
 
 ```
-- admin@zonespro.ma / password123 (ADMIN)
-- manager@zonespro.ma / password123 (ZONE_MANAGER)
+- admin@industria.ma / password123 (ADMIN)
+- manager@industria.ma / password123 (ZONE_MANAGER)
 - demo@entreprise.ma / password123 (USER)
 ```
 If you run Keycloak manually, pass `--import-realm` with the path to this file

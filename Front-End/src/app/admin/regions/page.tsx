@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
-import { SelectField } from '@/components/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 interface Region {
   id: string
@@ -152,12 +152,18 @@ export default function RegionsAdmin() {
             </div>
             <div>
               <Label htmlFor="countryId">Pays</Label>
-              <SelectField
-                options={allCountries.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="-- Sélectionnez un pays --"
-                value={form.countryId}
-                onValueChange={handleCountry}
-              />
+              <Select value={form.countryId || undefined} onValueChange={handleCountry}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-- Sélectionnez un pays --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCountries.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
           </form>

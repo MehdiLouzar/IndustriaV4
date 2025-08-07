@@ -5,7 +5,12 @@ import com.industria.platform.dto.ZoneDto;
 import com.industria.platform.entity.*;
 import com.industria.platform.repository.*;
 import com.industria.platform.service.StatusService;
+import com.industria.platform.service.GeometryUpdateService;
+import com.industria.platform.service.PermissionService;
+import com.industria.platform.service.UserService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.PageRequest;
 import com.industria.platform.dto.ListResponse;
@@ -25,6 +30,9 @@ public class ZoneController {
     private final ZoneAmenityRepository zoneAmenityRepository;
     private final ZoneTypeRepository zoneTypeRepository;
     private final RegionRepository regionRepository;
+    private final GeometryUpdateService geometryUpdateService;
+    private final PermissionService permissionService;
+    private final UserService userService;
 
     public ZoneController(StatusService statusService,
                           ZoneRepository zoneRepository,
@@ -33,7 +41,10 @@ public class ZoneController {
                           ZoneActivityRepository zoneActivityRepository,
                           ZoneAmenityRepository zoneAmenityRepository,
                           ZoneTypeRepository zoneTypeRepository,
-                          RegionRepository regionRepository) {
+                          RegionRepository regionRepository,
+                          GeometryUpdateService geometryUpdateService,
+                          PermissionService permissionService,
+                          UserService userService) {
         this.statusService = statusService;
         this.zoneRepository = zoneRepository;
         this.activityRepository = activityRepository;
@@ -42,12 +53,19 @@ public class ZoneController {
         this.zoneAmenityRepository = zoneAmenityRepository;
         this.zoneTypeRepository = zoneTypeRepository;
         this.regionRepository = regionRepository;
+        this.geometryUpdateService = geometryUpdateService;
+        this.permissionService = permissionService;
+        this.userService = userService;
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('CONTENT_MANAGER') or hasRole('ADMIN')")
-    public Zone updateStatus(@PathVariable String id, @RequestBody StatusRequest request) {
-        return statusService.updateZoneStatus(id, request.status());
+    @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<Zone> updateStatus(@PathVariable String id, @RequestBody StatusRequest request) {
+        if (!permissionService.canModifyZone(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        Zone zone = statusService.updateZoneStatus(id, request.status());
+        return ResponseEntity.ok(zone);
     }
 
     @GetMapping
@@ -72,29 +90,43 @@ public class ZoneController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ZoneDto create(@RequestBody ZoneDto dto) {
         Zone z = new Zone();
         updateEntity(z, dto);
+        
+        // Définir automatiquement le créateur
+        z.setCreatedBy(userService.getCurrentUser());
+        
         zoneRepository.save(z);
         return toDto(z);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ZoneDto update(@PathVariable String id, @RequestBody ZoneDto dto) {
+    @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<ZoneDto> update(@PathVariable String id, @RequestBody ZoneDto dto) {
+        if (!permissionService.canModifyZone(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
         Zone z = zoneRepository.findById(id).orElseThrow();
         updateEntity(z, dto);
         zoneRepository.save(z);
-        return toDto(z);
+        return ResponseEntity.ok(toDto(z));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public void delete(@PathVariable String id) { zoneRepository.deleteById(id); }
+    @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        if (!permissionService.canModifyZone(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
+        zoneRepository.deleteById(id);
+        return ResponseEntity.ok().build();
+    }
 
     private ZoneDto toDto(Zone z) {
-        double[] centroid = parseCentroid(z.getGeometry());
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -108,12 +140,13 @@ public class ZoneController {
                 z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getId()).toList(),
                 z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getId()).toList(),
                 parseGeometry(z.getGeometry()),
-                centroid[1],
-                centroid[0]
+                z.getLatitude(),  // Utiliser les coordonnées pré-calculées
+                z.getLongitude()  // Utiliser les coordonnées pré-calculées
         );
     }
 
     private void updateEntity(Zone z, ZoneDto dto) {
+        System.out.println("DEBUG: updateEntity appelé pour zone " + z.getId());
         z.setName(dto.name());
         z.setDescription(dto.description());
         z.setAddress(dto.address());
@@ -128,6 +161,10 @@ public class ZoneController {
             z.setRegion(regionRepository.findById(dto.regionId()).orElse(null));
         z.setGeometry(buildGeometry(dto.vertices()));
         z.setSrid(4326);
+        
+        System.out.println("DEBUG: Vertices reçus: " + dto.vertices());
+        // Calculer automatiquement les coordonnées WGS84
+        geometryUpdateService.updateZoneCoordinates(z, dto.vertices());
 
         if (z.getActivities() != null && !z.getActivities().isEmpty()) {
             zoneActivityRepository.deleteAll(z.getActivities());

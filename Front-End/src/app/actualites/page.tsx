@@ -7,7 +7,7 @@ export default function ActualitesPage() {
       <Header />
       <div className="flex-grow container mx-auto px-4 py-12 space-y-6">
         <h1 className="text-3xl font-bold text-center">Actualités</h1>
-        <p className="text-gray-600 text-center">Suivez toute l'actualité de ZonesPro.</p>
+        <p className="text-gray-600 text-center">Suivez toute l'actualité d'Industria.</p>
       </div>
       <Footer />
     </main>

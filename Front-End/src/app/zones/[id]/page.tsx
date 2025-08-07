@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DynamicIcon from "@/components/DynamicIcon";
 import { fetchApi } from "@/lib/utils";
+import { fetchPublicApi } from "@/lib/publicApi";
 import type { ListResponse } from "@/types";
 
 interface Parcel {
@@ -67,16 +68,16 @@ export default function ZonePage() {
 
   useEffect(() => {
     async function load() {
-      const z = await fetchApi<ZoneResponse>(`/api/zones/${id}`)
+      const z = await fetchPublicApi<ZoneResponse>(`/api/zones/${id}`)
       if (!z) return
 
-      const region = z.regionId ? await fetchApi<{ name: string }>(`/api/regions/${z.regionId}`) : null
-      const zoneType = z.zoneTypeId ? await fetchApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : null
+      const region = z.regionId ? await fetchPublicApi<{ name: string }>(`/api/regions/${z.regionId}`) : null
+      const zoneType = z.zoneTypeId ? await fetchPublicApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : null
 
       const [activities, amenities, parcelsRes] = await Promise.all([
-        Promise.all((z.activityIds || []).map(aid => fetchApi<{ name: string }>(`/api/activities/${aid}`))),
-        Promise.all((z.amenityIds || []).map(aid => fetchApi<{ name: string }>(`/api/amenities/${aid}`))),
-        fetchApi<ListResponse<Parcel>>(`/api/parcels?zoneId=${id}`),
+        Promise.all((z.activityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/activities/${aid}`))),
+        Promise.all((z.amenityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/amenities/${aid}`))),
+        fetchPublicApi<ListResponse<Parcel>>(`/api/parcels?zoneId=${id}`),
       ])
 
       const parcels = parcelsRes && Array.isArray(parcelsRes.items) ? parcelsRes.items : []

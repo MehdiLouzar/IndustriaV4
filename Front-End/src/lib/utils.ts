@@ -85,6 +85,17 @@ class SecureApiCache {
 }
 
 export const apiCache = new SecureApiCache()
+
+// Gestionnaire des requêtes en cours pour éviter les doublons
+const pendingRequests = new Map<string, Promise<any>>()
+
+// Fonction pour créer une clé unique pour une requête
+function createRequestKey(path: string, init?: RequestInit): string {
+  const method = init?.method || 'GET'
+  const body = init?.body ? JSON.stringify(init.body) : ''
+  return `${method}:${path}:${body}`
+}
+
 let cleanupTimer: NodeJS.Timeout | null = null
 if (typeof window !== 'undefined') {
   cleanupTimer = setInterval(() => apiCache.cleanup(), 60000)
@@ -121,37 +132,95 @@ export async function fetchApi<T>(
     }
     const method = init?.method?.toUpperCase() || 'GET'
     const cacheKey = `${method}:${url}`
+    const requestKey = createRequestKey(path, init)
 
     if (method === 'GET') {
       const cached = apiCache.get(cacheKey)
       if (cached) return cached as T
+      
+      // Vérifier s'il y a une requête en cours pour éviter les doublons
+      if (pendingRequests.has(requestKey)) {
+        return pendingRequests.get(requestKey)
+      }
     }
 
-    const isProtected =
-      path.startsWith('/api/admin') ||
-      (path.startsWith('/api') && !path.startsWith('/api/public'))
+    // Routes publiques (sans authentification)
+    const publicRoutes = [
+      '/api/public',
+      '/api/zones',
+      '/api/map',
+      '/api/activities',
+      '/api/amenities',
+      '/api/regions',
+      '/api/zone-types',
+      '/api/countries'
+    ]
+    
+    const isPublicRoute = publicRoutes.some(route => path.startsWith(route))
+    const isProtected = 
+      path.startsWith('/api/admin') || 
+      (path.startsWith('/api/') && method !== 'GET' && !isPublicRoute && !path.includes('/reservations')) ||
+      (path.startsWith('/api/') && method === 'GET' && !isPublicRoute && path.includes('/users'))
+    
+    console.log(`API Call: ${method} ${path} - Protected: ${isProtected}`)
 
     if (token) {
       headers.set('Authorization', `Bearer ${token}`)
     } else if (isProtected && typeof window !== 'undefined') {
-      window.location.href = '/auth/login'
-      return Promise.reject(new Error('Missing auth token'))
-    }
-
-    const res = await fetch(url.toString(), { credentials: 'include', ...init, headers })
-    if (init.signal?.aborted) return null
-    if (!res.ok) {
-      if (res.status === 401 && typeof window !== 'undefined') {
-        window.location.href = '/auth/login'
+      // Try to get token from localStorage if not provided
+      const storedToken = localStorage.getItem('token')
+      if (storedToken) {
+        console.log(`Setting auth token for ${method} ${path}`)
+        headers.set('Authorization', `Bearer ${storedToken}`)
+      } else {
+        console.error(`No auth token found for protected route: ${path}`)
+        // Seulement rediriger pour les routes admin
+        if (path.startsWith('/api/admin')) {
+          window.location.href = '/auth/login'
+          return Promise.reject(new Error('Missing auth token'))
+        }
       }
-      return null
     }
 
-    const data = await res.json()
-    if (method === 'GET' && !init.signal?.aborted) {
-      apiCache.set(cacheKey, data)
+    // Créer la promesse de requête
+    const requestPromise = (async () => {
+      const res = await fetch(url.toString(), { credentials: 'include', ...init, headers })
+      if (init.signal?.aborted) return null
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => 'No response body')
+        console.warn(`API Error ${res.status} for ${method} ${url}:`, errorText)
+        
+        if (res.status === 401 && typeof window !== 'undefined') {
+          if (isProtected) {
+            console.warn('Authentication failed for protected route')
+            // Seulement rediriger pour les routes admin
+            if (path.startsWith('/api/admin')) {
+              window.location.href = '/auth/login'
+            }
+          } else {
+            console.info('401 on public route - this is normal, using fallback data')
+          }
+        }
+        
+        return null
+      }
+
+      const data = await res.json()
+      if (method === 'GET' && !init.signal?.aborted) {
+        apiCache.set(cacheKey, data)
+      }
+      return data
+    })()
+
+    // Ajouter aux requêtes en cours pour les GET
+    if (method === 'GET') {
+      pendingRequests.set(requestKey, requestPromise)
+      requestPromise.finally(() => {
+        pendingRequests.delete(requestKey)
+      })
     }
-    return data
+
+    return await requestPromise
   } catch (err) {
     if (err instanceof Error && err.name !== 'AbortError') {
       console.error('Fetch error:', err)

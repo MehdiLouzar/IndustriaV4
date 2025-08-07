@@ -1,94 +1,85 @@
-#!/bin/bash
-# Script de démarrage complet pour l'environnement Industria
+#!/usr/bin/env bash
+# start.sh — Démarrage de l'environnement Industria (bash)
+
 set -euo pipefail
 
+echo
+echo "==============================================="
 echo "🚀 Démarrage de l'environnement Industria..."
+echo "==============================================="
+echo
+
+# Vérifier la présence de Docker et Docker Compose
+if ! command -v docker >/dev/null 2>&1; then
+  echo "❌ Docker n'est pas installé ou non accessible"
+  exit 1
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  echo "❌ Docker Compose n'est pas installé ou non accessible"
+  exit 1
+fi
+echo "✅ Docker et Docker Compose détectés"
+echo
 
 # Nettoyage des conteneurs existants
 echo "🧹 Nettoyage des conteneurs existants..."
 docker compose down -v --remove-orphans
+echo
 
 # Construction et démarrage des services
 echo "🔨 Construction et démarrage des services..."
 docker compose up --build -d
+echo
 
-# Fonction d'attente avec timeout
+# Helpers d'attente HTTP
 wait_for_service() {
-    local service_name=$1
-    local health_url=$2
-    local max_attempts=60
-    local attempt=1
-    
-    echo "⏳ Attente du service $service_name..."
-    
-    while [ $attempt -le $max_attempts ]; do
-        if curl -sf "$health_url" > /dev/null 2>&1; then
-            echo "✅ $service_name est prêt !"
-            return 0
-        fi
-        
-        echo "   Tentative $attempt/$max_attempts..."
-        sleep 5
-        ((attempt++))
-    done
-    
-    echo "❌ Timeout: $service_name n'est pas disponible après $((max_attempts * 5)) secondes"
-    return 1
+  local name=$1 url=$2 max=60
+  echo "⏳ Attente de $name..."
+  for i in $(seq 1 $max); do
+    if curl -sf "$url" >/dev/null 2>&1; then
+      echo "✅ $name est prêt !"
+      return 0
+    fi
+    printf "   Tentative %2d/%d...\r" "$i" "$max"
+    sleep 5
+  done
+  echo
+  echo "❌ Timeout: $name n'est pas dispo après $((max*5))s"
+  exit 1
 }
 
-# Attendre que PostgreSQL soit prêt
+# Attendre PostgreSQL
 echo "⏳ Attente de PostgreSQL..."
-while ! docker compose exec -T db pg_isready -U postgres > /dev/null 2>&1; do
-    echo "   PostgreSQL pas encore prêt..."
-    sleep 2
+until docker compose exec -T db pg_isready -U postgres >/dev/null 2>&1; do
+  echo "   PostgreSQL pas encore prêt..."
+  sleep 2
 done
 echo "✅ PostgreSQL est prêt !"
+echo
 
 # Attendre Keycloak
 wait_for_service "Keycloak" "http://localhost:8081/realms/industria"
+echo
 
-# Attendre le backend
+# Attendre Backend
 wait_for_service "Backend" "http://localhost:8080/actuator/health"
+echo
 
-# Attendre que l'initialisation des données soit terminée
-echo "⏳ Attente de l'initialisation des données..."
-while docker compose ps db-init | grep -q "running\|restarting"; do
-    echo "   Initialisation des données en cours..."
-    sleep 3
-done
-
-# Vérifier le statut de l'initialisation
-if docker compose ps db-init | grep -q "exited (0)"; then
-    echo "✅ Initialisation des données terminée avec succès !"
-else
-    echo "❌ Problème lors de l'initialisation des données"
-    echo "📜 Logs de l'initialisation :"
-    docker compose logs db-init
-fi
-
-# Attendre le frontend
+# Attendre Frontend
 wait_for_service "Frontend" "http://localhost:3000"
+echo
 
-echo ""
-echo "🎉 Tous les services sont démarrés avec succès !"
-echo ""
-echo "📋 Services disponibles :"
-echo "   • Frontend:  http://localhost:3000"
-echo "   • Backend:   http://localhost:8080"
-echo "   • Keycloak:  http://localhost:8081"
-echo "   • Database:  localhost:5432"
-echo ""
-echo "👤 Comptes de test :"
-echo "   • Admin:    admin@zonespro.ma / password123"
-echo "   • Manager:  manager@zonespro.ma / password123"
-echo "   • User:     demo@entreprise.ma / password123"
-echo ""
+echo "==============================================="
+echo "🎉 Tous les services sont démarrés !"
+echo "-----------------------------------------------"
+echo "• Frontend: http://localhost:3000"
+echo "• Backend:  http://localhost:8080"
+echo "• Keycloak: http://localhost:8081"
+echo "• DB:       localhost:5432"
+echo "==============================================="
+echo
 echo "🔧 Commandes utiles :"
-echo "   • Voir les logs: docker compose logs -f [service]"
-echo "   • Arrêter:      docker compose down"
-echo "   • Redémarrer:   docker compose restart [service]"
-echo ""
-
-# Afficher les logs des services en arrière-plan
-echo "📜 Logs des services (Ctrl+C pour arrêter l'affichage) :"
-docker compose logs -f
+echo "   • Voir les logs : docker compose logs -f [service]"
+echo "   • Arrêter      : docker compose down"
+echo "   • Redémarrer   : docker compose restart [service]"
+echo

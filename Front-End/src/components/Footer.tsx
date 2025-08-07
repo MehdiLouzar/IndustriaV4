@@ -41,7 +41,7 @@ export default function Footer() {
               Être contacté
             </Button>
             <Button
-              className="header-red text-white hover:opacity-90 flex items-center gap-2"
+              className="header-brown text-white hover:opacity-90 flex items-center gap-2"
               onClick={() => setShowForm(true)}
             >
               <Calendar className="w-5 h-5" />
@@ -103,11 +103,11 @@ export default function Footer() {
             <div className="space-y-2">
               <h4 className="font-semibold">Contactez-nous sur</h4>
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-red-400" />
+                <Phone className="w-4 h-4 text-industria-yellow-gold" />
                 <span className="text-xl font-bold">+212 5 37 57 20 00</span>
               </div>
               <Button
-                className="w-full header-red text-white hover:opacity-90 mt-3"
+                className="w-full header-brown text-white hover:opacity-90 mt-3"
                 onClick={() => setShowForm(true)}
               >
                 Prise de rendez-vous
@@ -122,8 +122,8 @@ export default function Footer() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <Building2 className="w-6 h-6 text-red-400" />
-              <span className="text-sm">© ZONES-PRO {currentYear} - Powered by ZonesPro</span>
+              <Building2 className="w-6 h-6 text-industria-yellow-gold" />
+              <span className="text-sm">© INDUSTRIA {currentYear} - Powered by Industria</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 text-sm">

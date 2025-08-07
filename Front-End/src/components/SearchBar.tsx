@@ -116,7 +116,7 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-red-600" /> Région
+            <MapPin className="w-4 h-4 text-industria-brown-gold" /> Région
           </label>
           <Select value={filters.regionId} onValueChange={(v) => setFilters({ ...filters, regionId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>
@@ -130,7 +130,7 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <Factory className="w-4 h-4 text-red-600" /> Type
+            <Factory className="w-4 h-4 text-industria-brown-gold" /> Type
           </label>
           <Select value={filters.zoneTypeId} onValueChange={(v) => setFilters({ ...filters, zoneTypeId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>

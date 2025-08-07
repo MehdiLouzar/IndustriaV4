@@ -1,0 +1,18 @@
+/* Fix pour les dropdowns Select dans les Dialogs */
+[data-radix-select-content] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+[data-radix-select-content][aria-hidden="true"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: block !important;
+}
+
+/* Assurer que le SelectContent est visible dans les Dialogs */
+[data-radix-dialog-content] [data-radix-select-content] {
+  z-index: 9999 !important;
+  position: fixed !important;
+}

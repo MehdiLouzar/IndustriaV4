@@ -81,7 +81,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-industria-gray-light to-white flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -91,7 +91,7 @@ export default function RegisterPage() {
             <p className="text-gray-600 mb-4">
               Votre compte a été créé avec succès. Vous allez être connecté automatiquement...
             </p>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-industria-brown-gold mx-auto"></div>
           </CardContent>
         </Card>
       </div>
@@ -99,13 +99,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-industria-gray-light to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Building2 className="w-8 h-8 text-red-600" />
-            <h1 className="text-2xl font-bold text-gray-900">ZonesPro</h1>
+            <Building2 className="w-8 h-8 text-industria-brown-gold" />
+            <h1 className="text-2xl font-bold text-gray-900">Industria</h1>
           </div>
           <p className="text-gray-600">Rejoignez notre plateforme B2B</p>
         </div>
@@ -121,7 +121,7 @@ export default function RegisterPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                <div className="flex items-center gap-2 p-3 bg-industria-gray-light border border-industria-brown-gold rounded-lg text-industria-brown-gold">
                   <AlertCircle className="w-4 h-4" />
                   <span className="text-sm">{error}</span>
                 </div>
@@ -233,7 +233,7 @@ export default function RegisterPage() {
             <div className="mt-4 text-center">
               <Link
                 href="/auth/login"
-                className="text-sm text-red-600 hover:underline"
+                className="text-sm text-industria-brown-gold hover:underline"
               >
                 Déjà un compte ? Se connecter
               </Link>
@@ -242,9 +242,9 @@ export default function RegisterPage() {
         </Card>
 
         {/* Note */}
-        <Card className="bg-blue-50">
+        <Card className="bg-industria-gray-light">
           <CardContent className="p-4">
-            <p className="text-sm text-blue-800">
+            <p className="text-sm text-industria-brown-gold">
               <strong>Note :</strong> Votre compte sera activé avec le rôle "Utilisateur".
               Pour un accès privilégié, contactez notre équipe commerciale.
             </p>
@@ -255,7 +255,7 @@ export default function RegisterPage() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-sm text-gray-600 hover:text-red-600"
+            className="text-sm text-gray-600 hover:text-industria-brown-gold"
           >
             ← Retour à l'accueil
           </Link>

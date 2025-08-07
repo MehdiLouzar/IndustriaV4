@@ -10,6 +10,15 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Nouvelle palette Industria
+        'industria-black': '#1C1C1C',
+        'industria-white': '#FFFFFF',
+        'industria-gray-light': '#F5F5F5',
+        'industria-gray-medium': '#CCCCCC',
+        'industria-brown-gold': '#8C6B2F',
+        'industria-olive-light': '#A79059',
+        'industria-yellow-gold': '#C9A956',
+        
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

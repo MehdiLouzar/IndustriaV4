@@ -30,11 +30,8 @@ const emptyStats = {
 };
 
 async function getAdminStats() {
-  if (typeof window !== 'undefined') {
-    return emptyStats;
-  }
-  const data = await fetchApi('/api/admin/stats').catch(() => null);
-  return data || emptyStats;
+  // Temporarily disabled - endpoint not implemented yet
+  return emptyStats;
 }
 
 export default async function AdminDashboard() {
@@ -112,6 +109,30 @@ export default async function AdminDashboard() {
       icon: Settings,
       href: '/admin/amenities',
       color: 'bg-pink-500',
+      permission: ['ADMIN']
+    },
+    {
+      title: 'Types de Construction',
+      description: 'Gérer les types de construction',
+      icon: Building2,
+      href: '/admin/construction-types',
+      color: 'bg-cyan-500',
+      permission: ['ADMIN']
+    },
+    {
+      title: 'Notifications',
+      description: 'Gestion des notifications email',
+      icon: FileText,
+      href: '/admin/notifications',
+      color: 'bg-yellow-500',
+      permission: ['ADMIN', 'MANAGER']
+    },
+    {
+      title: 'Journal d\'audit',
+      description: 'Logs d\'activité système',
+      icon: Activity,
+      href: '/admin/audit-logs',
+      color: 'bg-gray-500',
       permission: ['ADMIN']
     },
     {
