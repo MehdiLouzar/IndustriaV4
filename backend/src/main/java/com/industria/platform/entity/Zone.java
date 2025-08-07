@@ -35,6 +35,10 @@ public class Zone {
     private String geometry;
 
     private Integer srid;
+    
+    // Coordonnées calculées automatiquement à partir des vertices
+    private Double longitude;
+    private Double latitude;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

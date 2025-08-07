@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 
 interface Activity {
   id: string
@@ -20,7 +21,10 @@ interface Activity {
 export default function ActivitiesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Activity[]>([])
+  const [allActivities, setAllActivities] = useState<Activity[]>([])
+  const [selectedActivityId, setSelectedActivityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Activity>({
@@ -31,14 +35,35 @@ export default function ActivitiesAdmin() {
   })
 
 
-  async function load() {
-    const items = await fetchApi<Activity[]>('/api/activities')
-    if (items) {
-      setItems(items)
-      setCurrentPage(1)
+  async function load(page = currentPage) {
+    const res = await fetchApi<ListResponse<Activity>>(`/api/activities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
+    if (res) {
+      const arr = Array.isArray(res.items) ? res.items : []
+      setItems(arr)
+      setTotalPages(res.totalPages || 1)
+      setCurrentPage(res.page || 1)
+    } else {
+      setItems([])
     }
   }
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
+
+  useEffect(() => {
+    fetchApi<ListResponse<Activity>>("/api/activities/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
+            : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllActivities(arr)
+      })
+      .catch(() => setAllActivities([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -66,7 +91,7 @@ export default function ActivitiesAdmin() {
     }
     setForm({ id: '', name: '', description: '', icon: '' })
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Activity) {
@@ -80,7 +105,7 @@ export default function ActivitiesAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/activities/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -106,9 +131,7 @@ export default function ActivitiesAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((a) => (
+              {(Array.isArray(items) ? items : []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.name}</td>
                   <td className="p-2 align-top">{a.description}</td>
@@ -126,8 +149,25 @@ export default function ActivitiesAdmin() {
         </CardContent>
       </Card>
 
+      <select
+        className="border p-2"
+        value={selectedActivityId}
+        onChange={e => setSelectedActivityId(e.target.value)}
+      >
+        {(Array.isArray(allActivities) ? allActivities.length : 0) === 0 ? (
+          <option value="">Aucune activité trouvée</option>
+        ) : (
+          <>
+            <option value="">-- Sélectionnez une activité --</option>
+            {(Array.isArray(allActivities) ? allActivities : []).map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </>
+        )}
+      </select>
+
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}

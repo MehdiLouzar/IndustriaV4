@@ -9,13 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
+import type { ListResponse } from '@/types'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 interface Region {
   id: string
@@ -30,22 +25,28 @@ export default function RegionsAdmin() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [countries, setCountries] = useState<{ id: string; name: string }[]>([])
+  const [allCountries, setAllCountries] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<Region>({ id: '', name: '', code: '', countryId: '' })
 
 
   async function load() {
-    const [r, c] = await Promise.all([
-      fetchApi<Region[]>('/api/regions'),
-      fetchApi<{ id: string; name: string }[]>('/api/countries'),
-    ])
+    const r = await fetchApi<ListResponse<Region>>('/api/regions').catch(() => null)
     if (r) {
-      setItems(r)
+      const arr = Array.isArray(r.items) ? r.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
-    if (c) setCountries(c)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    fetchApi<{ id: string; name: string }[]>(
+      '/api/countries/all',
+      { credentials: 'include' }
+    ).then(setAllCountries)
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -108,7 +109,7 @@ export default function RegionsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
@@ -129,7 +130,7 @@ export default function RegionsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -151,13 +152,15 @@ export default function RegionsAdmin() {
             </div>
             <div>
               <Label htmlFor="countryId">Pays</Label>
-              <Select value={form.countryId} onValueChange={handleCountry}>
+              <Select value={form.countryId || undefined} onValueChange={handleCountry}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un pays --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {countries.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  {allCountries.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

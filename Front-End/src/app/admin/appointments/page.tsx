@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -29,6 +30,11 @@ interface Appointment {
   status: string
 }
 
+interface ParcelDto {
+  id: string
+  reference: string
+}
+
 const statuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']
 
 export default function AppointmentsAdmin() {
@@ -37,7 +43,7 @@ export default function AppointmentsAdmin() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [parcels, setParcels] = useState<{ id: string; reference: string }[]>([])
+  const [parcels, setParcels] = useState<ParcelDto[]>([])
   const [form, setForm] = useState<Appointment>({
     id: '',
     contactName: '',
@@ -50,19 +56,29 @@ export default function AppointmentsAdmin() {
     status: 'PENDING',
   })
 
-
   async function load() {
-    const [a, p] = await Promise.all([
-      fetchApi<Appointment[]>('/api/appointments'),
-      fetchApi<{ id: string; reference: string }[]>('/api/parcels'),
-    ])
+    const a = await fetchApi<ListResponse<Appointment>>('/api/appointments').catch(() => null)
     if (a) {
-      setItems(a)
+      const arr = Array.isArray(a.items) ? a.items : []
+      setItems(arr)
       setCurrentPage(1)
+    } else {
+      setItems([])
     }
-    if (p) setParcels(p)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    fetchApi<ListResponse<ParcelDto>>("/api/parcels/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setParcels(arr)
+      })
+      .catch(() => setParcels([]))
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -169,7 +185,7 @@ export default function AppointmentsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {items
+              {(Array.isArray(items) ? items : [])
                 .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                 .map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
@@ -190,7 +206,7 @@ export default function AppointmentsAdmin() {
       </Card>
 
       <Pagination
-        totalItems={items.length}
+        totalItems={Array.isArray(items) ? items.length : 0}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -228,27 +244,31 @@ export default function AppointmentsAdmin() {
             </div>
             <div>
               <Label htmlFor="parcelId">Parcelle</Label>
-              <Select value={form.parcelId} onValueChange={handleParcel}>
+              <Select value={form.parcelId || undefined} onValueChange={handleParcel}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une parcelle --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {parcels.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.reference}</SelectItem>
-                  ))}
+                  {(Array.isArray(parcels) ? parcels : [])
+                    .filter((p) => p.id && String(p.id).trim() !== "")
+                    .map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
+                  {statuses
+                    .filter((s) => s && s.trim() !== "")
+                    .map((s) => (
+                      <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

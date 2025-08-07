@@ -1,9 +1,12 @@
 package com.industria.platform.controller;
 
 import com.industria.platform.dto.CountryDto;
+import com.industria.platform.dto.ListResponse;
 import com.industria.platform.entity.Country;
 import com.industria.platform.repository.CountryRepository;
+import jakarta.annotation.security.PermitAll;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -15,7 +18,20 @@ public class CountryController {
     public CountryController(CountryRepository repo) {this.repo = repo;}
 
     @GetMapping
-    public List<CountryDto> all() {
+    public ListResponse<CountryDto> list(@RequestParam(defaultValue = "1") int page,
+                                         @RequestParam(defaultValue = "10") int limit) {
+        int p = Math.max(1, page);
+        int l = Math.min(Math.max(1, limit), 100);
+        var res = repo.findAll(PageRequest.of(p - 1, l));
+        var items = res.getContent().stream()
+                .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
+                .toList();
+        return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
+    }
+
+    @GetMapping("/all")
+    @PermitAll
+    public List<CountryDto> getAll() {
         return repo.findAll().stream()
                 .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
                 .toList();

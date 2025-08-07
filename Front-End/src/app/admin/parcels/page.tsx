@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import {
   Select,
@@ -16,6 +17,13 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { PARCEL_STATUSES, getEnumLabel, getEnumBadge } from '@/lib/translations'
+import { 
+  formatWGS84,
+  createGoogleMapsLink,
+  type WGS84Coordinate 
+} from '@/lib/coordinates'
 
 interface Vertex {
   seq: number
@@ -27,105 +35,194 @@ interface Parcel {
   id: string
   reference: string
   area?: number | null
-  price?: number | null
   status: string
-  isFree?: boolean | null
   isShowroom?: boolean | null
-  cos?: number | null
-  cus?: number | null
-  lambertX?: number | null
-  lambertY?: number | null
-  latitude?: number | null
-  longitude?: number | null
   zoneId: string
   vertices?: Vertex[]
+  longitude?: number | null  // Coordonnées calculées côté backend
+  latitude?: number | null   // Coordonnées calculées côté backend
+}
+
+interface ZoneDto {
+  id: string
+  name: string
 }
 
 interface ParcelForm {
   id: string
   reference: string
   area: string
-  price: string
   status: string
-  isFree: boolean
   isShowroom: boolean
-  cos: string
-  cus: string
-  lambertX: string
-  lambertY: string
-  latitude: string
-  longitude: string
   zoneId: string
   vertices: { lambertX: string; lambertY: string }[]
 }
 
-const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
+// Composant mémorisé pour les lignes de la table des parcelles
+const ParcelTableRow = memo(({ 
+  parcel, 
+  getParcelCoordinates, 
+  onEdit, 
+  onDelete 
+}: { 
+  parcel: Parcel, 
+  getParcelCoordinates: (parcel: Parcel) => any,
+  onEdit: (parcel: Parcel) => void,
+  onDelete: (id: string) => void
+}) => {
+  const coordinates = useMemo(() => getParcelCoordinates(parcel), [parcel, getParcelCoordinates])
+  
+  return (
+    <tr key={parcel.id} className="border-b last:border-0">
+      <td className="p-2 align-top">{parcel.reference}</td>
+      <td className="p-2 align-top">{parcel.zoneId}</td>
+      <td className="p-2 align-top">
+        <Badge className={getEnumBadge(PARCEL_STATUSES, parcel.status).color}>
+          {getEnumBadge(PARCEL_STATUSES, parcel.status).label}
+        </Badge>
+      </td>
+      <td className="p-2 align-top">
+        <div className="text-xs">
+          {coordinates.wgs84 ? (
+            <div className="space-y-1">
+              <div className="font-mono">
+                {coordinates.display}
+              </div>
+              <a
+                href={createGoogleMapsLink(coordinates.wgs84)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline text-xs"
+              >
+                Voir sur Google Maps
+              </a>
+            </div>
+          ) : (
+            <span className="text-gray-500">{coordinates.display}</span>
+          )}
+        </div>
+      </td>
+      <td className="p-2 space-x-2 whitespace-nowrap">
+        <Button size="sm" onClick={() => onEdit(parcel)}>Éditer</Button>
+        <Button size="sm" variant="destructive" onClick={() => onDelete(parcel.id)}>
+          Supprimer
+        </Button>
+      </td>
+    </tr>
+  )
+})
+
+ParcelTableRow.displayName = 'ParcelTableRow'
+
+// Les statuts sont maintenant importés de translations.ts
 
 export default function ParcelsAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Parcel[]>([])
+  const [allParcels, setAllParcels] = useState<Parcel[]>([])
+  const [selectedParcelId, setSelectedParcelId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [zones, setZones] = useState<{ id: string; name: string }[]>([])
+  const [zones, setZones] = useState<ZoneDto[]>([])
   const [form, setForm] = useState<ParcelForm>({
     id: '',
     reference: '',
     area: '',
-    price: '',
-    status: 'AVAILABLE',
-    isFree: true,
+    status: 'LIBRE',
     isShowroom: false,
-    cos: '',
-    cus: '',
-
-    lambertX: '',
-    lambertY: '',
-    latitude: '',
-    longitude: '',
     zoneId: '',
     vertices: [],
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
-
-  async function load() {
-    const [p, z] = await Promise.all([
-      fetchApi<Parcel[]>('/api/parcels'),
-      fetchApi<{ id: string; name: string }[]>('/api/zones'),
-    ])
-    if (p) {
-      setItems(p)
-      setCurrentPage(1)
+  // Fonction pour récupérer les coordonnées pré-calculées d'une parcelle
+  const getParcelCoordinates = useCallback((parcel: Parcel) => {
+    if (!parcel.longitude || !parcel.latitude) {
+      return {
+        display: 'Aucune coordonnée',
+        wgs84: null,
+        lambert: null
+      }
     }
-    if (z) setZones(z)
-  }
-  useEffect(() => { load() }, [])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
+    const wgs84 = {
+      longitude: parcel.longitude,
+      latitude: parcel.latitude
+    }
 
-  const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.checked })
-  }
+    return {
+      display: formatWGS84(wgs84),
+      wgs84: wgs84,
+      lambert: null // Plus besoin des coordonnées Lambert
+    }
+  }, [])
 
-  const handleStatus = (value: string) => {
-    setForm({ ...form, status: value })
-  }
+  const load = useCallback(async (page = currentPage) => {
+    const p = await fetchApi<ListResponse<Parcel>>(
+      `/api/parcels?page=${page}&limit=${itemsPerPage}`
+    ).catch(() => null)
+    if (p) {
+      const arr = Array.isArray(p.items) ? p.items : []
+      setItems(arr)
+      setTotalPages(p.totalPages || 1)
+      setCurrentPage(p.page || 1)
+    } else {
+      setItems([])
+    }
+  }, [currentPage, itemsPerPage])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(currentPage) }, [currentPage])
 
-  const handleZone = (value: string) => {
-    setForm({ ...form, zoneId: value })
-  }
+  useEffect(() => {
+    fetchApi<ListResponse<Parcel>>("/api/parcels/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setAllParcels(arr)
+      })
+      .catch(() => setAllParcels([]))
+  }, [])
 
-  const addVertex = () => {
+  useEffect(() => {
+    fetchApi<ListResponse<ZoneDto>>("/api/zones/all")
+      .then((data) => {
+        const arr = data && Array.isArray(data.items) ? data.items : []
+        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
+          console.warn('⚠️ Format de données inattendu:', data)
+        }
+        setZones(arr)
+      })
+      .catch(() => setZones([]))
+  }, [])
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }, [])
+
+  const handleToggle = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.checked }))
+  }, [])
+
+  const handleStatus = useCallback((value: string) => {
+    setForm(prev => ({ ...prev, status: value }))
+  }, [])
+
+  const handleZone = useCallback((value: string) => {
+    setForm(prev => ({ ...prev, zoneId: value }))
+  }, [])
+
+  const addVertex = useCallback(() => {
     setForm((f) => ({
       ...f,
       vertices: [...f.vertices, { lambertX: '', lambertY: '' }],
     }))
-  }
+  }, [])
 
-  const updateVertex = (
+  const updateVertex = useCallback((
     index: number,
     field: 'lambertX' | 'lambertY',
     value: string
@@ -135,17 +232,17 @@ export default function ParcelsAdmin() {
       verts[index] = { ...verts[index], [field]: value }
       return { ...f, vertices: verts }
     })
-  }
+  }, [])
 
-  const removeVertex = (index: number) => {
+  const removeVertex = useCallback((index: number) => {
     setForm((f) => {
       const verts = [...f.vertices]
       verts.splice(index, 1)
       return { ...f, vertices: verts }
     })
-  }
+  }, [])
 
-  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFiles = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
     const files = Array.from(e.target.files).map((file) => ({
       file,
@@ -153,32 +250,24 @@ export default function ParcelsAdmin() {
     }))
     setImages((imgs) => [...imgs, ...files])
     e.target.value = ''
-  }
+  }, [])
 
-  const removeImage = (idx: number) => {
+  const removeImage = useCallback((idx: number) => {
     setImages((imgs) => {
       const copy = [...imgs]
       URL.revokeObjectURL(copy[idx].url)
       copy.splice(idx, 1)
       return copy
     })
-  }
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const body = {
       reference: form.reference,
       area: form.area ? parseFloat(form.area) : undefined,
-      price: form.price ? parseFloat(form.price) : undefined,
       status: form.status,
-      isFree: form.isFree,
       isShowroom: form.isShowroom,
-      cos: form.cos ? parseFloat(form.cos) : undefined,
-      cus: form.cus ? parseFloat(form.cus) : undefined,
-      lambertX: form.lambertX ? parseFloat(form.lambertX) : undefined,
-      lambertY: form.lambertY ? parseFloat(form.lambertY) : undefined,
-      latitude: form.latitude ? parseFloat(form.latitude) : undefined,
-      longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       zoneId: form.zoneId,
       vertices: form.vertices.map((v, i) => ({
         seq: i,
@@ -205,68 +294,45 @@ export default function ParcelsAdmin() {
       id: '',
       reference: '',
       area: '',
-      price: '',
-      status: 'AVAILABLE',
-      isFree: true,
+      status: 'LIBRE',
       isShowroom: false,
-      cos: '',
-      cus: '',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
       zoneId: '',
       vertices: [],
     })
     setImages([])
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
-  function edit(it: Parcel) {
+  const handleEdit = useCallback((it: Parcel) => {
     setForm({
       id: it.id,
       reference: it.reference,
       area: it.area?.toString() ?? '',
-      price: it.price?.toString() ?? '',
       status: it.status,
-      isFree: it.isFree ?? true,
       isShowroom: it.isShowroom ?? false,
-      cos: it.cos?.toString() ?? '',
-      cus: it.cus?.toString() ?? '',
-      lambertX: it.lambertX?.toString() ?? '',
-      lambertY: it.lambertY?.toString() ?? '',
-      latitude: it.latitude?.toString() ?? '',
-      longitude: it.longitude?.toString() ?? '',
       zoneId: it.zoneId,
-      vertices: it.vertices ? it.vertices.sort((a,b)=>a.seq-b.seq).map(v=>({
+      vertices: it.vertices ? it.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
         lambertX: v.lambertX.toString(),
         lambertY: v.lambertY.toString(),
       })) : [],
     })
     setImages([])
     setOpen(true)
-  }
-  async function del(id: string) {
+  }, [])
+
+  const handleDelete = useCallback(async (id: string) => {
     await fetchApi(`/api/parcels/${id}`, { method: 'DELETE' })
-    load()
-  }
+    load(currentPage)
+  }, [load, currentPage])
 
   function addNew() {
     setForm({
       id: '',
       reference: '',
       area: '',
-      price: '',
-      status: 'AVAILABLE',
-      isFree: true,
+      status: 'LIBRE',
       isShowroom: false,
-      cos: '',
-      cus: '',
-      lambertX: '',
-      lambertY: '',
-      latitude: '',
-      longitude: '',
       zoneId: '',
       vertices: [],
     })
@@ -288,32 +354,45 @@ export default function ParcelsAdmin() {
                 <th className="p-2">Référence</th>
                 <th className="p-2">Zone</th>
                 <th className="p-2">Statut</th>
+                <th className="p-2">Coordonnées</th>
                 <th className="p-2 w-32"></th>
               </tr>
             </thead>
             <tbody>
-              {items
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((p) => (
-                <tr key={p.id} className="border-b last:border-0">
-                  <td className="p-2 align-top">{p.reference}</td>
-                  <td className="p-2 align-top">{p.zoneId}</td>
-                  <td className="p-2 align-top">{p.status}</td>
-                  <td className="p-2 space-x-2 whitespace-nowrap">
-                    <Button size="sm" onClick={() => edit(p)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(p.id)}>
-                      Supprimer
-                    </Button>
-                  </td>
-                </tr>
+              {(Array.isArray(items) ? items : []).map((parcel) => (
+                <ParcelTableRow
+                  key={parcel.id}
+                  parcel={parcel}
+                  getParcelCoordinates={getParcelCoordinates}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
               ))}
             </tbody>
           </table>
         </CardContent>
       </Card>
 
+      <Select
+        value={selectedParcelId || undefined}
+        onValueChange={(value) => setSelectedParcelId(value)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="-- Sélectionnez une parcelle --" />
+        </SelectTrigger>
+        <SelectContent>
+          {(Array.isArray(allParcels) ? allParcels : [])
+            .filter((parcel) => parcel.id && String(parcel.id).trim() !== "")
+            .map((parcel) => (
+              <SelectItem key={parcel.id} value={String(parcel.id)}>
+                {parcel.reference}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+
       <Pagination
-        totalItems={items.length}
+        totalItems={totalPages * itemsPerPage}
         itemsPerPage={itemsPerPage}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -334,63 +413,27 @@ export default function ParcelsAdmin() {
                 <Label htmlFor="area">Surface m²</Label>
                 <Input id="area" name="area" value={form.area} onChange={handleChange} />
               </div>
-              <div>
-                <Label htmlFor="price">Prix</Label>
-                <Input id="price" name="price" value={form.price} onChange={handleChange} />
-              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lambertX">Lambert X</Label>
-                <Input id="lambertX" name="lambertX" value={form.lambertX} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="lambertY">Lambert Y</Label>
-                <Input id="lambertY" name="lambertY" value={form.lambertY} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="latitude">Latitude</Label>
-                <Input id="latitude" name="latitude" value={form.latitude} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="longitude">Longitude</Label>
-                <Input id="longitude" name="longitude" value={form.longitude} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="isFree" name="isFree" checked={form.isFree} onChange={handleToggle} />
-                <Label htmlFor="isFree">Libre</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="isShowroom" name="isShowroom" checked={form.isShowroom} onChange={handleToggle} />
-                <Label htmlFor="isShowroom">Showroom</Label>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="cos">CoS</Label>
-                <Input id="cos" name="cos" value={form.cos} onChange={handleChange} />
-              </div>
-              <div>
-                <Label htmlFor="cus">CuS</Label>
-                <Input id="cus" name="cus" value={form.cus} onChange={handleChange} />
-              </div>
+            
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="isShowroom" name="isShowroom" checked={form.isShowroom} onChange={handleToggle} />
+              <Label htmlFor="isShowroom">Showroom</Label>
             </div>
             <div>
               <Label>Coordonnées Lambert (polygone)</Label>
-              {form.vertices.map((v, idx) => (
+              <div className="text-xs text-gray-600 mb-2">
+                Les coordonnées GPS seront calculées automatiquement après sauvegarde
+              </div>
+              {(form.vertices ?? []).map((v, idx) => (
                 <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
                   <Input
-                    placeholder="X"
+                    placeholder="X (Lambert)"
                     value={v.lambertX}
                     onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
                   />
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Y"
+                      placeholder="Y (Lambert)"
                       value={v.lambertY}
                       onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
                     />
@@ -404,41 +447,51 @@ export default function ParcelsAdmin() {
             </div>
             <div>
               <Label htmlFor="zoneId">Zone</Label>
-              <Select value={form.zoneId} onValueChange={handleZone}>
+              <Select value={form.zoneId || undefined} onValueChange={handleZone}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zones.map((z) => (
-                    <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
-                  ))}
+                  {(Array.isArray(zones) ? zones : [])
+                    .filter((z) => z.id && String(z.id).trim() !== "")
+                    .map((z) => (
+                      <SelectItem key={z.id} value={String(z.id)}>
+                        {z.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>
-              <Select value={form.status} onValueChange={handleStatus}>
+              <Select value={form.status || undefined} onValueChange={handleStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir" />
+                  <SelectValue placeholder="-- Sélectionnez un statut --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statuses.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {PARCEL_STATUSES.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Photos</Label>
-              <Input type="file" multiple onChange={handleFiles} />
+              <Input type="file" multiple onChange={handleFiles} accept="image/*" />
+              {images.length === 0 && (
+                <p className="text-gray-500 text-xs mt-1">Note: Les images sont prévisualisées mais ne sont pas encore sauvegardées (en attente de l'implémentation backend)</p>
+              )}
               <div className="flex flex-wrap gap-2 mt-2">
-                {images.map((img, idx) => (
+                {(images ?? []).map((img, idx) => (
                   <div key={idx} className="relative">
-                    <img src={img.url} className="w-24 h-24 object-cover rounded" />
+                    <img src={img.url} className="w-24 h-24 object-cover rounded" alt={`Image ${idx + 1}`} />
                     <button
                       type="button"
                       onClick={() => removeImage(idx)}
-                      className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center"
+                      className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-700"
+                      title="Supprimer cette image"
                     >
                       ×
                     </button>

@@ -34,14 +34,25 @@ interface Zone {
 
 export default function ZoneMap({ zone }: { zone: Zone }) {
   const [selected, setSelected] = useState<Parcel | null>(null);
+  const [_zone_parcels, setZoneParcels] = useState<Parcel[]>([]);
   const mapRef = useRef<L.Map | null>(null);
+
+  const isParcelWrapper = (data: unknown): data is { items: Parcel[] } =>
+    typeof data === 'object' && data !== null && Array.isArray((data as { items?: unknown }).items);
+
+  useEffect(() => {
+    if (Array.isArray(zone.parcels)) setZoneParcels(zone.parcels);
+    else if (isParcelWrapper(zone.parcels)) setZoneParcels(zone.parcels.items);
+    else setZoneParcels([]);
+  }, [zone.parcels]);
 
   useEffect(() => {
     if (!mapRef.current) return;
     // Ensure Leaflet calculates dimensions correctly when the component mounts
-    setTimeout(() => {
+    const t = setTimeout(() => {
       mapRef.current?.invalidateSize();
     }, 100);
+    return () => clearTimeout(t);
   }, []);
 
   // Use parameters matching EPSG:26191 so parcels align with database values
@@ -52,45 +63,9 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     return [lon, lat];
   };
 
-  const centroid = (verts: { lambertX: number; lambertY: number }[]): [number, number] | null => {
-    if (!verts.length) return null
-    if (verts.length < 3) {
-      const sum = verts.reduce((acc, v) => [acc[0] + v.lambertX, acc[1] + v.lambertY], [0,0])
-      return [sum[0] / verts.length, sum[1] / verts.length]
-    }
-    let area = 0
-    let cx = 0
-    let cy = 0
-    for (let i = 0; i < verts.length; i++) {
-      const x1 = verts[i].lambertX
-      const y1 = verts[i].lambertY
-      const x2 = verts[(i+1)%verts.length].lambertX
-      const y2 = verts[(i+1)%verts.length].lambertY
-      const f = x1*y2 - x2*y1
-      area += f
-      cx += (x1 + x2) * f
-      cy += (y1 + y2) * f
-    }
-    area *= 0.5
-    if (area === 0) {
-      const sum = verts.reduce((acc, v) => [acc[0] + v.lambertX, acc[1] + v.lambertY], [0,0])
-      return [sum[0] / verts.length, sum[1] / verts.length]
-    }
-    cx /= (6*area)
-    cy /= (6*area)
-    return [cx, cy]
-  }
-
-  const center = zone.latitude != null && zone.longitude != null
-    ? [zone.latitude, zone.longitude]
-    : zone.vertices && zone.vertices.length
-      ? (() => {
-          const verts = [...zone.vertices].sort((a, b) => a.seq - b.seq)
-          const c = centroid(verts)
-          if (!c) return [31.7, -6.5]
-          const [lon, lat] = toLatLng(c[0], c[1])
-          return [lat, lon]
-        })()
+  const center: [number, number] =
+    zone.latitude != null && zone.longitude != null
+      ? [zone.latitude, zone.longitude]
       : zone.lambertX != null && zone.lambertY != null
         ? (() => { const [lon, lat] = toLatLng(zone.lambertX, zone.lambertY); return [lat, lon] })()
         : [31.7, -6.5]
@@ -187,7 +162,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
             </div>
           </Popup>
         </Polygon>
-        {zone.parcels?.map(
+        {(Array.isArray(_zone_parcels) ? _zone_parcels : []).map(
           (p) =>
             (p.lambertX != null && p.lambertY != null) && (
               <Polygon

@@ -14,33 +14,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DynamicIcon from "@/components/DynamicIcon";
 import { fetchApi } from "@/lib/utils";
+import { fetchPublicApi } from "@/lib/publicApi";
+import type { ListResponse } from "@/types";
 
 interface Parcel {
   id: string;
   reference: string;
   status: string;
-  latitude?: number;
-  longitude?: number;
+  isShowroom?: boolean
   area?: number | null;
-  price?: number | null;
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  zoneId?: string | null
+}
+
+interface ZoneResponse {
+  id: string
+  name: string
+  description?: string | null
+  address?: string | null
+  status: string
+  totalArea?: number | null
+  price?: number | null
+  regionId?: string | null
+  zoneTypeId?: string | null
+  activityIds?: string[]
+  amenityIds?: string[]
+  vertices?: { seq: number; lambertX: number; lambertY: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 interface Zone {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  latitude?: number;
-  longitude?: number;
-  totalArea?: number | null;
-  price?: number | null;
-  region?: { name: string } | null;
-  zoneType?: { name: string } | null;
-  activities?: { activity: { name: string } }[];
-  amenities?: string[];
-  parcels?: Parcel[];
-  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  id: string
+  name: string
+  description?: string | null
+  status: string
+  totalArea?: number | null
+  price?: number | null
+  region?: { name: string } | null
+  zoneType?: { name: string } | null
+  activities?: { activity: { name: string } }[]
+  amenities?: string[]
+  parcels?: Parcel[]
+  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export default function ZonePage() {
@@ -50,10 +67,44 @@ export default function ZonePage() {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    fetchApi<Zone>(`/api/zones/${id}`)
-      .then((z) => z && setZone(z))
-      .catch(console.error);
-  }, [id]);
+    async function load() {
+      const z = await fetchPublicApi<ZoneResponse>(`/api/zones/${id}`)
+      if (!z) return
+
+      const region = z.regionId ? await fetchPublicApi<{ name: string }>(`/api/regions/${z.regionId}`) : null
+      const zoneType = z.zoneTypeId ? await fetchPublicApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : null
+
+      const [activities, amenities, parcelsRes] = await Promise.all([
+        Promise.all((z.activityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/activities/${aid}`))),
+        Promise.all((z.amenityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/amenities/${aid}`))),
+        fetchPublicApi<ListResponse<Parcel>>(`/api/parcels?zoneId=${id}`),
+      ])
+
+      const parcels = parcelsRes && Array.isArray(parcelsRes.items) ? parcelsRes.items : []
+      if (parcelsRes && !Array.isArray((parcelsRes as any).items) && !Array.isArray(parcelsRes)) {
+        console.warn('⚠️ Format de données inattendu:', parcelsRes)
+      }
+
+      const zone: Zone = {
+        id: z.id,
+        name: z.name,
+        description: z.description ?? null,
+        status: z.status,
+        totalArea: z.totalArea ?? null,
+        price: z.price ?? null,
+        region: region ? { name: region.name } : null,
+        zoneType: zoneType ? { name: zoneType.name } : null,
+        activities: Array.isArray(activities) ? activities.map(a => ({ activity: { name: a?.name || '' } })) : [],
+        amenities: Array.isArray(amenities) ? amenities.map(a => a?.name || '') : [],
+        parcels,
+        vertices: z.vertices,
+        latitude: z.latitude ?? null,
+        longitude: z.longitude ?? null,
+      }
+      setZone(zone)
+    }
+    load()
+  }, [id])
 
   if (!zone) return <p className="p-4">Chargement...</p>;
 
@@ -77,7 +128,7 @@ export default function ZonePage() {
               Coordonnées: {zone.latitude.toFixed(5)}, {zone.longitude.toFixed(5)}
             </p>
           )}
-          {zone.activities && zone.activities.length > 0 && (
+          {Array.isArray(zone.activities) && zone.activities.length > 0 && (
             <p>
               Activités:{" "}
               {zone.activities.map((a) => a.activity.name).join(", ")}
@@ -85,7 +136,7 @@ export default function ZonePage() {
           )}
         </CardContent>
         </Card>
-        {zone.amenities && zone.amenities.length > 0 && (
+        {Array.isArray(zone.amenities) && zone.amenities.length > 0 && (
           <div className="border rounded-lg p-4 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-lg font-semibold">Equipements de proximité</span>
@@ -107,7 +158,7 @@ export default function ZonePage() {
         </div>
       </div>
       <Footer />
-      {showForm && zone.parcels && zone.parcels[0] && (
+      {showForm && Array.isArray(zone.parcels) && zone.parcels[0] && (
         <AppointmentForm
           parcel={{ id: zone.parcels[0].id, reference: zone.parcels[0].reference }}
           onClose={() => setShowForm(false)}

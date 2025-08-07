@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { Search, MapPin, Factory } from 'lucide-react'
 import { fetchApi } from '@/lib/utils'
+import type { ListResponse } from '@/types'
 
 interface Filters {
   regionId: string
@@ -33,30 +34,52 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
 
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([])
   const [zoneTypes, setZoneTypes] = useState<{ id: string; name: string }[]>([])
-  const statuses = ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM']
-  const priceRanges = [
-    { label: 'Tout prix', min: undefined, max: undefined },
-    { label: 'Moins de 500 DH/m²', min: undefined, max: 500 },
-    { label: '500 - 1000 DH/m²', min: 500, max: 1000 },
-    { label: '1000 - 3000 DH/m²', min: 1000, max: 3000 },
-    { label: 'Plus de 3000 DH/m²', min: 3000, max: undefined },
-  ]
-  const areaRanges = [
-    { label: 'Toute superficie', min: undefined, max: undefined },
-    { label: 'Moins de 10 000 m²', min: undefined, max: 10000 },
-    { label: '10 000 - 50 000 m²', min: 10000, max: 50000 },
-    { label: '50 000 - 100 000 m²', min: 50000, max: 100000 },
-    { label: 'Plus de 100 000 m²', min: 100000, max: undefined },
-  ]
+  const statuses = useMemo(() => ['AVAILABLE', 'RESERVED', 'OCCUPIED', 'SHOWROOM'], [])
+  const priceRanges = useMemo(
+    () => [
+      { label: 'Tout prix', min: undefined, max: undefined },
+      { label: 'Moins de 500 DH/m²', min: undefined, max: 500 },
+      { label: '500 - 1000 DH/m²', min: 500, max: 1000 },
+      { label: '1000 - 3000 DH/m²', min: 1000, max: 3000 },
+      { label: 'Plus de 3000 DH/m²', min: 3000, max: undefined },
+    ],
+    []
+  )
+  const areaRanges = useMemo(
+    () => [
+      { label: 'Toute superficie', min: undefined, max: undefined },
+      { label: 'Moins de 10 000 m²', min: undefined, max: 10000 },
+      { label: '10 000 - 50 000 m²', min: 10000, max: 50000 },
+      { label: '50 000 - 100 000 m²', min: 50000, max: 100000 },
+      { label: 'Plus de 100 000 m²', min: 100000, max: undefined },
+    ],
+    []
+  )
 
   useEffect(() => {
     async function load() {
       const [r, t] = await Promise.all([
-        fetchApi<{ id: string; name: string }[]>('/api/regions'),
-        fetchApi<{ id: string; name: string }[]>('/api/zone-types'),
+        fetchApi<ListResponse<{ id: string; name: string }>>('/api/regions'),
+        fetchApi<ListResponse<{ id: string; name: string }>>('/api/zone-types'),
       ])
-      if (r) setRegions(r)
-      if (t) setZoneTypes(t)
+      if (r) {
+        const arr = Array.isArray(r.items) ? r.items : []
+        if (!Array.isArray(r.items) && !Array.isArray(r)) {
+          console.warn('⚠️ Format de données inattendu:', r)
+        }
+        setRegions(arr)
+      } else {
+        setRegions([])
+      }
+      if (t) {
+        const arr = Array.isArray(t.items) ? t.items : []
+        if (!Array.isArray(t.items) && !Array.isArray(t)) {
+          console.warn('⚠️ Format de données inattendu:', t)
+        }
+        setZoneTypes(arr)
+      } else {
+        setZoneTypes([])
+      }
     }
     load()
   }, [])
@@ -93,12 +116,12 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-red-600" /> Région
+            <MapPin className="w-4 h-4 text-industria-brown-gold" /> Région
           </label>
           <Select value={filters.regionId} onValueChange={(v) => setFilters({ ...filters, regionId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>
             <SelectContent>
-              {regions.map((r) => (
+              {(Array.isArray(regions) ? regions : []).map((r) => (
                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
               ))}
             </SelectContent>
@@ -107,12 +130,12 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-            <Factory className="w-4 h-4 text-red-600" /> Type
+            <Factory className="w-4 h-4 text-industria-brown-gold" /> Type
           </label>
           <Select value={filters.zoneTypeId} onValueChange={(v) => setFilters({ ...filters, zoneTypeId: v })}>
             <SelectTrigger><SelectValue placeholder="Choisissez" /></SelectTrigger>
             <SelectContent>
-              {zoneTypes.map((t) => (
+              {(Array.isArray(zoneTypes) ? zoneTypes : []).map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
               ))}
             </SelectContent>

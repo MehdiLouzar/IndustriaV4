@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
+@Table(indexes = {@Index(columnList = "zone_id")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,6 +33,10 @@ public class Parcel {
     private String geometry;
 
     private Integer srid;
+    
+    // Coordonnées calculées automatiquement à partir des vertices
+    private Double longitude;
+    private Double latitude;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
