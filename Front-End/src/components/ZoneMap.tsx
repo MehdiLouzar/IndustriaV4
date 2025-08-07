@@ -1,10 +1,15 @@
 "use client";
 
 import { MapContainer, TileLayer, Polygon, Popup } from "react-leaflet";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import L from "leaflet";
+import maplibregl from "maplibre-gl";
+import "@maplibre/maplibre-gl-leaflet";
+import "maplibre-gl/dist/maplibre-gl.css";
 import proj4 from "proj4";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
+import type { Feature, FeatureCollection } from "geojson";
 
 interface Parcel {
   id: string;
@@ -36,6 +41,11 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   const [selected, setSelected] = useState<Parcel | null>(null);
   const [_zone_parcels, setZoneParcels] = useState<Parcel[]>([]);
   const mapRef = useRef<L.Map | null>(null);
+  const glLayerRef = useRef<{
+    getMaplibreMap(): maplibregl.Map;
+    remove(): void;
+  } | null>(null);
+  const glMapRef = useRef<maplibregl.Map | null>(null);
 
   const isParcelWrapper = (data: unknown): data is { items: Parcel[] } =>
     typeof data === 'object' && data !== null && Array.isArray((data as { items?: unknown }).items);
@@ -54,6 +64,75 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     }, 100);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const LMaplibre = L as unknown as typeof L & {
+      maplibreGL: (opts: {
+        style: maplibregl.StyleSpecification | string;
+        interactive: boolean;
+      }) => {
+        addTo(map: L.Map): { getMaplibreMap(): maplibregl.Map; remove(): void };
+      };
+    };
+    const layer = LMaplibre
+      .maplibreGL({ style: { version: 8, sources: {}, layers: [] }, interactive: false })
+      .addTo(mapRef.current);
+    glLayerRef.current = layer;
+    const mlMap = layer.getMaplibreMap();
+    glMapRef.current = mlMap;
+
+    const colorExpr = [
+      "match",
+      ["get", "status"],
+      "AVAILABLE",
+      "green",
+      "RESERVED",
+      "orange",
+      "OCCUPIED",
+      "red",
+      "SHOWROOM",
+      "blue",
+      "gray",
+    ] as maplibregl.Expression;
+
+    const handleLoad = () => {
+      mlMap.addSource("zones", { type: "geojson", data: geojsonData });
+      mlMap.addLayer({
+        id: "zones-fill",
+        type: "fill",
+        source: "zones",
+        paint: { "fill-color": colorExpr, "fill-opacity": 0.4 },
+      });
+      mlMap.addLayer({
+        id: "zones-outline",
+        type: "line",
+        source: "zones",
+        paint: { "line-color": colorExpr, "line-width": 2 },
+      });
+    };
+    mlMap.on("load", handleLoad);
+
+    return () => {
+      mlMap.off("load", handleLoad);
+      try {
+        mlMap.remove();
+      } catch {}
+      glMapRef.current = null;
+      try {
+        layer.remove();
+      } catch {}
+      glLayerRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (glMapRef.current?.getSource("zones")) {
+      (glMapRef.current.getSource("zones") as maplibregl.GeoJSONSource).setData(
+        geojsonData
+      );
+    }
+  }, [geojsonData]);
 
   // Use parameters matching EPSG:26191 so parcels align with database values
   const lambertMA =
@@ -76,7 +155,10 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
         .map((v) =>
           v.lat != null && v.lon != null
             ? [v.lat, v.lon]
-            : (() => { const [lon, lat] = toLatLng(v.lambertX, v.lambertY); return [lat, lon] })()
+            : (() => {
+                const [lon, lat] = toLatLng(v.lambertX, v.lambertY);
+                return [lat, lon];
+              })()
         )
     : (() => {
         const [lat, lon] = center;
@@ -88,30 +170,63 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
         ];
       })();
 
-  const parcelPoly = (p: Parcel): [number, number][] =>
-    p.vertices && p.vertices.length
-      ? p.vertices
-          .sort((a, b) => a.seq - b.seq)
-          .map((v) =>
-            v.lat != null && v.lon != null
-              ? [v.lat, v.lon]
-              : (() => { const [lon, lat] = toLatLng(v.lambertX, v.lambertY); return [lat, lon] })()
-          )
-      : (() => {
-          const size = 100; // meters in Lambert units
-          const baseX = p.lambertX ?? zone.lambertX ?? 0;
-          const baseY = p.lambertY ?? zone.lambertY ?? 0;
-          const [lon1, lat1] = toLatLng(baseX - size, baseY - size);
-          const [lon2, lat2] = toLatLng(baseX - size, baseY + size);
-          const [lon3, lat3] = toLatLng(baseX + size, baseY + size);
-          const [lon4, lat4] = toLatLng(baseX + size, baseY - size);
-          return [
-            [lat1, lon1],
-            [lat2, lon2],
-            [lat3, lon3],
-            [lat4, lon4],
-          ];
-        })();
+  const zonePolygonGL = useMemo(
+    () => zonePolygon.map(([lat, lon]) => [lon, lat]),
+    [zonePolygon]
+  );
+
+  const parcelPoly = useCallback(
+    (p: Parcel): [number, number][] =>
+      p.vertices && p.vertices.length
+        ? p.vertices
+            .sort((a, b) => a.seq - b.seq)
+            .map((v) =>
+              v.lat != null && v.lon != null
+                ? [v.lat, v.lon]
+                : (() => {
+                    const [lon, lat] = toLatLng(v.lambertX, v.lambertY);
+                    return [lat, lon];
+                  })()
+            )
+        : (() => {
+            const size = 100; // meters in Lambert units
+            const baseX = p.lambertX ?? zone.lambertX ?? 0;
+            const baseY = p.lambertY ?? zone.lambertY ?? 0;
+            const [lon1, lat1] = toLatLng(baseX - size, baseY - size);
+            const [lon2, lat2] = toLatLng(baseX - size, baseY + size);
+            const [lon3, lat3] = toLatLng(baseX + size, baseY + size);
+            const [lon4, lat4] = toLatLng(baseX + size, baseY - size);
+            return [
+              [lat1, lon1],
+              [lat2, lon2],
+              [lat3, lon3],
+              [lat4, lon4],
+            ];
+          })(),
+    [zone.lambertX, zone.lambertY]
+  );
+
+  const geojsonData = useMemo<FeatureCollection>(() => {
+    const features: Feature[] = [];
+    if (zonePolygonGL.length) {
+      features.push({
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [zonePolygonGL] },
+        properties: { id: zone.id, status: zone.status },
+      });
+    }
+    for (const p of _zone_parcels) {
+      if (p.lambertX != null && p.lambertY != null) {
+        const coords = parcelPoly(p).map(([lat, lon]) => [lon, lat]);
+        features.push({
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [coords] },
+          properties: { id: p.id, status: p.status },
+        });
+      }
+    }
+    return { type: "FeatureCollection", features } as FeatureCollection;
+  }, [_zone_parcels, zone.id, zone.status, zonePolygonGL, parcelPoly]);
 
   const zoneColor: Record<string, string> = {
     AVAILABLE: "green",
@@ -148,7 +263,12 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polygon
           positions={zonePolygon}
-          pathOptions={{ color: zoneColor[zone.status] || "blue" }}
+          pathOptions={{
+            color: zoneColor[zone.status] || "blue",
+            opacity: 0,
+            fillOpacity: 0,
+            weight: 0,
+          }}
         >
           <Popup>
             <div className="space-y-1 text-sm">
@@ -168,7 +288,12 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
               <Polygon
                 key={p.id}
                 positions={parcelPoly(p)}
-                pathOptions={{ color: parcelColor(p.status), fillOpacity: 0.5 }}
+                pathOptions={{
+                  color: parcelColor(p.status),
+                  fillOpacity: 0,
+                  opacity: 0,
+                  weight: 0,
+                }}
               >
                 <Popup>
                   <div className="space-y-1 text-sm">
