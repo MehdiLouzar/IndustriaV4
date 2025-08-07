@@ -15,8 +15,9 @@ import {
   Marker,
   Popup,
   Polygon,
+  type LatLngTuple,
 } from 'react-leaflet'
-import MarkerClusterGroup from 'react-leaflet-cluster'
+import MarkerClusterGroup from 'react-leaflet-markercluster'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@/styles/map.css'
@@ -199,6 +200,11 @@ export default function HomeMapView() {
   /** RÉFÉRENCES */
   const mapRef = useRef<L.Map | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const zoneCache = useRef<Map<number, ZoneFeature[]>>(new Map())
+  const lastLoad = useRef(0)
+  
+  /** CONSTANTES DE CACHE */
+  const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
   /** ICONES MEMO */
   const ICONS = useMemo(() => {
@@ -360,126 +366,127 @@ export default function HomeMapView() {
     )
   })
 
-  /*****************************
-   *  Chargement des données  *
-   *****************************/
+// ————————————————————————————————————————————————————————
+//  Data loading (LOD + WebWorker)
+// ————————————————————————————————————————————————————————
+const loadZones = useCallback(async (precision: number, force = false) => {
+  // Simple time-based cache
+  if (!force && Date.now() - lastLoad.current < CACHE_DURATION) {
+    const cached = zoneCache.current.get(precision);
+    if (cached) {
+      setZones(cached);
+      return;
+    }
+  }
+  
+  // Abort previous request
+  if (abortControllerRef.current) {
+    abortControllerRef.current.abort();
+  }
+  abortControllerRef.current = new AbortController();
+  setLoading(true);
+  setError(null);
 
-  /** Cache (LOD) des zones selon la précision */
-  const zoneCache = useRef<Map<number, ZoneFeature[]>>(new Map())
-  const precisionRef = useRef<number>(-1)
-
-  const loadZones = useCallback(
-    async (precision: number, force = false) => {
-      if (!force && zoneCache.current.has(precision)) {
-        setZones(zoneCache.current.get(precision) || [])
-        setLoading(false)
-        return
+  try {
+    // Simplified timeout without AbortSignal.any
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+    }, 8000); // 8 seconds timeout
 
+    const resp = await fetchPublicApi<{ features: ZoneFeatureResp[] }>(
+      `/api/map/zones/simplified?zoom=${precision}`,
+      { signal: abortControllerRef.current.signal }
+    );
+    
+    clearTimeout(timeoutId);
+    let data: ZoneFeature[] = []
+    if (resp?.features) {
+      data = resp.features.map((f) => {
+        const poly = f.coordinates.map((c) => [c[0], c[1]] as LatLngTuple)
+        const centroid: LatLngTuple = [
+          poly.reduce((sum, p) => sum + p[0], 0) / poly.length,
+          poly.reduce((sum, p) => sum + p[1], 0) / poly.length,
+        ]
+        return {
+          polygon: poly,
+          centroid,
+          properties: {
+            id: f.id,
+            name: f.name,
+            status: f.status,
+            availableParcels: f.availableParcels,
+            activityIcons: f.activityIcons || [],
+            amenityIcons: f.amenityIcons || [],
+            description: f.description,
+            price: f.price,
+            area: f.area,
+            location: f.location,
+          },
+        }
+      })
+    }
+    zoneCache.current.set(precision, data)
+    setZones(data.length ? data : FALLBACK_ZONES)
+    lastLoad.current = Date.now()
+  } catch (err) {
+    // Ignorer seulement les erreurs d'annulation explicites
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      console.log('Requête annulée normalement');
+      return;
+    }
+    
+    console.error('Erreur de chargement des zones:', {
+      error: err,
+      message: err instanceof Error ? err.message : 'Unknown error',
+      name: err instanceof Error ? err.name : 'Unknown',
+      stack: err instanceof Error ? err.stack : 'No stack'
+    });
+    setError('Impossible de charger les zones, utilisation des données de démonstration');
+    setZones(FALLBACK_ZONES);
+  } finally {
+    setLoading(false);
+  }
+}, [])
+
+  // Chargement initial des zones simplifié
+  useEffect(() => {
+    loadZones(10) // Chargement unique au montage
+  }, [loadZones])
+
+  // Nettoyage des AbortController au démontage
+  useEffect(() => {
+    return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
-
-      abortControllerRef.current = new AbortController()
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetchPublicApi<{ features: ZoneFeatureResp[] }>(
-          `/api/map/zones/simplified?zoom=${precision}`,
-          { signal: abortControllerRef.current.signal },
-        )
-
-        if (response?.features) {
-          const zonesData: ZoneFeature[] = response.features.map((f) => {
-            const poly = f.coordinates.map((c) => [c[0], c[1]] as [number, number])
-            const center = poly.reduce<[number, number]>(
-              (acc, cur) => [acc[0] + cur[0], acc[1] + cur[1]],
-              [0, 0],
-            )
-            center[0] /= poly.length
-            center[1] /= poly.length
-
-            return {
-              polygon: poly,
-              centroid: center,
-              properties: {
-                id: f.id,
-                name: f.name,
-                status: f.status,
-                availableParcels: f.availableParcels,
-                activityIcons: f.activityIcons || [],
-                amenityIcons: f.amenityIcons || [],
-                description: f.description,
-                price: f.price,
-                area: f.area,
-                location: f.location,
-              },
-            }
-          })
-          zoneCache.current.set(precision, zonesData)
-          setZones(zonesData)
-        } else {
-          setZones(FALLBACK_ZONES)
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        console.error('Erreur lors du chargement des zones:', err)
-        setError(
-          "Impossible de charger les zones. Affichage des données de démonstration.",
-        )
-        setZones(FALLBACK_ZONES)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [],
-  )
-
-  /** Synchronise le chargement des données avec le zoom de la carte */
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    /** Convertit un niveau de zoom en "précision" pour l'API (de 0 à 3) */
-    const precisionFromZoom = (z: number) => {
-      if (z >= 14) return 3
-      if (z >= 10) return 2
-      if (z >= 8) return 1
-      return 0
     }
-
-    const handleZoom = () => {
-      const p = precisionFromZoom(map.getZoom())
-      if (precisionRef.current !== p) {
-        precisionRef.current = p
-        loadZones(p)
-      }
-    }
-
-    map.on('zoomend', handleZoom)
-    // Premier chargement
-    handleZoom()
-
-    return () => {
-      map.off('zoomend', handleZoom)
-      if (abortControllerRef.current) abortControllerRef.current.abort()
-    }
-  }, [loadZones])
-
-  /*****************
-   *  Rendu carte  *
-   *****************/
+  }, [])
 
   return (
-    <div className="relative overflow-hidden" style={{ height: 500 }}>
+    <div className="w-full h-full relative">
+      {loading && (
+        <div className="absolute top-4 right-4 z-50 bg-industria-brown-gold text-white px-3 py-1 rounded-md shadow-lg">
+          Chargement des zones...
+        </div>
+      )}
+      
+      {error && (
+        <div className="absolute top-4 right-4 z-50 bg-red-500 text-white px-3 py-1 rounded-md shadow-lg">
+          {error}
+        </div>
+      )}
+
       <MapContainer
-        center={[31.7917, -7.0926]}
+        key="home-map-view" // Clé unique pour éviter les conflits
+        center={[31.7917, -7.0926]} // Centre du Maroc
         zoom={6}
         style={{ height: '100%', width: '100%' }}
-        className="rounded-lg"
-        whenCreated={(map) => {
-          mapRef.current = map
+        whenCreated={(mapInstance) => {
+          mapRef.current = mapInstance
+          // Invalidation de taille pour s'assurer du bon rendu
+          setTimeout(() => mapInstance.invalidateSize(), 100)
         }}
       >
         <TileLayer
@@ -487,48 +494,18 @@ export default function HomeMapView() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        {/* Polygones */}
-        {zones.map((z) => (
-          <Polygon
-            key={`poly-${z.properties.id}`}
-            positions={z.polygon}
-            pathOptions={{ color: '#B1936D', weight: 1, fillOpacity: 0.1 }}
-          />
-        ))}
-
-        {/* Clustering optimisé pour les zones */}
-        <MarkerClusterGroup
-          maxClusterRadius={60}
-          disableClusteringAtZoom={11}
-          spiderfyOnMaxZoom
-          showCoverageOnHover={false}
-          chunkedLoading
-          animate={false}
-        >
+        {/* Affichage des zones avec clustering */}
+        <MarkerClusterGroup>
           {zones.map((zone) => (
-            <ZoneMarker key={zone.properties.id} zone={zone} />
+            <ZoneMarker key={`home-zone-${zone.properties.id}`} zone={zone} />
           ))}
         </MarkerClusterGroup>
 
-        {/* Points d'intérêt */}
+        {/* Affichage des POIs (ports, gares, aéroports) */}
         {pois.map((poi) => (
-          <PoiMarker key={poi.id} poi={poi} />
+          <PoiMarker key={`home-poi-${poi.id}`} poi={poi} />
         ))}
       </MapContainer>
-
-      {/* Alerte d'erreur */}
-      {error && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-orange-100 border border-orange-300 text-orange-700 px-4 py-2 rounded-lg text-sm z-10">
-          {error}
-        </div>
-      )}
-
-      {/* Compteur de zones visibles */}
-      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg z-10">
-        <div className="text-sm font-semibold text-gray-900">
-          {loading ? 'Chargement…' : `${zones.length} zone${zones.length > 1 ? 's' : ''} visible${zones.length > 1 ? 's' : ''}`}
-        </div>
-      </div>
     </div>
   )
 }

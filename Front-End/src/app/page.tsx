@@ -2,8 +2,7 @@
 import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamic from 'next/dynamic';
-import React, { useEffect, useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { useEffect, useState } from 'react';
 import { fetchPublicApi } from '@/lib/publicApi';
 import { Suspense } from 'react';
 import Footer from '@/components/Footer';
@@ -23,26 +22,23 @@ const ZoneGrid = dynamic(() => import('@/components/ZoneGrid'), {
 const HomeMapView = dynamic(() => import('@/components/HomeMapView'), {
   ssr: false,
   loading: () => (
-    <div className="relative overflow-hidden" style={{ height: 500 }}>
-      <div className="absolute inset-0 bg-gray-100 flex items-center justify-center rounded-lg">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto"></div>
-          <p className="text-gray-600 font-medium">Chargement de la carte...</p>
-          <p className="text-sm text-gray-500 mt-2">Localisation des zones et centres d'intérêt</p>
-        </div>
+    <div className="w-full h-[500px] bg-gray-100 flex items-center justify-center rounded-lg">
+      <div className="text-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto"></div>
+        <p className="text-gray-600 font-medium">Chargement de la carte...</p>
+        <p className="text-sm text-gray-500">Localisation des zones et centres d'intérêt</p>
       </div>
     </div>
   ),
 });
 
 export default function Home() {
-  const { t, i18n } = useTranslation();
-  const [welcome, setWelcome] = useState(t('welcome'));
+  const [welcome, setWelcome] = useState('Bienvenue sur Industria');
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
 
   // Chargement du message de bienvenue avec mise en cache
   useEffect(() => {
-    const cacheKey = `greeting-${i18n.language}`;
+    const cacheKey = 'greeting-fr'; // Simplification sans i18n
     const cached = sessionStorage.getItem(cacheKey);
     
     if (cached) {
@@ -58,9 +54,10 @@ export default function Home() {
         }
       })
       .catch((err) => {
-        console.warn('Erreur API greeting:', err.message);
+        console.warn('Erreur API greeting:', err?.message || 'Erreur inconnue');
+        // Garde la valeur par défaut en cas d'erreur
       });
-  }, [i18n.language, t]);
+  }, []);
 
   return (
     <main className="min-h-screen bg-gray-50">

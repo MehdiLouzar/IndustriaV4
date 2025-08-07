@@ -15,60 +15,10 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 import { fetchApi } from '@/lib/utils'
 import DynamicIcon from '@/components/DynamicIcon'
-import maplibregl from 'maplibre-gl'
-import '@maplibre/maplibre-gl-leaflet'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import osmtogeojson from 'osmtogeojson'
-import type { FeatureCollection } from 'geojson'
+// Imports MapLibre supprimés pour éviter les conflits
 import { TrainFront, Ship, Plane } from 'lucide-react'
 
-// Simple debounce utility to avoid excessive API calls
-function debounce<Args extends unknown[]>(func: (...args: Args) => void, delay: number) {
-  let timer: NodeJS.Timeout
-  const debounced = (...args: Args) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => func(...args), delay)
-  }
-  debounced.cancel = () => clearTimeout(timer)
-  return debounced
-}
-
-// Small cache for Overpass results to reduce network usage
-class OverpassCache {
-  private cache = new Map<string, { data: FeatureCollection; ts: number }>()
-  private readonly TTL = 3_600_000 // 1 hour
-  private readonly MAX_SIZE = 20
-
-  private key(bbox: string, zoom: number) {
-    const precision = zoom > 12 ? 2 : 1
-    return bbox
-      .split(',')
-      .map((n) => parseFloat(n).toFixed(precision))
-      .join(',')
-  }
-
-  get(bbox: string, zoom: number) {
-    const k = this.key(bbox, zoom)
-    const item = this.cache.get(k)
-    if (!item) return null
-    if (Date.now() - item.ts > this.TTL) {
-      this.cache.delete(k)
-      return null
-    }
-    return item.data
-  }
-
-  set(bbox: string, zoom: number, data: FeatureCollection) {
-    const k = this.key(bbox, zoom)
-    this.cache.set(k, { data, ts: Date.now() })
-    if (this.cache.size > this.MAX_SIZE) {
-      const oldest = this.cache.keys().next().value
-      this.cache.delete(oldest)
-    }
-  }
-}
-
-const overpassCache = new OverpassCache()
+// Utilitaires simplifiés - suppression du cache Overpass qui causait des conflits
 
 
 type ZoneFeature = {
@@ -97,13 +47,8 @@ type ZoneFeatureResp = {
 export default function MapView() {
   const [zones, setZones] = useState<ZoneFeature[]>([])
   type Poi = { id: string; coordinates: [number, number]; type: 'station' | 'port' | 'airport' }
-  const [pois, setPois] = useState<Poi[]>([])
+  const [pois] = useState<Poi[]>([]) // POIs statiques simples
   const mapRef = useRef<L.Map | null>(null)
-  const glLayerRef = useRef<{ getMaplibreMap(): maplibregl.Map; remove(): void } | null>(null)
-  const glMapRef = useRef<maplibregl.Map | null>(null)
-  const glLoaded = useRef(false)
-  const lastBbox = useRef('')
-  const overpassAbort = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -187,96 +132,7 @@ export default function MapView() {
   }, [zones])
 
 
-  const applyOverpassData = useCallback(
-    (geojson: FeatureCollection) => {
-      const newPois: Poi[] = []
-      for (const f of geojson.features) {
-        if (f.geometry.type === 'Point') {
-          const [lon, lat] = f.geometry.coordinates as [number, number]
-          const props = f.properties as Record<string, unknown>
-          if (props.railway === 'station' || props.public_transport === 'station') {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'station' })
-          } else if (props.harbour != null) {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'port' })
-          } else if (props.aeroway === 'aerodrome') {
-            newPois.push({ id: String(props['@id'] ?? `${lon}-${lat}`), coordinates: [lat, lon], type: 'airport' })
-          }
-        }
-      }
-      setPois(newPois)
-
-      if (glMapRef.current?.getSource('overpass')) {
-        ;(glMapRef.current.getSource('overpass') as maplibregl.GeoJSONSource).setData(geojson)
-      } else if (glMapRef.current) {
-        glMapRef.current.addSource('overpass', { type: 'geojson', data: geojson })
-        glMapRef.current.addLayer({
-          id: 'highways',
-          type: 'line',
-          source: 'overpass',
-          filter: ['match', ['get', 'highway'], ['motorway', 'trunk'], true, false],
-          minzoom: 0,
-          paint: {
-            'line-color': '#0000ff',
-            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2, 8, 4, 12, 8, 16, 10],
-          },
-        })
-      }
-    },
-    []
-  )
-
-  const fetchOverpassData = useCallback(async (bbox: string, zoom: number) => {
-    overpassAbort.current?.abort()
-    const ctrl = new AbortController()
-    overpassAbort.current = ctrl
-    const elements =
-      zoom > 10
-        ? 'way["highway"~"motorway|trunk"];' +
-          'node["railway"="station"];node["public_transport"="station"];' +
-          'node["harbour"];node["aeroway"="aerodrome"];'
-        : 'way["highway"="motorway"];node["aeroway"="aerodrome"];'
-    const query = `[out:json][timeout:25];(${elements})(${bbox});out geom;`
-    try {
-      const res = await fetch(
-        'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query),
-        { signal: ctrl.signal }
-      )
-      if (!res.ok) {
-        console.error('Overpass HTTP error', res.status, res.statusText)
-        return
-      }
-      const osm = await res.json()
-      if (ctrl.signal.aborted) return
-      const geojson = osmtogeojson(osm) as FeatureCollection
-      overpassCache.set(bbox, zoom, geojson)
-      applyOverpassData(geojson)
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        console.error('Overpass fetch failed', err)
-      }
-    } finally {
-      if (overpassAbort.current === ctrl) overpassAbort.current = null
-    }
-  }, [applyOverpassData])
-
-  const loadOverpassData = useCallback(
-    debounce(() => {
-      if (!mapRef.current || !glMapRef.current || !glLoaded.current) return
-      const zoom = mapRef.current.getZoom()
-      if (zoom < 11) return
-      const b = mapRef.current.getBounds()
-      const bbox = `${b.getSouth().toFixed(2)},${b.getWest().toFixed(2)},${b.getNorth().toFixed(2)},${b.getEast().toFixed(2)}`
-      if (bbox === lastBbox.current) return
-      lastBbox.current = bbox
-      const cached = overpassCache.get(bbox, zoom)
-      if (cached) {
-        applyOverpassData(cached)
-        return
-      }
-      fetchOverpassData(bbox, zoom)
-    }, 5000),
-    [fetchOverpassData, applyOverpassData]
-  ) as ReturnType<typeof debounce>
+  // Suppression de toute la logique Overpass qui causait les conflits
 
   useEffect(() => {
     fetchApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
@@ -298,141 +154,37 @@ export default function MapView() {
       .catch(console.error)
   }, [])
 
-  useEffect(() => {
-    if (!mapRef.current) return
-    const abortController = new AbortController()
-    const mapInstance = mapRef.current
-    let loadTimeout: NodeJS.Timeout | null = null
-    let isDestroyed = false
-
-    const LMaplibre = L as unknown as typeof L & {
-      maplibreGL: (opts: { style: string; interactive: boolean }) => {
-        addTo(map: L.Map): { getMaplibreMap(): maplibregl.Map; remove(): void }
-      }
-    }
-    const layer = LMaplibre
-      .maplibreGL({ style: 'https://demotiles.maplibre.org/style.json', interactive: false })
-      .addTo(mapInstance)
-    glLayerRef.current = layer
-    const mlMap = layer.getMaplibreMap() as maplibregl.Map
-    glMapRef.current = mlMap
-
-    const handleLoad = () => {
-      if (isDestroyed) return
-      glLoaded.current = true
-      loadTimeout = setTimeout(() => {
-        if (!isDestroyed && !abortController.signal.aborted) {
-          loadOverpassData()
-          mapInstance?.on('moveend', loadOverpassData)
-        }
-      }, 500)
-    }
-
-    mlMap.on('load', handleLoad)
-
-    return () => {
-      console.log('🧹 MapView cleanup START')
-      isDestroyed = true
-      abortController.abort()
-      overpassAbort.current?.abort()
-      overpassAbort.current = null
-      if (loadTimeout) {
-        clearTimeout(loadTimeout)
-        loadTimeout = null
-      }
-      loadOverpassData.cancel()
-      try {
-        mapInstance?.off('moveend', loadOverpassData)
-        mlMap.off('load', handleLoad)
-      } catch (e: unknown) {
-        console.warn('Listener cleanup error:', e)
-      }
-      if (glMapRef.current) {
-        try {
-          glMapRef.current.remove()
-        } catch (e: unknown) {
-          console.warn('MapLibre destruction error:', e)
-        }
-        glMapRef.current = null
-      }
-      if (glLayerRef.current) {
-        try {
-          glLayerRef.current.remove()
-        } catch (e: unknown) {
-          console.warn('Layer destruction error:', e)
-        }
-        glLayerRef.current = null
-      }
-      glLoaded.current = false
-      if (typeof window !== 'undefined' && 'gc' in window) {
-        try {
-          ;((window as unknown) as { gc?: () => void }).gc?.()
-        } catch {
-          /* noop */
-        }
-      }
-      console.log('✅ MapView cleanup COMPLETE')
-    }
-  }, [loadOverpassData])
+  // Suppression de la logique MapLibre GL complexe
 
 
   return (
     <div className="relative overflow-hidden">
       <MapContainer
+        key="simple-map-view" // Clé unique pour éviter les conflits
         center={[31.7, -6.5]}
         zoom={6}
         preferCanvas={true}
         style={{ height: 600, width: '100%' }}
         whenCreated={(m) => {
           mapRef.current = m
+          // Invalidation de taille simple
+          setTimeout(() => m.invalidateSize(), 100)
         }}
       >
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      {/* Cluster pour zones industrielles */}
-      <MarkerClusterGroup
-        maxClusterRadius={60}
-        disableClusteringAtZoom={14}
-        spiderfyOnMaxZoom={false}
-        showCoverageOnHover={false}
-        chunkedLoading
-      >
-        {visibleZones.map((z) => (
-          <ZoneMarker key={z.properties.id} zone={z} />
-        ))}
-      </MarkerClusterGroup>
-      {/* Points d'intérêt sans clustering */}
-      {pois.map((poi) => (
-        <Marker
-          key={poi.id}
-          position={poi.coordinates}
-          icon={
-            poi.type === 'station'
-              ? ICONS.station
-              : poi.type === 'port'
-              ? ICONS.port
-              : ICONS.airport
-          }
-        />
-      ))}
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {/* Cluster pour zones industrielles */}
+        <MarkerClusterGroup
+          maxClusterRadius={60}
+          disableClusteringAtZoom={14}
+          spiderfyOnMaxZoom={false}
+          showCoverageOnHover={false}
+          chunkedLoading
+        >
+          {visibleZones.map((z) => (
+            <ZoneMarker key={`simple-${z.properties.id}`} zone={z} />
+          ))}
+        </MarkerClusterGroup>
       </MapContainer>
-      <div className="absolute bottom-2 right-2 bg-white/80 p-2 text-xs rounded shadow space-y-1 z-10">
-        <div>
-          <span className="inline-block w-6 border-b-8 border-blue-600 align-middle mr-1"></span>
-          Autoroutes
-        </div>
-        <div>
-          <span className="inline-block w-3 h-3 bg-blue-600 rounded-full align-middle mr-1"></span>
-          Gares
-        </div>
-        <div>
-          <span className="inline-block w-3 h-3 bg-gray-700 rounded-full align-middle mr-1"></span>
-          Ports
-        </div>
-        <div>
-          <span className="inline-block w-3 h-3 bg-green-700 rounded-full align-middle mr-1"></span>
-          Aéroports
-        </div>
-      </div>
     </div>
   )
 }

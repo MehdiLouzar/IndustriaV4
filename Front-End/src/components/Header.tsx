@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, MapPin, Building2 } from 'lucide-react';
 import AuthButton from '@/components/AuthButton';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import Image from 'next/image';
 
 export default function Header({ showAdminLink = false }: { showAdminLink?: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -70,7 +71,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <Building2 className="w-8 h-8 text-industria-brown-gold" />
+                <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Industria</h1>
                   <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
