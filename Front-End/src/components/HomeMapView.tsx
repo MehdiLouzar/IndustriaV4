@@ -129,6 +129,7 @@ export default function HomeMapView() {
   const [error, setError] = useState<string | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const workerRef = useRef<Worker | null>(null)
   const lastLoadTime = useRef<number>(0)
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
@@ -282,75 +283,64 @@ export default function HomeMapView() {
       setLoading(false)
       return
     }
-    
+
     // Annuler la requête précédente si elle existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    
+    if (workerRef.current) {
+      workerRef.current.terminate()
+      workerRef.current = null
+    }
+
     abortControllerRef.current = new AbortController()
     setLoading(true)
     setError(null)
-    
+
     try {
       // Essayer les deux APIs en parallèle pour réduire la latence
       const [mapResponse, zonesResponse] = await Promise.allSettled([
         fetchPublicApi<PublicZonesResponse>("/api/map/zones", { signal: abortControllerRef.current.signal }),
         fetchPublicApi<PublicZonesResponse>("/api/zones", { signal: abortControllerRef.current.signal })
       ])
-      
+
       let response: PublicZonesResponse | null = null
-      
+
       // Utiliser la première réponse valide
       if (mapResponse.status === 'fulfilled' && mapResponse.value?.features) {
         response = mapResponse.value
       } else if (zonesResponse.status === 'fulfilled' && zonesResponse.value) {
         response = zonesResponse.value
       }
-      
-      if (response?.features) {
-        // Optimisation: traitement batch des données
-        const zonesData: ZoneFeature[] = response.features.map((f) => ({
-          geometry: { type: "Point", coordinates: [f.coordinates[0], f.coordinates[1]] },
-          properties: {
-            id: f.id,
-            name: f.name,
-            status: f.status,
-            availableParcels: f.availableParcels,
-            activityIcons: f.activityIcons || [],
-            amenityIcons: f.amenityIcons || [],
-            description: f.description,
-            price: f.price,
-            area: f.area,
-            location: f.location,
-          },
-        }))
-        setZones(zonesData)
-        lastLoadTime.current = Date.now()
-      } else if (response?.items) {
-        // Optimisation: filtrage et mapping en une seule passe
-        const zonesData: ZoneFeature[] = response.items
-          .reduce<ZoneFeature[]>((acc, zone) => {
-            if (!zone.coordinates) return acc // Skip sans coordonnées
-            acc.push({
-              geometry: { type: "Point", coordinates: zone.coordinates },
-              properties: {
-                id: zone.id,
-                name: zone.name,
-                status: zone.status,
-                availableParcels: 0,
-                activityIcons: zone.activityIcons || [],
-                amenityIcons: zone.amenityIcons || [],
-                description: zone.description,
-                price: zone.price,
-                area: zone.area,
-                location: zone.location,
-              },
-            })
-            return acc
-          }, [])
-        setZones(zonesData)
-        lastLoadTime.current = Date.now()
+
+      if (response?.features || response?.items) {
+        const worker = new Worker(new URL('../workers/geometryWorker.ts', import.meta.url))
+        workerRef.current = worker
+
+        const zonesData: ZoneFeature[] = await new Promise((resolve, reject) => {
+          const abortHandler = () => {
+            worker.terminate()
+            reject(new DOMException('Aborted', 'AbortError'))
+          }
+          abortControllerRef.current?.signal.addEventListener('abort', abortHandler, { once: true })
+          worker.onmessage = (ev) => {
+            abortControllerRef.current?.signal.removeEventListener('abort', abortHandler)
+            resolve(ev.data as ZoneFeature[])
+          }
+          worker.onerror = (err) => {
+            abortControllerRef.current?.signal.removeEventListener('abort', abortHandler)
+            reject(err)
+          }
+          worker.postMessage(response?.features ?? response?.items ?? [])
+        })
+
+        if (!abortControllerRef.current.signal.aborted) {
+          setZones(zonesData)
+          lastLoadTime.current = Date.now()
+        }
+
+        worker.terminate()
+        workerRef.current = null
       } else {
         // Données de démonstration minimal pour éviter le lag
         setZones(FALLBACK_ZONES)
@@ -361,7 +351,7 @@ export default function HomeMapView() {
         console.log('Requête annulée')
         return // Ne pas traiter les requêtes annulées
       }
-      
+
       console.error('Erreur lors du chargement des zones:', err)
       setError('Impossible de charger les zones. Affichage des données de démonstration.')
       setZones(FALLBACK_ZONES)
@@ -378,6 +368,10 @@ export default function HomeMapView() {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
+      }
+      if (workerRef.current) {
+        workerRef.current.terminate()
+        workerRef.current = null
       }
     }
   }, [loadZones])
