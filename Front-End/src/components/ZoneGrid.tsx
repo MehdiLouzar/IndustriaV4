@@ -40,19 +40,66 @@ export default function ZoneGrid() {
       )
 
       if (response?.items) {
-        // Adapter les données publiques vers le format IndustrialZone
-        const zonesData: IndustrialZone[] = response.items.map(zone => ({
-          id: zone.id,
-          name: zone.name,
-          description: zone.description || 'Description non disponible',
-          location: zone.location || 'Localisation non disponible',
-          area: zone.area || 'Surface non spécifiée',
-          price: zone.price || 'Prix sur demande',
-          type: zone.type || 'Type non spécifié',
-          status: zone.status,
-          deliveryDate: undefined, // Pas dans l'API publique
-          image: undefined // Pas d'images pour l'instant
-        }))
+        // Adapter les données publiques vers le format IndustrialZone avec formatage correct
+        const zonesData: IndustrialZone[] = response.items.map(zone => {
+          // Formatter la superficie
+          const formatArea = (area: any) => {
+            if (!area) return 'Surface non spécifiée'
+            const numArea = typeof area === 'string' ? parseFloat(area) : area
+            return isNaN(numArea) ? 'Surface non spécifiée' : `${numArea.toLocaleString()} m²`
+          }
+          
+          // Formatter le prix
+          const formatPrice = (price: any) => {
+            if (!price) return 'Prix sur demande'
+            const numPrice = typeof price === 'string' ? parseFloat(price) : price
+            return isNaN(numPrice) ? 'Prix sur demande' : `${numPrice} DH/m²`
+          }
+          
+          // Récupérer le type depuis les propriétés de zone (ex: region, zoneType)
+          const getZoneType = (zone: any) => {
+            // Si on a directement le type
+            if (zone.type) return zone.type
+            // Mapper les IDs vers des noms lisibles
+            if (zone.zoneTypeId) {
+              const typeMap: { [key: string]: string } = {
+                'zt-private': 'Zone Privée',
+                'zt-public': 'Zone Publique', 
+                'zt-free-zone': 'Zone Franche',
+                'zt-logistics': 'Parc Logistique'
+              }
+              return typeMap[zone.zoneTypeId] || 'Zone Industrielle'
+            }
+            // Mapper les régions vers des noms lisibles  
+            if (zone.regionId) {
+              const regionMap: { [key: string]: string } = {
+                'region-cas': 'Casablanca-Settat',
+                'region-rab': 'Rabat-Salé-Kénitra', 
+                'region-mar': 'Marrakech-Safi',
+                'region-tan': 'Tanger-Tétouan-Al Hoceima'
+              }
+              return `Zone de ${regionMap[zone.regionId] || zone.regionId}`
+            }
+            return 'Zone Industrielle'
+          }
+          
+          return {
+            id: zone.id,
+            name: zone.name,
+            description: zone.description || 'Description non disponible',
+            location: (zone as any).address || zone.location || 'Localisation non disponible',
+            area: formatArea((zone as any).totalArea || zone.area),
+            price: formatPrice(zone.price),
+            type: getZoneType(zone),
+            status: zone.status === 'LIBRE' ? 'Disponible' : 
+                   zone.status === 'RESERVE' ? 'Réservée' : 
+                   zone.status === 'VENDU' ? 'Vendue' : 
+                   zone.status === 'DEVELOPPEMENT' ? 'En développement' :
+                   zone.status || 'Statut inconnu',
+            deliveryDate: undefined,
+            image: undefined
+          }
+        })
 
         setZones(zonesData)
         setTotalPages(response.totalPages || Math.ceil(zonesData.length / ZONES_PER_PAGE) || 1)

@@ -160,7 +160,15 @@ export default function ZonesAdmin() {
     amenityIds: [],
     vertices: [],
   })
-  const [images, setImages] = useState<{ file: File; url: string }[]>([])
+  const [images, setImages] = useState<{ file: File; url: string; description?: string; isPrimary?: boolean }[]>([])
+  const [existingImages, setExistingImages] = useState<Array<{
+    id: string;
+    filename: string;
+    originalFilename: string;
+    description?: string;
+    isPrimary: boolean;
+    displayOrder: number;
+  }>>([])
   const [selectedZoneId, setSelectedZoneId] = useState('')
 
   // Fonction pour récupérer les coordonnées pré-calculées d'une zone
@@ -358,10 +366,68 @@ export default function ZonesAdmin() {
     const files = Array.from(e.target.files).map((file) => ({
       file,
       url: URL.createObjectURL(file),
+      description: '',
+      isPrimary: false
     }))
     setImages((imgs) => [...imgs, ...files])
     e.target.value = ''
   }, [])
+
+  const loadExistingImages = useCallback(async (zoneId: string) => {
+    if (!zoneId) {
+      setExistingImages([])
+      return
+    }
+    try {
+      const images = await fetchApi<Array<{
+        id: string;
+        filename: string;
+        originalFilename: string;
+        description?: string;
+        isPrimary: boolean;
+        displayOrder: number;
+      }>>(`/api/zones/${zoneId}/images`)
+      setExistingImages(images || [])
+    } catch (error) {
+      console.error('Erreur lors du chargement des images:', error)
+      setExistingImages([])
+    }
+  }, [])
+
+  const uploadImages = useCallback(async (zoneId: string) => {
+    if (images.length === 0) return
+    
+    for (const imageData of images) {
+      const formData = new FormData()
+      formData.append('file', imageData.file)
+      if (imageData.description) {
+        formData.append('description', imageData.description)
+      }
+      if (imageData.isPrimary) {
+        formData.append('isPrimary', 'true')
+      }
+
+      try {
+        await fetchApi(`/api/zones/${zoneId}/images`, {
+          method: 'POST',
+          body: formData,
+        })
+      } catch (error) {
+        console.error('Erreur upload image:', error)
+      }
+    }
+  }, [images])
+
+  const deleteExistingImage = useCallback(async (zoneId: string, imageId: string) => {
+    try {
+      await fetchApi(`/api/zones/${zoneId}/images/${imageId}`, {
+        method: 'DELETE'
+      })
+      await loadExistingImages(zoneId)
+    } catch (error) {
+      console.error('Erreur suppression image:', error)
+    }
+  }, [loadExistingImages])
 
   const removeImage = useCallback((idx: number) => {
     setImages((imgs) => {
@@ -393,6 +459,9 @@ export default function ZonesAdmin() {
         lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
       })),
     }
+    
+    let zoneId = form.id
+    
     if (form.id) {
       await fetchApi(`/api/zones/${form.id}`, {
         method: 'PUT',
@@ -400,12 +469,19 @@ export default function ZonesAdmin() {
         body: JSON.stringify(body),
       })
     } else {
-      await fetchApi('/api/zones', {
+      const newZone = await fetchApi('/api/zones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      zoneId = newZone.id
     }
+
+    // Upload des nouvelles images si il y en a
+    if (zoneId) {
+      await uploadImages(zoneId)
+    }
+
     setForm({
       id: '',
       name: '',
@@ -423,6 +499,7 @@ export default function ZonesAdmin() {
       vertices: [],
     })
     setImages([])
+    setExistingImages([])
     setOpen(false)
     loadZones(currentPage)
   }
@@ -448,8 +525,9 @@ export default function ZonesAdmin() {
       })) : [],
     })
     setImages([])
+    loadExistingImages(z.id)
     setOpen(true)
-  }, [])
+  }, [loadExistingImages])
 
   const handleDelete = useCallback(async (id: string) => {
     await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
@@ -706,24 +784,64 @@ export default function ZonesAdmin() {
             <div>
               <Label>Photos</Label>
               <Input type="file" multiple onChange={handleFiles} accept="image/*" />
-              {images.length === 0 && (
-                <p className="text-gray-500 text-xs mt-1">Note: Les images sont prévisualisées mais ne sont pas encore sauvegardées (en attente de l'implémentation backend)</p>
-              )}
-              <div className="flex flex-wrap gap-2 mt-2">
-                {(images ?? []).map((img, idx) => (
-                  <div key={idx} className="relative">
-                    <img src={img.url} className="w-24 h-24 object-cover rounded" alt={`Image ${idx + 1}`} />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-700"
-                      title="Supprimer cette image"
-                    >
-                      ×
-                    </button>
+              
+              {/* Images existantes */}
+              {existingImages.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Images existantes:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {existingImages.map((img) => (
+                      <div key={img.id} className="relative">
+                        <img 
+                          src={`/api/zones/${form.id}/images/${img.id}/file`} 
+                          className="w-24 h-24 object-cover rounded" 
+                          alt={img.originalFilename}
+                          title={img.description || img.originalFilename}
+                        />
+                        {img.isPrimary && (
+                          <span className="absolute top-0 left-0 bg-green-600 text-white text-xs px-1 rounded">
+                            Principal
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => deleteExistingImage(form.id, img.id)}
+                          className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-700"
+                          title="Supprimer cette image"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
+              {/* Nouvelles images à uploader */}
+              {images.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Nouvelles images à ajouter:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="relative">
+                        <img src={img.url} className="w-24 h-24 object-cover rounded" alt={`Nouvelle image ${idx + 1}`} />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-700"
+                          title="Supprimer cette image"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {images.length === 0 && existingImages.length === 0 && (
+                <p className="text-gray-500 text-xs mt-1">Aucune image. Vous pouvez ajouter des images pour illustrer cette zone.</p>
+              )}
             </div>
             <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
           </form>

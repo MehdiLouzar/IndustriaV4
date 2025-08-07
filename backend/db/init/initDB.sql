@@ -1,6 +1,9 @@
 -- initDB.sql - Données d'exemple pour la plateforme Industria
 -- Version optimisée pour model-first avec Hibernate
 -- Mise à jour : coordonnées géographiques réelles du Maroc
+-- Amélioration : Calcul automatique de latitude/longitude depuis les coordonnées Lambert
+-- Les colonnes latitude et longitude sont calculées automatiquement via ST_Transform 
+-- pour simplifier les futures migrations depuis des données Lambert
 
 -- Activer les extensions nécessaires (si pas déjà fait par Hibernate)
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -92,90 +95,136 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM amenity);
 
 -- 1) Zones avec coordonnées Lambert réelles du Maroc (EPSG:26191)
+-- Calcul automatique de latitude/longitude depuis les coordonnées Lambert
 INSERT INTO zone (
     id, name, description, address, total_area, price, price_type,
-    construction_type, status, geometry, srid, created_at, updated_at, deleted_at,
-    zone_type_id, region_id, created_by
+    construction_type, status, geometry, srid, latitude, longitude,
+    created_at, updated_at, deleted_at, zone_type_id, region_id, created_by
 )
-SELECT * FROM (VALUES
-    -- Zone démo - Coordonnées Lambert précises
-    ('zone-demo', 'Zone Industrielle Demo', 'Zone de démonstration avec infrastructures complètes', 'Route Demo, Casablanca',
-     150000, 2500, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-private', 'region-cas', 'user-admin'),
 
-    -- Zone Casablanca Nord
-    ('zone-casa-nord', 'Zone Industrielle Casablanca Nord', 'Zone industrielle moderne avec accès autoroutier', 'Route de Rabat, Ain Sebaä, Casablanca',
-     200000, 3000, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-public', 'region-cas', 'user-admin'),
+-- Zone démo - Coordonnées Lambert précises
+SELECT 
+    'zone-demo', 'Zone Industrielle Demo', 'Zone de démonstration avec infrastructures complètes', 'Route Demo, Casablanca',
+    150000, 2500, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191) as geom,
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as latitude,
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as longitude,
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-private', 'region-cas', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-demo')
 
-    -- Parc Industriel Aín Johra (PIAJ) - Coordonnées Lambert précises
-    ('zone-piaj', 'PIAJ', 'Parc industriel moderne proche de Rabat-Salé', 'Aín Johra, Salé',
-     1201325.73, 2200, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-public', 'region-rab', 'user-admin'),
+UNION ALL
 
-    -- Zone Industrielle ZAINA - Coordonnées Lambert précises
-    ('zone-zaina', 'ZAINA', 'Zone industrielle à Kénitra avec accès portuaire', 'Kénitra',
-     159338.90, 1800, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-free-zone', 'region-rab', 'user-admin'),
+-- Zone Casablanca Nord
+SELECT 
+    'zone-casa-nord', 'Zone Industrielle Casablanca Nord', 'Zone industrielle moderne avec accès autoroutier', 'Route de Rabat, Ain Sebaä, Casablanca',
+    200000, 3000, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-public', 'region-cas', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-casa-nord')
 
-    -- Zone Logistique OTTAWA (ex-Haidara) - Coordonnées Lambert précises
-    ('zone-ottawa', 'OTTAWA', 'Plateforme logistique moderne au Maroc', 'Zone industrielle Ottawa',
-     181100.01, 2800, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-logistics', 'region-rab', 'user-admin'),
+UNION ALL
 
-    -- Zone additionnelle Marrakech
-    ('zone-marrakech-1', 'Zone Industrielle Marrakech Sud', 'Zone industrielle avec avantages fiscaux', 'Route de l''Aéroport, Marrakech',
-     95000, 2000, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-     ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191),
-     26191, NOW(), NOW(), NULL::timestamp without time zone,
-     'zt-private', 'region-mar', 'user-admin')
-) AS data(
-    id, name, description, address, total_area, price, price_type,
-    construction_type, status, geometry, srid, created_at, updated_at, deleted_at,
-    zone_type_id, region_id, created_by
-)
-WHERE NOT EXISTS (SELECT 1 FROM zone WHERE zone.id = data.id);
+-- Parc Industriel Aín Johra (PIAJ) - Coordonnées Lambert précises
+SELECT 
+    'zone-piaj', 'PIAJ', 'Parc industriel moderne proche de Rabat-Salé', 'Aín Johra, Salé',
+    1201325.73, 2200, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-public', 'region-rab', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-piaj')
+
+UNION ALL
+
+-- Zone Industrielle ZAINA - Coordonnées Lambert précises
+SELECT 
+    'zone-zaina', 'ZAINA', 'Zone industrielle à Kénitra avec accès portuaire', 'Kénitra',
+    159338.90, 1800, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-free-zone', 'region-rab', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-zaina')
+
+UNION ALL
+
+-- Zone Logistique OTTAWA (ex-Haidara) - Coordonnées Lambert précises
+SELECT 
+    'zone-ottawa', 'OTTAWA', 'Plateforme logistique moderne au Maroc', 'Zone industrielle Ottawa',
+    181100.01, 2800, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-logistics', 'region-rab', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-ottawa')
+
+UNION ALL
+
+-- Zone additionnelle Marrakech
+SELECT 
+    'zone-marrakech-1', 'Zone Industrielle Marrakech Sud', 'Zone industrielle avec avantages fiscaux', 'Route de l''Aéroport, Marrakech',
+    95000, 2000, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-private', 'region-mar', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1');
 
 
 
--- 2) Parcelles avec coordonnées Lambert précises
+-- 2) Parcelles avec coordonnées Lambert précises et calcul auto des lat/lon
 INSERT INTO parcel (
     id, reference, area, status, is_showroom, cos, cus, height_limit, setback,
-    geometry, srid, created_at, updated_at, deleted_at, zone_id, created_by
+    geometry, srid, latitude, longitude, created_at, updated_at, deleted_at, zone_id, created_by
 )
-SELECT * FROM (VALUES
-    ('parcel-1', 'CAS-001', 10000, 'LIBRE', false, 0.6, 1.2, 15.0, 5.0,
-     ST_SetSRID(
-       ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'),
-       26191
-     ), 26191, NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'),
 
-    ('parcel-2', 'CAS-002', 12000, 'RESERVEE', false, 0.7, 1.4, 18.0, 4.0,
-     ST_SetSRID(
-       ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'),
-       26191
-     ), 26191, NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'),
+-- Parcel CAS-001
+SELECT 
+    'parcel-1', 'CAS-001', 10000, 'LIBRE', false, 0.6, 1.2, 15.0, 5.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-1')
 
-    ('parcel-3', 'CAS-NORD-001', 15000, 'LIBRE', false, 0.65, 1.3, 20.0, 6.0,
-     ST_SetSRID(
-       ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'),
-       26191
-     ), 26191, NOW(), NOW(), NULL::timestamp without time zone, 'zone-casa-nord', 'user-admin')
-) AS data(
-    id, reference, area, status, is_showroom, cos, cus, height_limit, setback,
-    geometry, srid, created_at, updated_at, deleted_at, zone_id, created_by
-)
-WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE parcel.id = data.id);
+UNION ALL
+
+-- Parcel CAS-002
+SELECT 
+    'parcel-2', 'CAS-002', 12000, 'RESERVEE', false, 0.7, 1.4, 18.0, 4.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-2')
+
+UNION ALL
+
+-- Parcel CAS-NORD-001
+SELECT 
+    'parcel-3', 'CAS-NORD-001', 15000, 'LIBRE', false, 0.65, 1.3, 20.0, 6.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191),
+    26191,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-casa-nord', 'user-admin'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-3');
 
 
 

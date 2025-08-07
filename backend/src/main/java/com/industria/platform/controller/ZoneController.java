@@ -8,6 +8,7 @@ import com.industria.platform.service.StatusService;
 import com.industria.platform.service.GeometryUpdateService;
 import com.industria.platform.service.PermissionService;
 import com.industria.platform.service.UserService;
+import com.industria.platform.service.PostGISGeometryService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -33,6 +34,7 @@ public class ZoneController {
     private final GeometryUpdateService geometryUpdateService;
     private final PermissionService permissionService;
     private final UserService userService;
+    private final PostGISGeometryService postGISGeometryService;
 
     public ZoneController(StatusService statusService,
                           ZoneRepository zoneRepository,
@@ -44,7 +46,8 @@ public class ZoneController {
                           RegionRepository regionRepository,
                           GeometryUpdateService geometryUpdateService,
                           PermissionService permissionService,
-                          UserService userService) {
+                          UserService userService,
+                          PostGISGeometryService postGISGeometryService) {
         this.statusService = statusService;
         this.zoneRepository = zoneRepository;
         this.activityRepository = activityRepository;
@@ -56,6 +59,7 @@ public class ZoneController {
         this.geometryUpdateService = geometryUpdateService;
         this.permissionService = permissionService;
         this.userService = userService;
+        this.postGISGeometryService = postGISGeometryService;
     }
 
     @PutMapping("/{id}/status")
@@ -127,6 +131,15 @@ public class ZoneController {
     }
 
     private ZoneDto toDto(Zone z) {
+        // Extraire les vertices directement depuis PostGIS pour éviter la corruption
+        List<VertexDto> vertices = List.of();
+        try {
+            vertices = postGISGeometryService.extractZoneVertices(z.getId());
+        } catch (Exception e) {
+            System.err.println("Erreur lors de l'extraction des vertices pour zone " + z.getId() + ": " + e.getMessage());
+            // Fallback vers les coordonnées stockées dans les colonnes latitude/longitude
+        }
+        
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -139,7 +152,7 @@ public class ZoneController {
                 z.getZoneType() == null ? null : z.getZoneType().getId(),
                 z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getId()).toList(),
                 z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getId()).toList(),
-                parseGeometry(z.getGeometry()),
+                vertices,
                 z.getLatitude(),  // Utiliser les coordonnées pré-calculées
                 z.getLongitude()  // Utiliser les coordonnées pré-calculées
         );
@@ -202,16 +215,8 @@ public class ZoneController {
         }
     }
 
-    private List<VertexDto> parseGeometry(String wkt) {
-        if (wkt == null) return List.of();
-        String numbers = wkt.replaceAll("[^0-9.\\- ]", " ");
-        String[] parts = numbers.trim().split(" +");
-        List<VertexDto> verts = new ArrayList<>();
-        for (int i = 0; i + 1 < parts.length; i += 2) {
-            verts.add(new VertexDto(i / 2, Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
-        }
-        return verts;
-    }
+    // Méthode parseGeometry() supprimée - remplacée par PostGISGeometryService.extractZoneVertices()
+    // pour éviter la corruption des coordonnées Lambert
 
     private double[] parseCentroid(String wkt) {
         if (wkt == null) return new double[]{0, 0};
