@@ -1,12 +1,14 @@
 "use client";
+
 import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamic from 'next/dynamic';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { fetchPublicApi } from '@/lib/publicApi';
-import { Suspense } from 'react';
 import Footer from '@/components/Footer';
 import ViewToggle from '@/components/ViewToggle';
+
+const ZONES_CACHE_KEY = 'zones-cache-v1';
 
 const ZoneGrid = dynamic(() => import('@/components/ZoneGrid'), {
   ssr: false,
@@ -22,7 +24,7 @@ const ZoneGrid = dynamic(() => import('@/components/ZoneGrid'), {
 const HomeMapView = dynamic(() => import('@/components/HomeMapView'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[500px] bg-gray-100 flex items-center justify-center rounded-lg">
+    <div className="w-full h-[600px] bg-gray-100 flex items-center justify-center rounded-lg">
       <div className="text-center space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto"></div>
         <p className="text-gray-600 font-medium">Chargement de la carte...</p>
@@ -36,34 +38,50 @@ export default function Home() {
   const [welcome, setWelcome] = useState('Bienvenue sur Industria');
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
 
-  // Chargement du message de bienvenue avec mise en cache
+  // Keep the map mounted after first display to avoid remount/fetch loops
+  const [mapEverShown, setMapEverShown] = useState(viewMode === 'map');
   useEffect(() => {
-    const cacheKey = 'greeting-fr'; // Simplification sans i18n
+    if (viewMode === 'map') setMapEverShown(true);
+  }, [viewMode]);
+
+  // Prefetch zones once so "Carte" opens instantly
+  useEffect(() => {
+    if (sessionStorage.getItem(ZONES_CACHE_KEY)) return;
+    (async () => {
+      try {
+        const resp = await fetchPublicApi<any>('/api/map/zones/simplified?zoom=8');
+        if (resp?.features) {
+          sessionStorage.setItem(ZONES_CACHE_KEY, JSON.stringify(resp.features));
+        }
+      } catch {
+        // ignore – HomeMapView has its own fallback
+      }
+    })();
+  }, []);
+
+  // Greeting (cached)
+  useEffect(() => {
+    const cacheKey = 'greeting-fr';
     const cached = sessionStorage.getItem(cacheKey);
-    
     if (cached) {
       setWelcome(cached);
       return;
     }
-
-    fetchPublicApi<{ message: string }>("/api/public/greeting")
+    fetchPublicApi<{ message: string }>('/api/public/greeting')
       .then((data) => {
         if (data?.message) {
           setWelcome(data.message);
           sessionStorage.setItem(cacheKey, data.message);
         }
       })
-      .catch((err) => {
-        console.warn('Erreur API greeting:', err?.message || 'Erreur inconnue');
-        // Garde la valeur par défaut en cas d'erreur
-      });
+      .catch(() => {});
   }, []);
 
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Hero section */}
+      {/* Hero */}
       <section className="relative bg-gradient-to-br from-industria-gray-light to-white py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -71,15 +89,15 @@ export default function Home() {
               {welcome || 'Bienvenue sur Industria'}
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-              Découvrez et réservez des zones industrielles, parcs logistiques et zones franches à travers le Maroc. 
-              Votre partenaire de confiance pour l'implantation industrielle.
+              Découvrez et réservez des zones industrielles, parcs logistiques et zones franches à travers le Maroc.
+              Votre partenaire de confiance pour l&apos;implantation industrielle.
             </p>
             <SearchBar />
           </div>
         </div>
       </section>
 
-      {/* Section de la carte interactive */}
+      {/* Map / Grid */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between mb-12">
@@ -88,46 +106,57 @@ export default function Home() {
                 Explorez nos zones industrielles
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl">
-                Découvrez l'emplacement de toutes nos zones industrielles et les centres d'intérêt stratégiques du Maroc
+                Découvrez l&apos;emplacement de toutes nos zones industrielles et les centres d&apos;intérêt stratégiques du Maroc
               </p>
             </div>
-            
-            <ViewToggle 
+
+            <ViewToggle
               currentView={viewMode}
               onViewChange={setViewMode}
               className="flex-shrink-0"
             />
           </div>
-          
-          {viewMode === 'map' ? (
-            <Suspense fallback={
-              <div className="relative overflow-hidden" style={{ height: 500 }}>
-                <div className="absolute inset-0 bg-gray-100 flex items-center justify-center rounded-lg">
-                  <div className="text-center space-y-4">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto"></div>
-                    <p className="text-gray-600 font-medium">Chargement de la carte...</p>
-                    <p className="text-sm text-gray-500 mt-2">Localisation des zones et centres d'intérêt</p>
+
+          <div className="relative">
+            {/* Keep map mounted after the first time, give it real height */}
+            <div className={viewMode === 'map' ? 'block' : 'hidden'} aria-hidden={viewMode !== 'map'}>
+              <div className="h-[600px]">
+                <Suspense
+                  fallback={
+                    <div className="relative overflow-hidden h-[600px]">
+                      <div className="absolute inset-0 bg-gray-100 flex items-center justify-center rounded-lg">
+                        <div className="text-center space-y-4">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto"></div>
+                          <p className="text-gray-600 font-medium">Chargement de la carte...</p>
+                          <p className="text-sm text-gray-500 mt-2">Localisation des zones et centres d&apos;intérêt</p>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                >
+                  {mapEverShown ? <HomeMapView /> : null}
+                </Suspense>
+              </div>
+            </div>
+
+            <div className={viewMode === 'map' ? 'hidden' : 'block'} aria-hidden={viewMode === 'map'}>
+              <Suspense
+                fallback={
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto mb-4"></div>
+                    <p className="text-gray-600 font-medium">Chargement des zones industrielles...</p>
+                    <p className="text-sm text-gray-500 mt-2">Recherche des meilleures opportunités pour vous</p>
                   </div>
-                </div>
-              </div>
-            }>
-              <HomeMapView />
-            </Suspense>
-          ) : (
-            <Suspense fallback={
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Chargement des zones industrielles...</p>
-                <p className="text-sm text-gray-500 mt-2">Recherche des meilleures opportunités pour vous</p>
-              </div>
-            }>
-              <ZoneGrid />
-            </Suspense>
-          )}
+                }
+              >
+                <ZoneGrid />
+              </Suspense>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Section d'appel à l'action */}
+      {/* CTA section */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8 mb-16">
@@ -162,8 +191,7 @@ export default function Home() {
         </div>
       </section>
 
-
-      {/* Section avantages */}
+      {/* Benefits section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -174,7 +202,7 @@ export default function Home() {
               Notre expertise au service de votre réussite industrielle
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="w-12 h-12 bg-industria-gray-light rounded-lg flex items-center justify-center mx-auto mb-4">

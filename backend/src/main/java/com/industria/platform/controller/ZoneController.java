@@ -9,6 +9,7 @@ import com.industria.platform.service.GeometryUpdateService;
 import com.industria.platform.service.PermissionService;
 import com.industria.platform.service.UserService;
 import com.industria.platform.service.PostGISGeometryService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -113,10 +114,11 @@ public class ZoneController {
             return ResponseEntity.status(403).build(); // Forbidden
         }
         
-        Zone z = zoneRepository.findById(id).orElseThrow();
-        updateEntity(z, dto);
-        zoneRepository.save(z);
-        return ResponseEntity.ok(toDto(z));
+        Zone zone = zoneRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Zone not found with id: " + id));
+        updateEntity(zone, dto);
+        zoneRepository.save(zone);
+        return ResponseEntity.ok(toDto(zone));
     }
 
     @DeleteMapping("/{id}")
