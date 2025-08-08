@@ -299,7 +299,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
       <MapContainer
         key={`map-${zone.id}-${zone.vertices?.length || 0}-${isMapReady}`}
         center={center}
-        zoom={16}
+        zoom={11} /* Réduit de 30% : 16 - (16 × 30%) ≈ 11 */
         style={{ height: "100%", width: "100%" }}
         whenCreated={(m) => {
           mapRef.current = m;

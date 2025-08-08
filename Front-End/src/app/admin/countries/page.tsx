@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 
 interface Country {
@@ -134,9 +135,11 @@ export default function CountriesAdmin() {
                   <td className="p-2 align-top">{c.code}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(c)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(c.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={c.name}
+                      onConfirm={() => del(c.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer le pays "${c.name}" ? Cette action est irréversible et supprimera toutes les associations existantes.`}
+                    />
                   </td>
                 </tr>
               ))}

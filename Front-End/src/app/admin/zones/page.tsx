@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import {
   Select,
   SelectTrigger,
@@ -121,9 +122,11 @@ const ZoneTableRow = memo(({
       </td>
       <td className="p-2 space-x-2 whitespace-nowrap">
         <Button size="sm" onClick={() => onEdit(zone)}>Éditer</Button>
-        <Button size="sm" variant="destructive" onClick={() => onDelete(zone.id)}>
-          Supprimer
-        </Button>
+        <DeleteConfirmDialog
+          itemName={zone.name}
+          onConfirm={() => onDelete(zone.id)}
+          description={`Êtes-vous sûr de vouloir supprimer la zone "${zone.name}" ? Cette action est irréversible et supprimera toutes les parcelles, images et associations liées.`}
+        />
       </td>
     </tr>
   )

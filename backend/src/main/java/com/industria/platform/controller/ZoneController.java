@@ -210,13 +210,33 @@ public class ZoneController {
         }
         
         Zone zone = zoneRepository.findById(id).orElse(null);
-        zoneRepository.deleteById(id);
+        if (zone == null) {
+            return ResponseEntity.notFound().build();
+        }
         
-        auditService.log(AuditAction.DELETE, "Zone", id, 
-            zone, null, 
-            "Suppression de la zone: " + (zone != null ? zone.getName() : id));
-        
-        return ResponseEntity.ok().build();
+        try {
+            // Nettoyer manuellement les relations zone_activities et zone_amenities
+            // car elles n'ont pas de cascade delete
+            if (zone.getActivities() != null && !zone.getActivities().isEmpty()) {
+                zoneActivityRepository.deleteAll(zone.getActivities());
+            }
+            if (zone.getAmenities() != null && !zone.getAmenities().isEmpty()) {
+                zoneAmenityRepository.deleteAll(zone.getAmenities());
+            }
+            
+            // Les parcels, images ont cascade=ALL donc seront supprimées automatiquement
+            zoneRepository.deleteById(id);
+            
+            auditService.log(AuditAction.DELETE, "Zone", id, 
+                zone, null, 
+                "Suppression de la zone: " + zone.getName());
+            
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            System.err.println("Erreur lors de la suppression de la zone " + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     private ZoneDto toDto(Zone z) {

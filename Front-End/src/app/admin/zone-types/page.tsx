@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 
 interface ZoneType {
@@ -145,9 +146,11 @@ export default function ZoneTypesAdmin() {
                   <td className="p-2 align-top">{t.name}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(t)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(t.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={t.name}
+                      onConfirm={() => del(t.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer le type de zone "${t.name}" ? Cette action est irréversible et supprimera toutes les zones de ce type.`}
+                    />
                   </td>
                 </tr>
               ))}

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 import {
   Select,
@@ -211,9 +212,11 @@ export default function UsersAdmin() {
                   <td className="p-2 align-top">{u.zoneCount ?? 0}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(u)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(u.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={u.email}
+                      onConfirm={() => del(u.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer l'utilisateur "${u.email}" ? Cette action est irréversible et supprimera tous les rendez-vous et associations liés.`}
+                    />
                   </td>
                 </tr>
               ))}

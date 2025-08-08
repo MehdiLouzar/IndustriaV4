@@ -4,7 +4,7 @@
 .zone-popup .leaflet-popup-content {
   margin: 0;
   padding: 0;
-  width: 400px !important;
+  width: 456px !important; /* 380px + 20% = 456px */
 }
 
 .zone-popup .leaflet-popup-content-wrapper {

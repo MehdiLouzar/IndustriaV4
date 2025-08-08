@@ -11,6 +11,12 @@ public record ZoneSimplifiedFeatureDto(
         String name,
         String status,
         int availableParcels,
+        Integer totalParcels,
         List<String> activityIcons,
-        List<String> amenityIcons
+        List<String> amenityIcons,
+        String description,
+        String location,
+        String area,
+        String price,
+        String type
 ) {}

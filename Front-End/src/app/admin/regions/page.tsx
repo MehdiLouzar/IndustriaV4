@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
@@ -165,9 +166,11 @@ export default function RegionsAdmin() {
                   <td className="p-2 align-top">{r.countryId}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(r)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(r.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={r.name}
+                      onConfirm={() => del(r.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer la région "${r.name}" ? Cette action est irréversible et supprimera toutes les zones associées.`}
+                    />
                   </td>
                 </tr>
               ))}

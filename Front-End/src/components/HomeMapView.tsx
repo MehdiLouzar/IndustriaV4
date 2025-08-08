@@ -294,62 +294,58 @@ export default function HomeMapView() {
   const ZoneMarker = React.memo(function ZoneMarker({ zone }: { zone: ZoneFeature }) {
     return (
       <Marker position={zone.centroid} icon={ICONS.zone}>
-        <Popup maxWidth={400} className="zone-popup" closeButton={false}>
-          {/* Carte complète avec style ZoneCard */}
+        <Popup maxWidth={456} className="zone-popup" closeButton={false}>
+          {/* Popup de zone avec contenu spécifique */}
           <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200 m-0">
-            {/* Header avec image/placeholder */}
-            <div className="relative h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-              <Factory className="w-8 h-8 text-gray-400" />
-              
-              {/* Badge de statut */}
-              <div className="absolute top-2 left-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(zone.properties.status)}`}>
+            {/* Contenu de la popup */}
+            <div className="p-4 space-y-3">
+              {/* 1. Nom de la zone (titre en gras) */}
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-bold text-lg leading-tight text-gray-900 flex-1">
+                  {zone.properties.name}
+                </h3>
+                {/* 2. Badge de statut coloré */}
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusColor(zone.properties.status)}`}>
                   {STATUS_LABELS[zone.properties.status] || zone.properties.status}
                 </span>
               </div>
-            </div>
-            
-            {/* Contenu de la carte */}
-            <div className="p-3 space-y-3">
-              {/* Titre et description */}
-              <div>
-                <h3 className="font-bold text-lg leading-tight text-gray-900 hover:text-industria-brown-gold transition-colors mb-1">
-                  {zone.properties.name}
-                </h3>
+
+              {/* 3. Courte description */}
+              {zone.properties.description && (
                 <p className="text-sm text-gray-600 line-clamp-2">
                   {zone.properties.description}
                 </p>
-              </div>
+              )}
 
-              {/* Informations détaillées */}
-              <div className="space-y-2">
-                {/* Location */}
+              {/* Informations organisées */}
+              <div className="space-y-2 text-sm">
+                {/* 4. Localisation (ville ou région) */}
                 {zone.properties.location && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
-                    <span className="truncate">{zone.properties.location}</span>
+                    <span>{zone.properties.location}</span>
                   </div>
                 )}
                 
-                {/* Area */}
+                {/* 5. Superficie */}
                 {zone.properties.area && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-gray-700">
                     <Ruler className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
                     <span>{zone.properties.area}</span>
                   </div>
                 )}
                 
-                {/* Zone Type */}
+                {/* 6. Type de zone */}
                 {zone.properties.type && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Factory className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
-                    <span className="truncate">{zone.properties.type}</span>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Building2 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+                    <span>{zone.properties.type}</span>
                   </div>
                 )}
                 
-                {/* Parcel information */}
+                {/* 7. Parcelles disponibles / totales */}
                 {(zone.properties.totalParcels !== undefined && zone.properties.availableParcels !== undefined) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-gray-700">
                     <Grid3X3 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
                     <span>
                       {zone.properties.availableParcels} / {zone.properties.totalParcels} parcelles disponibles
@@ -358,14 +354,17 @@ export default function HomeMapView() {
                 )}
               </div>
 
-              {/* Prix */}
+              {/* 8. Prix (s'il est fourni) */}
               {zone.properties.price && (
-                <div className="pt-2 border-t border-gray-200">
-                  <p className="font-semibold text-gray-900">{zone.properties.price}</p>
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-industria-brown-gold" />
+                    <span className="font-semibold text-gray-900">{zone.properties.price}</span>
+                  </div>
                 </div>
               )}
 
-              {/* Boutons d'action */}
+              {/* 9. Boutons d'action */}
               <div className="flex gap-2 pt-2">
                 {zone.properties.id.startsWith('demo-') ||
                 zone.properties.id.startsWith('fallback-') ? (

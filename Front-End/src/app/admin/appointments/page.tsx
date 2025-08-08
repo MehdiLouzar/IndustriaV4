@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 import {
   Select,
@@ -241,9 +242,11 @@ export default function AppointmentsAdmin() {
                   <td className="p-2 align-top">{a.parcelId}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(a)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(a.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={`Rendez-vous du ${new Date(a.appointmentDate).toLocaleDateString()}`}
+                      onConfirm={() => del(a.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer ce rendez-vous ? Cette action est irréversible.`}
+                    />
                   </td>
                 </tr>
               ))}

@@ -104,21 +104,61 @@ public class MapController {
                 );
                 
                 try {
-                    int parcelCount = parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE);
+                    int availableParcels = parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE);
+                    int totalParcels = parcelRepository.countByZoneId(z.getId());
+                    
+                    // Get activity icons
+                    List<String> activityIcons = z.getActivities() != null ? 
+                        z.getActivities().stream()
+                            .map(za -> za.getActivity().getIcon())
+                            .filter(Objects::nonNull)
+                            .toList() : 
+                        List.of();
+                    
+                    // Get amenity icons
+                    List<String> amenityIcons = z.getAmenities() != null ? 
+                        z.getAmenities().stream()
+                            .map(za -> za.getAmenity().getIcon())
+                            .filter(Objects::nonNull)
+                            .toList() : 
+                        List.of();
+                    
+                    // Format area
+                    String formattedArea = z.getTotalArea() != null ? 
+                        String.format("%.0f m²", z.getTotalArea()) : null;
+                    
+                    // Format price
+                    String formattedPrice = z.getPrice() != null ? 
+                        String.format("%.0f DH/m²", z.getPrice()) : null;
+                    
+                    // Get zone type
+                    String zoneType = z.getZoneType() != null ? z.getZoneType().getName() : null;
+                    
+                    // Use address as location, fallback to region
+                    String location = z.getAddress();
+                    if ((location == null || location.trim().isEmpty()) && z.getRegion() != null) {
+                        location = z.getRegion().getName();
+                    }
                     
                     ZoneSimplifiedFeatureDto feature = new ZoneSimplifiedFeatureDto(
                         coords,
                         z.getId(),
                         z.getName(),
                         z.getStatus().name(),
-                        parcelCount,
-                        List.of(), // Empty activities for now
-                        List.of()  // Empty amenities for now
+                        availableParcels,
+                        totalParcels,
+                        activityIcons,
+                        amenityIcons,
+                        z.getDescription(),
+                        location,
+                        formattedArea,
+                        formattedPrice,
+                        zoneType
                     );
                     
                     features.add(feature);
                 } catch (Exception e) {
-                    // Skip problematic zones
+                    logger.warn("Skipping zone {} due to error: {}", z.getId(), e.getMessage());
                 }
             }
         }
@@ -183,14 +223,56 @@ public class MapController {
                     continue; // Skip this zone
                 }
                 
+                int availableParcels = parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE);
+                int totalParcels = parcelRepository.countByZoneId(z.getId());
+                
+                // Get activity icons
+                List<String> activityIcons = z.getActivities() != null ? 
+                    z.getActivities().stream()
+                        .map(za -> za.getActivity().getIcon())
+                        .filter(Objects::nonNull)
+                        .toList() : 
+                    List.of();
+                
+                // Get amenity icons
+                List<String> amenityIcons = z.getAmenities() != null ? 
+                    z.getAmenities().stream()
+                        .map(za -> za.getAmenity().getIcon())
+                        .filter(Objects::nonNull)
+                        .toList() : 
+                    List.of();
+                
+                // Format area
+                String formattedArea = z.getTotalArea() != null ? 
+                    String.format("%.0f m²", z.getTotalArea()) : null;
+                
+                // Format price
+                String formattedPrice = z.getPrice() != null ? 
+                    String.format("%.0f DH/m²", z.getPrice()) : null;
+                
+                // Get zone type
+                String zoneType = z.getZoneType() != null ? z.getZoneType().getName() : null;
+                
+                // Use address as location, fallback to region
+                String location = z.getAddress();
+                if ((location == null || location.trim().isEmpty()) && z.getRegion() != null) {
+                    location = z.getRegion().getName();
+                }
+                
                 ZoneSimplifiedFeatureDto feature = new ZoneSimplifiedFeatureDto(
                         coords,
                         z.getId(),
                         z.getName(),
                         z.getStatus().name(),
-                        parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE),
-                        z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getIcon()).filter(Objects::nonNull).toList(),
-                        z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getIcon()).filter(Objects::nonNull).toList()
+                        availableParcels,
+                        totalParcels,
+                        activityIcons,
+                        amenityIcons,
+                        z.getDescription(),
+                        location,
+                        formattedArea,
+                        formattedPrice,
+                        zoneType
                 );
                 
                 result.add(feature);
