@@ -12,6 +12,12 @@ public interface ParcelRepository extends JpaRepository<Parcel, String> {
     Set<Parcel> findByZoneId(String zoneId);
 
     Page<Parcel> findByZoneId(String zoneId, Pageable pageable);
+    
+    Page<Parcel> findByReferenceContainingIgnoreCase(String reference, Pageable pageable);
 
+    int countByZoneId(String zoneId);
+    
     int countByZoneIdAndStatus(String zoneId, ParcelStatus status);
+    
+    long countByStatus(ParcelStatus status);
 }

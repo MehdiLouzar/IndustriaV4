@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 import {
   Select,
@@ -41,6 +42,8 @@ export default function AppointmentsAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Appointment[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [parcels, setParcels] = useState<ParcelDto[]>([])
@@ -56,17 +59,56 @@ export default function AppointmentsAdmin() {
     status: 'PENDING',
   })
 
-  async function load() {
-    const a = await fetchApi<ListResponse<Appointment>>('/api/appointments').catch(() => null)
-    if (a) {
-      const arr = Array.isArray(a.items) ? a.items : []
-      setItems(arr)
+  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
+    const response = await fetchApi<ListResponse<Appointment>>(
+      `/api/appointments?${params.toString()}`
+    ).catch(() => null)
+    
+    if (response && Array.isArray(response.items)) {
+      setItems(response.items)
+      setTotalPages(response.totalPages ?? 1)
+      setCurrentPage(response.page ?? 1)
+    } else if (Array.isArray(response)) {
+      setItems(response as Appointment[])
+      setTotalPages(1)
       setCurrentPage(1)
     } else {
       setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
     }
-  }
-  useEffect(() => { load() }, [])
+  }, [currentPage, itemsPerPage, searchTerm])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+    }
+    load(currentPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, router])
+
+  // Effet pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      load(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, load])
 
   useEffect(() => {
     fetchApi<ListResponse<ParcelDto>>("/api/parcels/all")
@@ -130,7 +172,7 @@ export default function AppointmentsAdmin() {
       status: 'PENDING',
     })
     setOpen(false)
-    load()
+    load(currentPage)
   }
 
   function edit(it: Appointment) {
@@ -149,7 +191,7 @@ export default function AppointmentsAdmin() {
   }
   async function del(id: string) {
     await fetchApi(`/api/appointments/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }
 
   function addNew() {
@@ -169,9 +211,17 @@ export default function AppointmentsAdmin() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">Rendez-vous</h1>
-        <Button onClick={addNew}>Ajouter</Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher par contact, email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={addNew}>Ajouter</Button>
+        </div>
       </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -185,18 +235,18 @@ export default function AppointmentsAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(Array.isArray(items) ? items : [])
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((a) => (
+              {(Array.isArray(items) ? items : []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{a.contactName}</td>
                   <td className="p-2 align-top">{a.status}</td>
                   <td className="p-2 align-top">{a.parcelId}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(a)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(a.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={`Rendez-vous du ${new Date(a.appointmentDate).toLocaleDateString()}`}
+                      onConfirm={() => del(a.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer ce rendez-vous ? Cette action est irréversible.`}
+                    />
                   </td>
                 </tr>
               ))}
@@ -205,12 +255,14 @@ export default function AppointmentsAdmin() {
         </CardContent>
       </Card>
 
-      <Pagination
-        totalItems={Array.isArray(items) ? items.length : 0}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          totalItems={totalPages * itemsPerPage}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

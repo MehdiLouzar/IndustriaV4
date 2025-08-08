@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { fetchApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import {
   Select,
   SelectTrigger,
@@ -104,9 +105,11 @@ const ParcelTableRow = memo(({
       </td>
       <td className="p-2 space-x-2 whitespace-nowrap">
         <Button size="sm" onClick={() => onEdit(parcel)}>Éditer</Button>
-        <Button size="sm" variant="destructive" onClick={() => onDelete(parcel.id)}>
-          Supprimer
-        </Button>
+        <DeleteConfirmDialog
+          itemName={parcel.reference}
+          onConfirm={() => onDelete(parcel.id)}
+          description={`Êtes-vous sûr de vouloir supprimer la parcelle "${parcel.reference}" ? Cette action est irréversible et supprimera tous les rendez-vous et images associés.`}
+        />
       </td>
     </tr>
   )
@@ -119,10 +122,9 @@ ParcelTableRow.displayName = 'ParcelTableRow'
 export default function ParcelsAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Parcel[]>([])
-  const [allParcels, setAllParcels] = useState<Parcel[]>([])
-  const [selectedParcelId, setSelectedParcelId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [zones, setZones] = useState<ZoneDto[]>([])
@@ -159,9 +161,18 @@ export default function ParcelsAdmin() {
     }
   }, [])
 
-  const load = useCallback(async (page = currentPage) => {
+  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
     const p = await fetchApi<ListResponse<Parcel>>(
-      `/api/parcels?page=${page}&limit=${itemsPerPage}`
+      `/api/parcels?${params.toString()}`
     ).catch(() => null)
     if (p) {
       const arr = Array.isArray(p.items) ? p.items : []
@@ -171,32 +182,32 @@ export default function ParcelsAdmin() {
     } else {
       setItems([])
     }
-  }, [currentPage, itemsPerPage])
+  }, [currentPage, itemsPerPage, searchTerm])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
 
+  // Effet pour la recherche
   useEffect(() => {
-    fetchApi<ListResponse<Parcel>>("/api/parcels/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
-        }
-        setAllParcels(arr)
-      })
-      .catch(() => setAllParcels([]))
-  }, [])
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      load(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, load])
+
 
   useEffect(() => {
-    fetchApi<ListResponse<ZoneDto>>("/api/zones/all")
+    fetchApi<ZoneDto[]>("/api/zones/all")
       .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
-        }
+        const arr = Array.isArray(data) ? data : []
         setZones(arr)
+        console.log('Zones chargées:', arr.length)
       })
-      .catch(() => setZones([]))
+      .catch((error) => {
+        console.error('Erreur lors du chargement des zones:', error)
+        setZones([])
+      })
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,9 +353,17 @@ export default function ParcelsAdmin() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">Parcelles</h1>
-        <Button onClick={addNew}>Ajouter</Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher par référence..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={addNew}>Ajouter</Button>
+        </div>
       </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -373,30 +392,14 @@ export default function ParcelsAdmin() {
         </CardContent>
       </Card>
 
-      <Select
-        value={selectedParcelId || undefined}
-        onValueChange={(value) => setSelectedParcelId(value)}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="-- Sélectionnez une parcelle --" />
-        </SelectTrigger>
-        <SelectContent>
-          {(Array.isArray(allParcels) ? allParcels : [])
-            .filter((parcel) => parcel.id && String(parcel.id).trim() !== "")
-            .map((parcel) => (
-              <SelectItem key={parcel.id} value={String(parcel.id)}>
-                {parcel.reference}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-
-      <Pagination
-        totalItems={totalPages * itemsPerPage}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          totalItems={totalPages * itemsPerPage}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -452,15 +455,26 @@ export default function ParcelsAdmin() {
                   <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Array.isArray(zones) ? zones : [])
-                    .filter((z) => z.id && String(z.id).trim() !== "")
-                    .map((z) => (
-                      <SelectItem key={z.id} value={String(z.id)}>
-                        {z.name}
-                      </SelectItem>
-                    ))}
+                  {zones.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      Aucune zone disponible
+                    </SelectItem>
+                  ) : (
+                    zones
+                      .filter((z) => z.id && String(z.id).trim() !== "")
+                      .map((z) => (
+                        <SelectItem key={z.id} value={String(z.id)}>
+                          {z.name}
+                        </SelectItem>
+                      ))
+                  )}
                 </SelectContent>
               </Select>
+              {zones.length === 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {zones.length === 0 ? 'Chargement des zones...' : `${zones.length} zones disponibles`}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="status">Statut</Label>

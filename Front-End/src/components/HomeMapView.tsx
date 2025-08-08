@@ -24,7 +24,7 @@ import '@/styles/map.css'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-import { TrainFront, Ship, Plane, MapPin } from 'lucide-react'
+import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye } from 'lucide-react'
 import type { FeatureCollection } from 'geojson'
 
 import DynamicIcon from '@/components/DynamicIcon'
@@ -45,12 +45,14 @@ type ZoneFeature = {
     name: string
     status: string
     availableParcels: number
+    totalParcels?: number
     activityIcons: string[]
     amenityIcons: string[]
     description?: string
     price?: string
     area?: string
     location?: string
+    type?: string
   }
 }
 
@@ -60,12 +62,14 @@ type ZoneFeatureResp = {
   name: string
   status: string
   availableParcels: number
+  totalParcels?: number
   activityIcons: string[]
   amenityIcons: string[]
   description?: string
   price?: string
   area?: string
   location?: string
+  type?: string
 }
 
 type Poi = {
@@ -155,12 +159,14 @@ const FALLBACK_ZONES: ZoneFeature[] = [
       name: 'Zone Demo Casablanca',
       status: 'LIBRE',
       availableParcels: 5,
+      totalParcels: 10,
       activityIcons: ['Factory'],
       amenityIcons: ['Zap'],
-      description: 'Zone de démonstration',
+      description: 'Zone de démonstration avec toutes les commodités nécessaires pour votre activité industrielle',
       price: '2 500 DH/m²',
       area: '10 000 m²',
       location: 'Casablanca',
+      type: 'Zone Privée',
     },
   },
   {
@@ -176,12 +182,14 @@ const FALLBACK_ZONES: ZoneFeature[] = [
       name: 'Zone Demo Rabat',
       status: 'LIBRE',
       availableParcels: 3,
+      totalParcels: 8,
       activityIcons: ['Cpu'],
       amenityIcons: ['Wifi'],
-      description: 'Zone technologique',
+      description: 'Zone technologique moderne dédiée à l\'innovation avec infrastructures de pointe',
       price: '3 000 DH/m²',
       area: '8 000 m²',
       location: 'Rabat',
+      type: 'Parc Technologique',
     },
   },
 ]
@@ -239,12 +247,18 @@ export default function HomeMapView() {
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       }),
-      // Icône pour le centre d'une zone (simple pin bronze)
+      // Icône pour le centre d'une zone (pin plus grand avec icône)
       zone: L.divIcon({
-        html: '<div class="w-3 h-3 rounded-full bg-[#B1936D] shadow-lg"></div>',
+        html: renderToStaticMarkup(
+          <div className="relative">
+            <div className="w-7 h-7 rounded-full bg-industria-brown-gold border-2 border-white shadow-lg flex items-center justify-center">
+              <MapPin width={16} height={16} stroke="white" fill="white" />
+            </div>
+          </div>
+        ),
         className: '',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       }),
     } as const
   }, [])
@@ -253,98 +267,131 @@ export default function HomeMapView() {
    *  Composants internes  *
    *************************/
 
+  /** Fonction pour obtenir la couleur du statut */
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Disponible':
+      case 'LIBRE':
+        return 'bg-green-100 text-green-800'
+      case 'Occupé':
+      case 'OCCUPE':
+        return 'bg-industria-gray-light text-industria-brown-gold'
+      case 'Réservé':
+      case 'RESERVE':
+        return 'bg-orange-100 text-orange-800'
+      case 'VENDU':
+        return 'bg-red-100 text-red-800'
+      case 'INDISPONIBLE':
+        return 'bg-gray-100 text-gray-800'
+      case 'DEVELOPPEMENT':
+        return 'bg-blue-100 text-blue-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
   /** Marqueur d'une zone */
   const ZoneMarker = React.memo(function ZoneMarker({ zone }: { zone: ZoneFeature }) {
     return (
       <Marker position={zone.centroid} icon={ICONS.zone}>
-        <Popup maxWidth={300} className="zone-popup">
-          <div className="space-y-3 p-2">
-            <div>
-              <h3 className="font-bold text-lg text-gray-900 mb-1">
-                {zone.properties.name}
-              </h3>
-              <p className="text-sm text-gray-600 line-clamp-2">
-                {zone.properties.description}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <MapPin className="w-4 h-4 text-industria-brown-gold" />
-                <span className="text-gray-600">{zone.properties.location}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium">Statut:</span>
-                <span
-                  className={`ml-1 font-semibold ${
-                    STATUS_COLORS[zone.properties.status] || 'text-gray-600'
-                  }`}
-                >
+        <Popup maxWidth={456} className="zone-popup" closeButton={false}>
+          {/* Popup de zone avec contenu spécifique */}
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200 m-0">
+            {/* Contenu de la popup */}
+            <div className="p-4 space-y-3">
+              {/* 1. Nom de la zone (titre en gras) */}
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-bold text-lg leading-tight text-gray-900 flex-1">
+                  {zone.properties.name}
+                </h3>
+                {/* 2. Badge de statut coloré */}
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusColor(zone.properties.status)}`}>
                   {STATUS_LABELS[zone.properties.status] || zone.properties.status}
                 </span>
               </div>
-              <div>
-                <span className="font-medium">Parcelles:</span>
-                <span className="ml-1 text-gray-700">
-                  {zone.properties.availableParcels}
-                </span>
-              </div>
-              {zone.properties.area && (
-                <div>
-                  <span className="font-medium">Surface:</span>
-                  <span className="ml-1 text-gray-700">{zone.properties.area}</span>
-                </div>
+
+              {/* 3. Courte description */}
+              {zone.properties.description && (
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {zone.properties.description}
+                </p>
               )}
+
+              {/* Informations organisées */}
+              <div className="space-y-2 text-sm">
+                {/* 4. Localisation (ville ou région) */}
+                {zone.properties.location && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <MapPin className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+                    <span>{zone.properties.location}</span>
+                  </div>
+                )}
+                
+                {/* 5. Superficie */}
+                {zone.properties.area && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Ruler className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+                    <span>{zone.properties.area}</span>
+                  </div>
+                )}
+                
+                {/* 6. Type de zone */}
+                {zone.properties.type && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Building2 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+                    <span>{zone.properties.type}</span>
+                  </div>
+                )}
+                
+                {/* 7. Parcelles disponibles / totales */}
+                {(zone.properties.totalParcels !== undefined && zone.properties.availableParcels !== undefined) && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Grid3X3 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+                    <span>
+                      {zone.properties.availableParcels} / {zone.properties.totalParcels} parcelles disponibles
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* 8. Prix (s'il est fourni) */}
               {zone.properties.price && (
-                <div>
-                  <span className="font-medium">Prix:</span>
-                  <span className="ml-1 text-gray-700">{zone.properties.price}</span>
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-industria-brown-gold" />
+                    <span className="font-semibold text-gray-900">{zone.properties.price}</span>
+                  </div>
                 </div>
               )}
-            </div>
 
-            {(zone.properties.activityIcons.length > 0 ||
-              zone.properties.amenityIcons.length > 0) && (
-              <div className="flex flex-wrap gap-2">
-                {zone.properties.activityIcons.map((icon, i) => (
-                  <DynamicIcon
-                    key={`activity-${i}`}
-                    name={icon}
-                    className="w-5 h-5 text-industria-brown-gold"
-                  />
-                ))}
-                {zone.properties.amenityIcons.map((icon, i) => (
-                  <DynamicIcon
-                    key={`amenity-${i}`}
-                    name={icon}
-                    className="w-5 h-5 text-industria-olive-light"
-                  />
-                ))}
+              {/* 9. Boutons d'action */}
+              <div className="flex gap-2 pt-2">
+                {zone.properties.id.startsWith('demo-') ||
+                zone.properties.id.startsWith('fallback-') ? (
+                  <Button size="sm" className="flex-1 bg-gray-400 text-white cursor-not-allowed" disabled>
+                    <Eye className="w-4 h-4 mr-1" /> Démonstration
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white"
+                    >
+                      <Link href={`/zones/${zone.properties.id}`}>
+                        <Eye className="w-4 h-4 mr-1" /> Voir
+                      </Link>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold"
+                    >
+                      <Phone className="w-4 h-4 mr-1" /> Contact
+                    </Button>
+                  </>
+                )}
               </div>
-            )}
-
-            <div className="flex gap-2 pt-2 border-t">
-              {zone.properties.id.startsWith('demo-') ||
-              zone.properties.id.startsWith('fallback-') ? (
-                <Button
-                  size="sm"
-                  className="flex-1 bg-gray-400 text-white cursor-not-allowed"
-                  disabled
-                >
-                  Zone de démonstration
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  size="sm"
-                  className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white"
-                >
-                  <Link href={`/zones/${zone.properties.id}`}>Voir les détails</Link>
-                </Button>
-              )}
             </div>
           </div>
         </Popup>
@@ -417,12 +464,14 @@ const loadZones = useCallback(async (precision: number, force = false) => {
             name: f.name,
             status: f.status,
             availableParcels: f.availableParcels,
+            totalParcels: f.totalParcels,
             activityIcons: f.activityIcons || [],
             amenityIcons: f.amenityIcons || [],
             description: f.description,
             price: f.price,
             area: f.area,
             location: f.location,
+            type: f.type,
           },
         }
       })
@@ -494,8 +543,46 @@ const loadZones = useCallback(async (precision: number, force = false) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        {/* Affichage des zones avec clustering */}
-        <MarkerClusterGroup>
+        {/* Affichage des zones avec clustering personnalisé */}
+        <MarkerClusterGroup
+          iconCreateFunction={(cluster) => {
+            const count = cluster.getChildCount()
+            let size = 'small'
+            let bgColor = '#A79059' // industria-brown-gold
+            
+            if (count >= 100) {
+              size = 'large'
+              bgColor = '#8C6B2F'
+            } else if (count >= 10) {
+              size = 'medium'
+              bgColor = '#9B8B46'
+            }
+            
+            const sizeClasses = {
+              small: 'w-8 h-8 text-xs',
+              medium: 'w-10 h-10 text-sm',
+              large: 'w-12 h-12 text-base'
+            }
+            
+            return L.divIcon({
+              html: renderToStaticMarkup(
+                <div 
+                  className={`rounded-full border-2 border-white shadow-lg flex items-center justify-center font-bold text-white ${sizeClasses[size as keyof typeof sizeClasses]}`}
+                  style={{ backgroundColor: bgColor }}
+                >
+                  {count}
+                </div>
+              ),
+              className: '',
+              iconSize: size === 'large' ? [48, 48] : size === 'medium' ? [40, 40] : [32, 32],
+              iconAnchor: size === 'large' ? [24, 24] : size === 'medium' ? [20, 20] : [16, 16],
+            })
+          }}
+          maxClusterRadius={50}
+          spiderfyOnMaxZoom={true}
+          showCoverageOnHover={false}
+          zoomToBoundsOnClick={true}
+        >
           {zones.map((zone) => (
             <ZoneMarker key={`home-zone-${zone.properties.id}`} zone={zone} />
           ))}

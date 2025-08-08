@@ -55,4 +55,7 @@ public class Parcel {
 
     @OneToMany(mappedBy = "parcel")
     private Set<ParcelAmenity> amenities;
+
+    @OneToMany(mappedBy = "parcel", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ParcelImage> images;
 }

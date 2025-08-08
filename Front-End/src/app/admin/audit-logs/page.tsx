@@ -29,7 +29,7 @@ interface User {
 
 interface AuditLog {
   id: string
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'ACCESS_DENIED' | 'EXPORT' | 'IMPORT'
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'SOFT_DELETE' | 'RESTORE' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_CANCELLED' | 'APPOINTMENT_RESCHEDULED'
   entity: string
   entityId?: string
   oldValues?: string
@@ -38,6 +38,8 @@ interface AuditLog {
   ipAddress?: string
   userAgent?: string
   createdAt: string
+  userId?: string
+  userEmail?: string
   user?: User
 }
 
@@ -69,14 +71,14 @@ export default function AuditLogsAdmin() {
       ...filters
     })
     
-    const response = await fetchApi<ListResponse<AuditLog>>(
-      `/api/admin/audit-logs?${params}`
+    const response = await fetchApi<any>(
+      `/api/audit-logs?page=${page - 1}&size=${itemsPerPage}`
     ).catch(() => null)
     
-    if (response && Array.isArray(response.items)) {
-      setItems(response.items)
+    if (response && Array.isArray(response.content)) {
+      setItems(response.content)
       setTotalPages(response.totalPages ?? 1)
-      setCurrentPage(response.page ?? 1)
+      setCurrentPage((response.number ?? 0) + 1)
     } else {
       setItems([])
     }
@@ -292,7 +294,7 @@ export default function AuditLogsAdmin() {
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>
                         <span className="font-medium">Utilisateur:</span>{' '}
-                        {log.user ? `${log.user.email} (${log.user.firstName} ${log.user.lastName})` : 'Système'}
+                        {log.userEmail || (log.user ? `${log.user.email} (${log.user.firstName || ''} ${log.user.lastName || ''})`.trim() : 'Système')}
                       </p>
                       <p>
                         <span className="font-medium">Date:</span>{' '}
@@ -369,10 +371,10 @@ export default function AuditLogsAdmin() {
                 <div>
                   <Label>Utilisateur</Label>
                   <p className="text-sm">
-                    {selectedLog.user 
-                      ? `${selectedLog.user.email} (${selectedLog.user.firstName} ${selectedLog.user.lastName})`
+                    {selectedLog.userEmail || (selectedLog.user 
+                      ? `${selectedLog.user.email} (${selectedLog.user.firstName || ''} ${selectedLog.user.lastName || ''})`.trim()
                       : 'Système'
-                    }
+                    )}
                   </p>
                 </div>
                 <div>

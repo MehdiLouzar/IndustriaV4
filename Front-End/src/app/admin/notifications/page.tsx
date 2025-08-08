@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,7 @@ export default function NotificationsAdmin() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [viewMode, setViewMode] = useState(false)
@@ -78,9 +79,18 @@ export default function NotificationsAdmin() {
     templateId: ''
   })
 
-  async function loadNotifications(page = currentPage) {
+  const loadNotifications = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
     const response = await fetchApi<ListResponse<Notification>>(
-      `/api/admin/notifications?page=${page}&limit=${itemsPerPage}`
+      `/api/admin/notifications?${params.toString()}`
     ).catch(() => null)
     
     if (response && Array.isArray(response.items)) {
@@ -89,8 +99,10 @@ export default function NotificationsAdmin() {
       setCurrentPage(response.page ?? 1)
     } else {
       setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
     }
-  }
+  }, [currentPage, itemsPerPage, searchTerm])
 
   async function loadTemplates() {
     const templates = await fetchApi<NotificationTemplate[]>('/api/admin/notification-templates').catch(() => [])
@@ -107,10 +119,20 @@ export default function NotificationsAdmin() {
         return
       }
     }
-    loadNotifications()
+    loadNotifications(currentPage)
     loadTemplates()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
+
+  // Effet pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      loadNotifications(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, loadNotifications])
 
   async function save() {
     if (!form.recipientEmail.trim() || !form.subject.trim()) return
@@ -130,7 +152,7 @@ export default function NotificationsAdmin() {
     
     setOpen(false)
     resetForm()
-    loadNotifications()
+    loadNotifications(currentPage)
   }
 
   async function deleteItem(id: string) {
@@ -140,7 +162,7 @@ export default function NotificationsAdmin() {
       method: 'DELETE'
     }).catch(console.error)
     
-    loadNotifications()
+    loadNotifications(currentPage)
   }
 
   async function retryNotification(id: string) {
@@ -148,7 +170,7 @@ export default function NotificationsAdmin() {
       method: 'POST'
     }).catch(console.error)
     
-    loadNotifications()
+    loadNotifications(currentPage)
   }
 
   function resetForm() {
@@ -223,6 +245,12 @@ export default function NotificationsAdmin() {
               <p className="text-gray-600">Gestion des notifications email</p>
             </div>
             <div className="flex items-center gap-4">
+              <Input
+                placeholder="Rechercher par sujet, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
               <Button onClick={openCreate} className="header-red text-white">
                 Nouvelle Notification
               </Button>
@@ -304,11 +332,13 @@ export default function NotificationsAdmin() {
               )}
             </div>
 
-            <Pagination 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+            {totalPages > 1 && (
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

@@ -34,8 +34,52 @@ const HomeMapView = dynamic(() => import('@/components/HomeMapView'), {
   ),
 });
 
+// Composant pour gérer les paramètres de recherche avec Suspense
+function SearchParamsHandler({ onFiltersChange }: { onFiltersChange: (filters: any, hasFilters: boolean) => void }) {
+  const { useSearchParams } = require('next/navigation');
+  const searchParams = useSearchParams();
+
+  // Extraction des filtres depuis les paramètres URL
+  const searchFilters = {
+    regionId: searchParams.get('regionId') || '',
+    zoneTypeId: searchParams.get('zoneTypeId') || '',
+    status: searchParams.get('status') || '',
+    minArea: searchParams.get('minArea') || '',
+    maxArea: searchParams.get('maxArea') || '',
+    minPrice: searchParams.get('minPrice') || '',
+    maxPrice: searchParams.get('maxPrice') || '',
+  };
+
+  // Vérifier si des filtres de recherche sont actifs
+  const hasSearchFilters = Object.values(searchFilters).some(value => value !== '');
+
+  React.useEffect(() => {
+    onFiltersChange(searchFilters, hasSearchFilters);
+  }, [onFiltersChange, searchParams]);
+
+  return null;
+}
+
 export default function Home() {
   const [welcome, setWelcome] = useState('Bienvenue sur Industria');
+  const [searchFilters, setSearchFilters] = useState({
+    regionId: '',
+    zoneTypeId: '',
+    status: '',
+    minArea: '',
+    maxArea: '',
+    minPrice: '',
+    maxPrice: '',
+  });
+  const [hasSearchFilters, setHasSearchFilters] = useState(false);
+
+  const handleFiltersChange = React.useCallback((filters: any, hasFilters: boolean) => {
+    setSearchFilters(filters);
+    setHasSearchFilters(hasFilters);
+    setViewMode(hasFilters ? 'grid' : 'map');
+  }, []);
+
+  // Si des filtres de recherche sont actifs, commencer en vue grille, sinon vue carte
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
 
   // Keep the map mounted after first display to avoid remount/fetch loops
@@ -79,6 +123,9 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50">
+      <Suspense fallback={null}>
+        <SearchParamsHandler onFiltersChange={handleFiltersChange} />
+      </Suspense>
       <Header />
 
       {/* Hero */}
@@ -149,7 +196,7 @@ export default function Home() {
                   </div>
                 }
               >
-                <ZoneGrid />
+                <ZoneGrid searchFilters={searchFilters} />
               </Suspense>
             </div>
           </div>

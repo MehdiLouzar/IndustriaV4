@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 import {
   Select,
@@ -35,6 +36,8 @@ export default function UsersAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<User[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<User & { password?: string }>({
@@ -49,17 +52,55 @@ export default function UsersAdmin() {
   })
 
 
-  const load = useCallback(async () => {
-    const users = await fetchApi<ListResponse<User>>('/api/users').catch(() => null)
-    if (users) {
-      const arr = Array.isArray(users.items) ? users.items : []
-      setItems(arr)
+  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
+    const response = await fetchApi<ListResponse<User>>(
+      `/api/users?${params.toString()}`
+    ).catch(() => null)
+    
+    if (response && Array.isArray(response.items)) {
+      setItems(response.items)
+      setTotalPages(response.totalPages ?? 1)
+      setCurrentPage(response.page ?? 1)
+    } else if (Array.isArray(response)) {
+      setItems(response as User[])
+      setTotalPages(1)
       setCurrentPage(1)
     } else {
       setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
     }
-  }, [])
-  useEffect(() => { load() }, [load])
+  }, [currentPage, itemsPerPage, searchTerm])
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+    }
+    load(currentPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, router])
+
+  // Effet pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      load(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, load])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
@@ -100,7 +141,7 @@ export default function UsersAdmin() {
       password: '',
     })
     setOpen(false)
-    load()
+    load(currentPage)
   }, [form, load])
 
   const edit = useCallback((it: User) => {
@@ -118,7 +159,7 @@ export default function UsersAdmin() {
   }, [])
   const del = useCallback(async (id: string) => {
     await fetchApi(`/api/users/${id}`, { method: 'DELETE' })
-    load()
+    load(currentPage)
   }, [load])
 
   const addNew = useCallback(() => {
@@ -135,16 +176,20 @@ export default function UsersAdmin() {
     setOpen(true)
   }, [])
 
-  const paginatedItems = useMemo(
-    () => (Array.isArray(items) ? items : []).slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    [items, currentPage]
-  )
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">Utilisateurs</h1>
-        <Button onClick={addNew}>Ajouter</Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher par email, nom..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={addNew}>Ajouter</Button>
+        </div>
       </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -159,7 +204,7 @@ export default function UsersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {(Array.isArray(paginatedItems) ? paginatedItems : []).map((u) => (
+              {(Array.isArray(items) ? items : []).map((u) => (
                 <tr key={u.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{u.email}</td>
                   <td className="p-2 align-top">{u.role}</td>
@@ -167,9 +212,11 @@ export default function UsersAdmin() {
                   <td className="p-2 align-top">{u.zoneCount ?? 0}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(u)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(u.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={u.email}
+                      onConfirm={() => del(u.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer l'utilisateur "${u.email}" ? Cette action est irréversible et supprimera tous les rendez-vous et associations liés.`}
+                    />
                   </td>
                 </tr>
               ))}
@@ -178,12 +225,14 @@ export default function UsersAdmin() {
         </CardContent>
       </Card>
 
-      <Pagination
-        totalItems={Array.isArray(items) ? items.length : 0}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          totalItems={totalPages * itemsPerPage}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
