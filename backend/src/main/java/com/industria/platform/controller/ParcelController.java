@@ -2,6 +2,7 @@ package com.industria.platform.controller;
 
 import com.industria.platform.dto.ParcelDto;
 import com.industria.platform.dto.VertexDto;
+import com.industria.platform.entity.AuditAction;
 import com.industria.platform.entity.Parcel;
 import com.industria.platform.entity.ParcelStatus;
 import com.industria.platform.entity.Zone;
@@ -11,6 +12,7 @@ import com.industria.platform.service.StatusService;
 import com.industria.platform.service.GeometryUpdateService;
 import com.industria.platform.service.PermissionService;
 import com.industria.platform.service.UserService;
+import com.industria.platform.service.AuditService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,31 +33,39 @@ public class ParcelController {
     private final GeometryUpdateService geometryUpdateService;
     private final PermissionService permissionService;
     private final UserService userService;
+    private final AuditService auditService;
 
     public ParcelController(StatusService statusService,
                              ParcelRepository parcelRepository,
                              ZoneRepository zoneRepository,
                              GeometryUpdateService geometryUpdateService,
                              PermissionService permissionService,
-                             UserService userService) {
+                             UserService userService,
+                             AuditService auditService) {
         this.statusService = statusService;
         this.parcelRepository = parcelRepository;
         this.zoneRepository = zoneRepository;
         this.geometryUpdateService = geometryUpdateService;
         this.permissionService = permissionService;
         this.userService = userService;
+        this.auditService = auditService;
     }
 
     @GetMapping
     public ListResponse<ParcelDto> all(@RequestParam(required = false) String zoneId,
                                        @RequestParam(defaultValue = "1") int page,
-                                       @RequestParam(defaultValue = "10") int limit) {
+                                       @RequestParam(defaultValue = "10") int limit,
+                                       @RequestParam(required = false) String search) {
         int p = Math.max(1, page);
         int l = Math.min(Math.max(1, limit), 100);
         var pageable = PageRequest.of(p - 1, l);
-        var res = zoneId != null ?
+        
+        var res = (search != null && !search.trim().isEmpty()) 
+            ? parcelRepository.findByReferenceContainingIgnoreCase(search.trim(), pageable)
+            : (zoneId != null ?
                 parcelRepository.findByZoneId(zoneId, pageable) :
-                parcelRepository.findAll(pageable);
+                parcelRepository.findAll(pageable));
+                
         var items = res.getContent().stream().map(this::toDto).toList();
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
@@ -88,6 +98,11 @@ public class ParcelController {
         p.setCreatedBy(userService.getCurrentUser());
         
         parcelRepository.save(p);
+        
+        auditService.log(AuditAction.CREATE, "Parcel", p.getId(), 
+            null, p, 
+            "Création de la parcelle: " + p.getReference());
+        
         return toDto(p);
     }
 
@@ -98,10 +113,20 @@ public class ParcelController {
             return ResponseEntity.status(403).build(); // Forbidden
         }
         
-        Parcel p = parcelRepository.findById(id).orElseThrow();
-        updateEntity(p, dto);
-        parcelRepository.save(p);
-        return ResponseEntity.ok(toDto(p));
+        Parcel oldParcel = parcelRepository.findById(id).orElseThrow();
+        Parcel parcelClone = new Parcel();
+        parcelClone.setReference(oldParcel.getReference());
+        parcelClone.setArea(oldParcel.getArea());
+        parcelClone.setStatus(oldParcel.getStatus());
+        
+        updateEntity(oldParcel, dto);
+        parcelRepository.save(oldParcel);
+        
+        auditService.log(AuditAction.UPDATE, "Parcel", id, 
+            parcelClone, oldParcel, 
+            "Modification de la parcelle: " + oldParcel.getReference());
+        
+        return ResponseEntity.ok(toDto(oldParcel));
     }
 
     @DeleteMapping("/{id}")
@@ -111,7 +136,13 @@ public class ParcelController {
             return ResponseEntity.status(403).build(); // Forbidden
         }
         
+        Parcel parcel = parcelRepository.findById(id).orElse(null);
         parcelRepository.deleteById(id);
+        
+        auditService.log(AuditAction.DELETE, "Parcel", id, 
+            parcel, null, 
+            "Suppression de la parcelle: " + (parcel != null ? parcel.getReference() : id));
+        
         return ResponseEntity.ok().build();
     }
 
@@ -122,7 +153,14 @@ public class ParcelController {
             return ResponseEntity.status(403).build(); // Forbidden
         }
         
+        Parcel oldParcel = parcelRepository.findById(id).orElse(null);
         Parcel parcel = statusService.updateParcelStatus(id, request.status());
+        
+        auditService.log(AuditAction.UPDATE, "Parcel", id, 
+            oldParcel != null ? oldParcel.getStatus() : null, 
+            parcel.getStatus(), 
+            "Changement de statut de la parcelle: " + parcel.getReference());
+        
         return ResponseEntity.ok(parcel);
     }
 
@@ -144,18 +182,23 @@ public class ParcelController {
             p.setZone(z);
         }
         
-        // Gestion de la géométrie
+        // Préserver la géométrie existante si pas de nouveaux vertices
         if (dto.vertices() != null && !dto.vertices().isEmpty()) {
-            p.setGeometry(buildGeometry(dto.vertices()));
-            p.setSrid(4326);
-            
-            // Calculer automatiquement les coordonnées WGS84
-            geometryUpdateService.updateParcelCoordinates(p, dto.vertices());
+            String newGeometry = buildGeometry(dto.vertices());
+            if (newGeometry != null) {
+                p.setGeometry(newGeometry);
+                p.setSrid(4326);
+                
+                System.out.println("DEBUG: Vertices reçus pour parcelle: " + dto.vertices());
+                System.out.println("DEBUG: Nouvelle géométrie générée: " + newGeometry);
+                // Calculer automatiquement les coordonnées WGS84
+                geometryUpdateService.updateParcelCoordinates(p, dto.vertices());
+            } else {
+                System.out.println("DEBUG: Géométrie générée nulle, conservation de l'existante");
+            }
         } else {
-            p.setGeometry(null);
-            p.setSrid(null);
-            p.setLongitude(null);
-            p.setLatitude(null);
+            System.out.println("DEBUG: Aucun vertex fourni, conservation de la géométrie existante");
+            // Ne pas appeler geometryUpdateService pour éviter de réinitialiser les coordonnées
         }
     }
     

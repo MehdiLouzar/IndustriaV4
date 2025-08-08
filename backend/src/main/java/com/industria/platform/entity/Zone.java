@@ -64,4 +64,7 @@ public class Zone {
 
     @OneToMany(mappedBy = "zone")
     private Set<ZoneAmenity> amenities;
+
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ZoneImage> images;
 }

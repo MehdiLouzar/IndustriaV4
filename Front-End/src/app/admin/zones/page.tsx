@@ -72,6 +72,7 @@ interface ZoneForm {
   activityIds: string[]
   amenityIds: string[]
   vertices: { lambertX: string; lambertY: string }[]
+  verticesModified: boolean  // Flag pour savoir si les coordonnées ont été modifiées
 }
 
 // Composant mémorisé pour les lignes de la table des zones
@@ -135,9 +136,9 @@ ZoneTableRow.displayName = 'ZoneTableRow'
 export default function ZonesAdmin() {
   const router = useRouter()
   const [zones, setZones] = useState<Zone[]>([])
-  const [allZones, setAllZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
@@ -159,6 +160,7 @@ export default function ZonesAdmin() {
     activityIds: [],
     amenityIds: [],
     vertices: [],
+    verticesModified: false,
   })
   const [images, setImages] = useState<{ file: File; url: string; description?: string; isPrimary?: boolean }[]>([])
   const [existingImages, setExistingImages] = useState<Array<{
@@ -169,7 +171,6 @@ export default function ZonesAdmin() {
     isPrimary: boolean;
     displayOrder: number;
   }>>([])
-  const [selectedZoneId, setSelectedZoneId] = useState('')
 
   // Fonction pour récupérer les coordonnées pré-calculées d'une zone
   const getZoneCoordinates = useCallback((zone: Zone) => {
@@ -193,9 +194,18 @@ export default function ZonesAdmin() {
     }
   }, [])
 
-  const loadZones = useCallback(async (page = currentPage) => {
+  const loadZones = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
     const response = await fetchApi<ListResponse<Zone>>(
-      `/api/zones?page=${page}&limit=${itemsPerPage}`
+      `/api/zones?${params.toString()}`
     ).catch(() => null)
     let zonesData: Zone[] = []
     if (response && Array.isArray(response.items)) {
@@ -208,7 +218,7 @@ export default function ZonesAdmin() {
     setZones(zonesData)
     setTotalPages(response?.totalPages ?? 1)
     setCurrentPage(response?.page ?? 1)
-  }, [currentPage, itemsPerPage])
+  }, [currentPage, itemsPerPage, searchTerm])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -222,21 +232,16 @@ export default function ZonesAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
 
+  // Effet pour la recherche
   useEffect(() => {
-    fetchApi<ListResponse<Zone>>('/api/zones/all')
-      .then((response) => {
-        let arr: Zone[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as Zone[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setAllZones(arr)
-      })
-      .catch(() => setAllZones([]))
-  }, [])
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      loadZones(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, loadZones])
+
 
   useEffect(() => {
     fetchApi<{ id: string; name: string }[]>('/api/zone-types/all')
@@ -338,6 +343,7 @@ export default function ZonesAdmin() {
     setForm((f) => ({
       ...f,
       vertices: [...f.vertices, { lambertX: '', lambertY: '' }],
+      verticesModified: true,
     }))
   }, [])
 
@@ -349,7 +355,7 @@ export default function ZonesAdmin() {
     setForm((f) => {
       const verts = [...f.vertices]
       verts[index] = { ...verts[index], [field]: value }
-      return { ...f, vertices: verts }
+      return { ...f, vertices: verts, verticesModified: true }
     })
   }, [])
 
@@ -357,7 +363,7 @@ export default function ZonesAdmin() {
     setForm((f) => {
       const verts = [...f.vertices]
       verts.splice(index, 1)
-      return { ...f, vertices: verts }
+      return { ...f, vertices: verts, verticesModified: true }
     })
   }, [])
 
@@ -440,68 +446,76 @@ export default function ZonesAdmin() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const body = {
-      name: form.name,
-      description: form.description || undefined,
-      address: form.address || undefined,
-      totalArea: form.totalArea ? parseFloat(form.totalArea) : undefined,
-      price: form.price ? parseFloat(form.price) : undefined,
-      priceType: form.priceType || undefined,
-      constructionType: form.constructionType || undefined,
-      status: form.status,
-      zoneTypeId: form.zoneTypeId || undefined,
-      regionId: form.regionId || undefined,
-      activityIds: form.activityIds,
-      amenityIds: form.amenityIds,
-      vertices: form.vertices.map((v, i) => ({
-        seq: i,
-        lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
-        lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
-      })),
-    }
     
-    let zoneId = form.id
-    
-    if (form.id) {
-      await fetchApi(`/api/zones/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } else {
-      const newZone = await fetchApi('/api/zones', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      zoneId = newZone.id
-    }
+    try {
+      const body = {
+        name: form.name,
+        description: form.description || undefined,
+        address: form.address || undefined,
+        totalArea: form.totalArea ? parseFloat(form.totalArea) : undefined,
+        price: form.price ? parseFloat(form.price) : undefined,
+        priceType: form.priceType || undefined,
+        constructionType: form.constructionType || undefined,
+        status: form.status,
+        zoneTypeId: form.zoneTypeId || undefined,
+        regionId: form.regionId || undefined,
+        activityIds: form.activityIds,
+        amenityIds: form.amenityIds,
+        // N'envoyer les vertices que si ils ont été modifiés OU si c'est une nouvelle zone
+        vertices: (!form.id || form.verticesModified) ? form.vertices.map((v, i) => ({
+          seq: i,
+          lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
+          lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
+        })) : undefined,
+      }
+      
+      console.log('Submitting zone data:', body)
+      
+      let zoneId = form.id
+      
+      if (form.id) {
+        await fetchApi(`/api/zones/${form.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        })
+      } else {
+        const newZone = await fetchApi('/api/zones', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        })
+        zoneId = newZone.id
+      }
 
-    // Upload des nouvelles images si il y en a
-    if (zoneId) {
-      await uploadImages(zoneId)
-    }
+      // Upload des nouvelles images si il y en a
+      if (zoneId) {
+        await uploadImages(zoneId)
+      }
 
-    setForm({
-      id: '',
-      name: '',
-      description: '',
-      address: '',
-      totalArea: '',
-      price: '',
-      priceType: 'FIXED_PRICE',
-      constructionType: 'CUSTOM_BUILD',
-      status: 'LIBRE',
-      zoneTypeId: '',
-      regionId: '',
-      activityIds: [],
-      amenityIds: [],
-      vertices: [],
-    })
-    setImages([])
-    setExistingImages([])
-    setOpen(false)
-    loadZones(currentPage)
+      setForm({
+        id: '',
+        name: '',
+        description: '',
+        address: '',
+        totalArea: '',
+        price: '',
+        priceType: 'FIXED_PRICE',
+        constructionType: 'CUSTOM_BUILD',
+        status: 'LIBRE',
+        zoneTypeId: '',
+        regionId: '',
+        activityIds: [],
+        amenityIds: [],
+        vertices: [],
+        verticesModified: false,
+      })
+      setImages([])
+      setExistingImages([])
+      setOpen(false)
+      loadZones(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      alert('Erreur lors de la sauvegarde: ' + (error instanceof Error ? error.message : 'Erreur inconnue'))
+    }
   }
 
   const handleEdit = useCallback((z: Zone) => {
@@ -523,6 +537,7 @@ export default function ZonesAdmin() {
         lambertX: v.lambertX.toString(),
         lambertY: v.lambertY.toString(),
       })) : [],
+      verticesModified: false, // Les coordonnées ne sont pas modifiées au départ
     })
     setImages([])
     loadExistingImages(z.id)
@@ -550,6 +565,7 @@ export default function ZonesAdmin() {
       activityIds: [],
       amenityIds: [],
       vertices: [],
+      verticesModified: false,
     })
     setImages([])
     setOpen(true)
@@ -557,9 +573,17 @@ export default function ZonesAdmin() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">Gestion des Zones</h1>
-        <Button onClick={addNew}>Ajouter</Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher par nom, adresse..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={addNew}>Ajouter</Button>
+        </div>
       </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -588,29 +612,14 @@ export default function ZonesAdmin() {
         </CardContent>
       </Card>
 
-      <select
-        className="border p-2"
-        value={selectedZoneId}
-        onChange={e => setSelectedZoneId(e.target.value)}
-      >
-        {(Array.isArray(allZones) ? allZones.length : 0) === 0 ? (
-          <option value="">Aucune zone trouvée</option>
-        ) : (
-          <>
-            <option value="">-- Sélectionnez une zone --</option>
-            {(Array.isArray(allZones) ? allZones : []).map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </>
-        )}
-      </select>
-
-      <Pagination
-        totalItems={totalPages * itemsPerPage}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          totalItems={totalPages * itemsPerPage}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

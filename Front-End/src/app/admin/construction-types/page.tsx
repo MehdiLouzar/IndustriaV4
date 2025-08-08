@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ export default function ConstructionTypesAdmin() {
   const [selectedTypeId, setSelectedTypeId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<ConstructionType>({
@@ -47,18 +48,29 @@ export default function ConstructionTypesAdmin() {
     code: 'CUSTOM_BUILD'
   })
 
-  async function load(page = currentPage) {
+  const load = useCallback(async (page = currentPage, search = searchTerm) => {
     // Simulate API call - in real scenario would be: /api/construction-types
-    const simulated = constructionTypes.map((ct, index) => ({
+    let simulated = constructionTypes.map((ct, index) => ({
       id: ct.code,
       name: ct.name,
       description: ct.description,
       code: ct.code
     }))
+    
+    // Filter based on search term
+    if (search.trim()) {
+      const searchLower = search.toLowerCase()
+      simulated = simulated.filter(item => 
+        item.name.toLowerCase().includes(searchLower) ||
+        item.code.toLowerCase().includes(searchLower) ||
+        (item.description && item.description.toLowerCase().includes(searchLower))
+      )
+    }
+    
     setItems(simulated)
     setTotalPages(1)
     setCurrentPage(1)
-  }
+  }, [currentPage, searchTerm])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -68,9 +80,19 @@ export default function ConstructionTypesAdmin() {
         return
       }
     }
-    load()
+    load(currentPage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
+
+  // Effet pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      load(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, load])
 
   async function save() {
     if (!form.name.trim()) return
@@ -80,7 +102,7 @@ export default function ConstructionTypesAdmin() {
     
     setOpen(false)
     resetForm()
-    load()
+    load(currentPage)
   }
 
   async function deleteItem(id: string) {
@@ -89,7 +111,7 @@ export default function ConstructionTypesAdmin() {
     console.log('Deleting construction type:', id)
     // In real scenario: await fetchApi(`/api/construction-types/${id}`, { method: 'DELETE' })
     
-    load()
+    load(currentPage)
   }
 
   function resetForm() {
@@ -122,6 +144,12 @@ export default function ConstructionTypesAdmin() {
               <p className="text-gray-600">Gestion des types de construction disponibles</p>
             </div>
             <div className="flex items-center gap-4">
+              <Input
+                placeholder="Rechercher par nom, code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
               <Button onClick={openCreate} className="header-red text-white">
                 Nouveau Type
               </Button>
@@ -174,11 +202,13 @@ export default function ConstructionTypesAdmin() {
               )}
             </div>
 
-            <Pagination 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+            {totalPages > 1 && (
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

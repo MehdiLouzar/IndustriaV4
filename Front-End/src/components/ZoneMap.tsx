@@ -1,9 +1,11 @@
 "use client";
 
-import { MapContainer, TileLayer, Polygon, Popup } from "react-leaflet";
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { MapContainer, TileLayer, Polygon, Popup, Marker } from "react-leaflet";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import L from "leaflet";
 import proj4 from "proj4";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MapPin, Home, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
@@ -189,6 +191,87 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     }
   };
 
+  // Icônes pour les marqueurs de parcelles
+  const PARCEL_ICONS = useMemo(() => {
+    const createParcelIcon = (color: string, status: string) => {
+      const isShowroom = status === "SHOWROOM";
+      const IconComponent = isShowroom ? Building2 : Home;
+      
+      return L.divIcon({
+        html: renderToStaticMarkup(
+          <div className="relative">
+            <div 
+              className="w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
+              style={{ backgroundColor: color }}
+            >
+              <IconComponent width={14} height={14} stroke="white" fill="white" />
+            </div>
+          </div>
+        ),
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+    };
+
+    return {
+      LIBRE: createParcelIcon('#A79059', 'LIBRE'),
+      AVAILABLE: createParcelIcon('#A79059', 'AVAILABLE'),
+      RESERVEE: createParcelIcon('#C9A956', 'RESERVEE'),
+      RESERVED: createParcelIcon('#C9A956', 'RESERVED'),
+      VENDU: createParcelIcon('#8C6B2F', 'VENDU'),
+      OCCUPIED: createParcelIcon('#8C6B2F', 'OCCUPIED'),
+      SHOWROOM: createParcelIcon('#1C1C1C', 'SHOWROOM'),
+      DEFAULT: createParcelIcon('#CCCCCC', 'DEFAULT'),
+    };
+  }, []);
+
+  // Calculer le centre d'une parcelle pour le marqueur
+  const getParcelCenter = useCallback(
+    (p: Parcel): [number, number] => {
+      // Si on a des coordonnées WGS84 directes
+      if (p.latitude != null && p.longitude != null) {
+        return [p.latitude, p.longitude];
+      }
+      
+      // Si on a des vertices, calculer le centroide
+      if (p.vertices && p.vertices.length > 0) {
+        const validVertices = p.vertices.filter(v => 
+          (v.lat != null && v.lon != null) || 
+          (v.lambertX != null && v.lambertY != null)
+        );
+        
+        if (validVertices.length > 0) {
+          let totalLat = 0;
+          let totalLon = 0;
+          
+          validVertices.forEach(v => {
+            if (v.lat != null && v.lon != null) {
+              totalLat += v.lat;
+              totalLon += v.lon;
+            } else {
+              const [lon, lat] = toLatLng(v.lambertX, v.lambertY);
+              totalLat += lat;
+              totalLon += lon;
+            }
+          });
+          
+          return [totalLat / validVertices.length, totalLon / validVertices.length];
+        }
+      }
+      
+      // Fallback avec coordonnées Lambert
+      if (p.lambertX != null && p.lambertY != null) {
+        const [lon, lat] = toLatLng(p.lambertX, p.lambertY);
+        return [lat, lon];
+      }
+      
+      // Dernier fallback - centre de la zone
+      return center;
+    },
+    [center]
+  );
+
   if (!isDataReady) {
     return (
       <div className="relative overflow-hidden h-full w-full flex items-center justify-center bg-gray-50">
@@ -257,45 +340,61 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
             </div>
           </Popup>
         </Polygon>
+        {/* Affichage des parcelles avec des polygones semi-transparents ET des marqueurs */}
         {(Array.isArray(_zone_parcels) ? _zone_parcels : []).map(
           (p) => {
             const hasValidCoords = (p.lambertX != null && p.lambertY != null) || (p.vertices && p.vertices.length > 2);
+            const parcelCenter = getParcelCenter(p);
+            const parcelIcon = PARCEL_ICONS[p.status as keyof typeof PARCEL_ICONS] || PARCEL_ICONS.DEFAULT;
             
             return hasValidCoords && (
-              <Polygon
-                key={`parcel-${p.id}-${p.vertices?.length || 0}`}
-                positions={parcelPoly(p)}
-                pathOptions={{
-                  color: parcelColor(p.status),
-                  opacity: 0.9,
-                  fillColor: parcelColor(p.status),
-                  fillOpacity: 0.3,
-                  weight: 2,
-                }}
-              >
-                <Popup>
-                  <div className="space-y-1 text-sm">
-                    <strong>{p.reference}</strong>
-                    {p.area && <div>Surface: {p.area} m²</div>}
-                    {p.price && <div>Prix: {p.price} DH</div>}
-                    <div>Statut: {p.status}</div>
-                    {p.latitude != null && p.longitude != null && (
-                      <div>
-                        Lat: {p.latitude.toFixed(5)}, Lon: {p.longitude.toFixed(5)}
+              <React.Fragment key={`parcel-${p.id}-${p.vertices?.length || 0}`}>
+                {/* Polygone semi-transparent pour délimiter la parcelle */}
+                <Polygon
+                  positions={parcelPoly(p)}
+                  pathOptions={{
+                    color: parcelColor(p.status),
+                    opacity: 0.6,
+                    fillColor: parcelColor(p.status),
+                    fillOpacity: 0.1,
+                    weight: 1,
+                  }}
+                />
+                {/* Marqueur au centre de la parcelle */}
+                <Marker
+                  position={parcelCenter}
+                  icon={parcelIcon}
+                >
+                  <Popup>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full border border-white shadow"
+                          style={{ backgroundColor: parcelColor(p.status) }}
+                        />
+                        <strong>{p.reference}</strong>
                       </div>
-                    )}
-                    {p.status === "AVAILABLE" && p.isFree && (
-                      <Button
-                        size="sm"
-                        className="mt-1"
-                        onClick={() => setSelected(p)}
-                      >
-                        Réserver
-                      </Button>
-                    )}
-                  </div>
-                </Popup>
-              </Polygon>
+                      {p.area && <div><span className="font-medium">Surface:</span> {p.area} m²</div>}
+                      {p.price && <div><span className="font-medium">Prix:</span> {p.price} DH</div>}
+                      <div><span className="font-medium">Statut:</span> {p.status}</div>
+                      {p.latitude != null && p.longitude != null && (
+                        <div className="text-xs text-gray-600">
+                          Lat: {p.latitude.toFixed(5)}, Lon: {p.longitude.toFixed(5)}
+                        </div>
+                      )}
+                      {(p.status === "AVAILABLE" || p.status === "LIBRE") && p.isFree && (
+                        <Button
+                          size="sm"
+                          className="mt-2 w-full bg-industria-brown-gold hover:bg-industria-olive-light"
+                          onClick={() => setSelected(p)}
+                        >
+                          Prendre rendez-vous
+                        </Button>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              </React.Fragment>
             );
           }
         )}

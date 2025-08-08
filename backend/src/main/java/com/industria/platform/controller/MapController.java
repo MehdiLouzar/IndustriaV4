@@ -13,6 +13,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @RestController
 @RequestMapping("/api/map")
 public class MapController {
+    private static final Logger logger = LoggerFactory.getLogger(MapController.class);
+    
     private final ZoneRepository zoneRepository;
     private final ParcelRepository parcelRepository;
     private final CoordinateCalculationService coordinateService;
@@ -61,37 +65,144 @@ public class MapController {
         return new MapResponse<>(features);
     }
 
+    @GetMapping("/zones/count")
+    public Map<String, Object> getZoneCount() {
+        List<Zone> zones = zoneRepository.findAll();
+        long withCoords = zones.stream().filter(z -> z.getLatitude() != null && z.getLongitude() != null).count();
+        return Map.of(
+            "totalZones", zones.size(),
+            "withCoordinates", withCoords,
+            "sampleZone", zones.isEmpty() ? null : Map.of(
+                "id", zones.get(0).getId(),
+                "name", zones.get(0).getName(),
+                "lat", zones.get(0).getLatitude(),
+                "lon", zones.get(0).getLongitude()
+            )
+        );
+    }
+    
     @GetMapping("/zones/simplified")
     public MapResponse<ZoneSimplifiedFeatureDto> simplifiedZones(@RequestParam(defaultValue = "6") int zoom) {
-        List<ZoneSimplifiedFeatureDto> features = simplifiedCache.computeIfAbsent(zoom, this::buildSimplifiedZones);
+        // Get all zones and create simplified features
+        List<Zone> zones = zoneRepository.findAll();
+        
+        List<ZoneSimplifiedFeatureDto> features = new ArrayList<>();
+        
+        for (Zone z : zones) {
+            if (z.getLatitude() != null && z.getLongitude() != null) {
+                // Create a small polygon around the center point
+                double lat = z.getLatitude();
+                double lon = z.getLongitude();
+                double offset = 0.005; // ~500m
+                
+                List<double[]> coords = List.of(
+                    new double[]{lat - offset, lon - offset},
+                    new double[]{lat - offset, lon + offset},
+                    new double[]{lat + offset, lon + offset},
+                    new double[]{lat + offset, lon - offset},
+                    new double[]{lat - offset, lon - offset}
+                );
+                
+                try {
+                    int parcelCount = parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE);
+                    
+                    ZoneSimplifiedFeatureDto feature = new ZoneSimplifiedFeatureDto(
+                        coords,
+                        z.getId(),
+                        z.getName(),
+                        z.getStatus().name(),
+                        parcelCount,
+                        List.of(), // Empty activities for now
+                        List.of()  // Empty amenities for now
+                    );
+                    
+                    features.add(feature);
+                } catch (Exception e) {
+                    // Skip problematic zones
+                }
+            }
+        }
+        
         return new MapResponse<>(features);
     }
 
     private List<ZoneSimplifiedFeatureDto> buildSimplifiedZones(int zoom) {
-        double tolerance = zoomToTolerance(zoom);
-        WKTReader reader = new WKTReader();
-        return zoneRepository.findAll().stream().map(z -> {
+        logger.info("Building simplified zones for zoom level {}", zoom);
+        List<Zone> allZones = zoneRepository.findAll();
+        logger.info("Found {} zones in database", allZones.size());
+        
+        List<ZoneSimplifiedFeatureDto> result = new ArrayList<>();
+        
+        for (Zone z : allZones) {
             try {
-                Geometry geom = reader.read(z.getGeometry());
-                Geometry simplified = DouglasPeuckerSimplifier.simplify(geom, tolerance);
+                logger.info("Processing zone {} - {}", z.getId(), z.getName());
+                logger.info("Zone has latitude={}, longitude={}", z.getLatitude(), z.getLongitude());
+                
+                // Utiliser les coordonnées WGS84 déjà calculées si disponibles
                 List<double[]> coords = new ArrayList<>();
-                for (Coordinate c : simplified.getCoordinates()) {
-                    double[] wgs = coordinateService.lambertToWGS84(c.getX(), c.getY());
-                    coords.add(new double[]{wgs[1], wgs[0]}); // lat, lon
+                
+                if (z.getLatitude() != null && z.getLongitude() != null) {
+                    // Créer un petit polygone autour du point central pour la visualisation
+                    double lat = z.getLatitude();
+                    double lon = z.getLongitude();
+                    double offset = 0.005; // environ 500m
+                    
+                    // Coordonnées dans l'ordre [lat, lon] comme attendu par le frontend
+                    coords.add(new double[]{lat - offset, lon - offset});
+                    coords.add(new double[]{lat - offset, lon + offset});
+                    coords.add(new double[]{lat + offset, lon + offset});
+                    coords.add(new double[]{lat + offset, lon - offset});
+                    coords.add(new double[]{lat - offset, lon - offset}); // fermer le polygone
+                    
+                    logger.info("Using center coordinates for zone {}: {}, {}", z.getId(), lat, lon);
+                } else {
+                    logger.info("No latitude/longitude for zone {}, trying WKT geometry", z.getId());
+                    // Fallback: essayer de lire la géométrie WKT si elle existe
+                    if (z.getGeometry() != null && !z.getGeometry().trim().isEmpty()) {
+                        try {
+                            WKTReader reader = new WKTReader();
+                            Geometry geom = reader.read(z.getGeometry());
+                            Geometry simplified = DouglasPeuckerSimplifier.simplify(geom, zoomToTolerance(zoom));
+                            for (Coordinate c : simplified.getCoordinates()) {
+                                double[] wgs = coordinateService.lambertToWGS84(c.getX(), c.getY());
+                                coords.add(new double[]{wgs[1], wgs[0]}); // lat, lon
+                            }
+                            logger.info("Using WKT geometry for zone {}", z.getId());
+                        } catch (Exception e) {
+                            logger.error("Error reading WKT for zone {}: {}", z.getId(), e.getMessage());
+                            continue; // Skip this zone
+                        }
+                    } else {
+                        logger.info("No geometry available for zone {}", z.getId());
+                        continue; // Skip this zone
+                    }
                 }
-                return new ZoneSimplifiedFeatureDto(
+                
+                if (coords.isEmpty()) {
+                    logger.info("No coordinates generated for zone {}", z.getId());
+                    continue; // Skip this zone
+                }
+                
+                ZoneSimplifiedFeatureDto feature = new ZoneSimplifiedFeatureDto(
                         coords,
                         z.getId(),
                         z.getName(),
                         z.getStatus().name(),
                         parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE),
-                        z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getIcon()).toList(),
-                        z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getIcon()).toList()
+                        z.getActivities() == null ? List.of() : z.getActivities().stream().map(a -> a.getActivity().getIcon()).filter(Objects::nonNull).toList(),
+                        z.getAmenities() == null ? List.of() : z.getAmenities().stream().map(a -> a.getAmenity().getIcon()).filter(Objects::nonNull).toList()
                 );
+                
+                result.add(feature);
+                logger.info("Successfully created feature for zone {} with {} coordinates", z.getId(), coords.size());
+                
             } catch (Exception e) {
-                return null;
+                logger.error("Error processing zone {}: {}", z.getId(), e.getMessage(), e);
             }
-        }).filter(Objects::nonNull).toList();
+        }
+        
+        logger.info("Built {} zone features total", result.size());
+        return result;
     }
 
     private double zoomToTolerance(int zoom) {
