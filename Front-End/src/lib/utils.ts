@@ -113,122 +113,58 @@ if (typeof window !== 'undefined') {
   })
 }
 
+
 export async function fetchApi<T>(
-  path: string,
-  init?: RequestInit & { signal?: AbortSignal },
-  token?: string
-): Promise<T | null> {
-  let abortController: AbortController | null = null
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  // Get the token from localStorage
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  
+  // Prepare headers
+  const headers: HeadersInit = {
+    ...options.headers,
+  };
+  
+  // Add Authorization header if token exists and not uploading files
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  // Add Content-Type if not a FormData request
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  // Make the request with the full URL
+  const response = await fetch(`http://localhost:8080${url}`, {
+    ...options,
+    headers,
+  });
+  
+  // Handle 401 Unauthorized
+  if (response.status === 401) {
+    // Token is invalid or expired
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      window.location.href = '/auth/login';
+    }
+    throw new Error('Unauthorized');
+  }
+  
+  // Handle other errors
+  if (!response.ok) {
+    const error = await response.text().catch(() => 'Request failed');
+    throw new Error(error);
+  }
+  
+  // Parse response
+  const text = await response.text();
+  if (!text) return {} as T;
+  
   try {
-    if (!init?.signal) {
-      abortController = new AbortController()
-      init = { ...init, signal: abortController.signal }
-    }
-
-    const url = new URL(path, getBaseUrl())
-    const headers = new Headers(init?.headers)
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
-    }
-    const method = init?.method?.toUpperCase() || 'GET'
-    const cacheKey = `${method}:${url}`
-    const requestKey = createRequestKey(path, init)
-
-    if (method === 'GET') {
-      const cached = apiCache.get(cacheKey)
-      if (cached) return cached as T
-      
-      // Vérifier s'il y a une requête en cours pour éviter les doublons
-      if (pendingRequests.has(requestKey)) {
-        return pendingRequests.get(requestKey)
-      }
-    }
-
-    // Routes publiques (sans authentification)
-    const publicRoutes = [
-      '/api/public',
-      '/api/zones',
-      '/api/map',
-      '/api/activities',
-      '/api/amenities',
-      '/api/regions',
-      '/api/zone-types',
-      '/api/countries'
-    ]
-    
-    const isPublicRoute = publicRoutes.some(route => path.startsWith(route))
-    const isProtected = 
-      path.startsWith('/api/admin') || 
-      (path.startsWith('/api/') && method !== 'GET' && !isPublicRoute && !path.includes('/reservations')) ||
-      (path.startsWith('/api/') && method === 'GET' && !isPublicRoute && path.includes('/users'))
-    
-    console.log(`API Call: ${method} ${path} - Protected: ${isProtected}`)
-
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`)
-    } else if (isProtected && typeof window !== 'undefined') {
-      // Try to get token from localStorage if not provided
-      const storedToken = localStorage.getItem('token')
-      if (storedToken) {
-        console.log(`Setting auth token for ${method} ${path}`)
-        headers.set('Authorization', `Bearer ${storedToken}`)
-      } else {
-        console.error(`No auth token found for protected route: ${path}`)
-        // Seulement rediriger pour les routes admin
-        if (path.startsWith('/api/admin')) {
-          window.location.href = '/auth/login'
-          return Promise.reject(new Error('Missing auth token'))
-        }
-      }
-    }
-
-    // Créer la promesse de requête
-    const requestPromise = (async () => {
-      const res = await fetch(url.toString(), { credentials: 'include', ...init, headers })
-      if (init.signal?.aborted) return null
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => 'No response body')
-        console.warn(`API Error ${res.status} for ${method} ${url}:`, errorText)
-        
-        if (res.status === 401 && typeof window !== 'undefined') {
-          if (isProtected) {
-            console.warn('Authentication failed for protected route')
-            // Seulement rediriger pour les routes admin
-            if (path.startsWith('/api/admin')) {
-              window.location.href = '/auth/login'
-            }
-          } else {
-            console.info('401 on public route - this is normal, using fallback data')
-          }
-        }
-        
-        return null
-      }
-
-      const data = await res.json()
-      if (method === 'GET' && !init.signal?.aborted) {
-        apiCache.set(cacheKey, data)
-      }
-      return data
-    })()
-
-    // Ajouter aux requêtes en cours pour les GET
-    if (method === 'GET') {
-      pendingRequests.set(requestKey, requestPromise)
-      requestPromise.finally(() => {
-        pendingRequests.delete(requestKey)
-      })
-    }
-
-    return await requestPromise
-  } catch (err) {
-    if (err instanceof Error && err.name !== 'AbortError') {
-      console.error('Fetch error:', err)
-    }
-    return null
-  } finally {
-    if (abortController) {
-      abortController = null
-    }
+    return JSON.parse(text);
+  } catch {
+    return text as unknown as T;
   }
 }

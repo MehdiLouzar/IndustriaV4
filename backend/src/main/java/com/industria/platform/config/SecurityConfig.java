@@ -48,8 +48,7 @@ public class SecurityConfig {
             )
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt
-                    .decoder(jwtDecoder())
-                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                                        .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
             )
             .sessionManagement(sess ->
@@ -58,13 +57,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public JwtDecoder jwtDecoder() {
-        // Utiliser seulement l'URL JWK pour valider la signature, sans validation de l'issuer
-        return NimbusJwtDecoder
-            .withJwkSetUri("http://keycloak:8080/realms/industria/protocol/openid-connect/certs")
-            .build();
-    }
+
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {

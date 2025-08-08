@@ -58,7 +58,7 @@ echo "✅ PostgreSQL est prêt !"
 echo
 
 # Attendre Keycloak
-wait_for_service "Keycloak" "http://localhost:8081/realms/industria"
+wait_for_service "Keycloak" "http://keycloak:8081/realms/industria"
 echo
 
 # Attendre Backend
@@ -74,7 +74,7 @@ echo "🎉 Tous les services sont démarrés !"
 echo "-----------------------------------------------"
 echo "• Frontend: http://localhost:3000"
 echo "• Backend:  http://localhost:8080"
-echo "• Keycloak: http://localhost:8081"
+echo "• Keycloak: http://keycloak:8081"
 echo "• DB:       localhost:5432"
 echo "==============================================="
 echo

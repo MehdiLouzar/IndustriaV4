@@ -46,7 +46,7 @@ echo ⏳ Attente de Keycloak...
 set max_kc=60
 set cnt=0
 :wait_keycloak
-curl -sf "http://localhost:8081/realms/industria" >nul 2>&1
+curl -sf "http://keycloak:8081/realms/industria" >nul 2>&1
 if not errorlevel 1 (
   echo ✅ Keycloak est prêt !
 ) else (
@@ -108,7 +108,7 @@ echo.
 echo 📋 Services disponibles :
 echo    • Frontend: http://localhost:3000
 echo    • Backend:  http://localhost:8080
-echo    • Keycloak: http://localhost:8081
+echo    • Keycloak: http://keycloak:8081
 echo    • DB:       localhost:5432
 echo.
 echo 🔧 Commandes utiles :
