@@ -1,21 +1,32 @@
-FROM oven/bun:1
-
+# ---------- Stage 1: Build ----------
+FROM oven/bun:1 AS builder
 WORKDIR /app
 
-# Installer curl pour les healthchecks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# Copy package files
-COPY package.json bun.lockb* ./
-
-# Install dependencies
+# Install deps first (cache friendly)
+COPY package.json bun.lock* ./
 RUN bun install
+#RUN bun install --frozen-lockfile
 
-# Copy source code
+# Copy the entire source
 COPY . .
 
-# Exposer le port
-EXPOSE 3000
+# Build Next.js for production
+ENV NODE_ENV=production
+RUN bun run build
 
-# Commande par défaut (sera surchargée par docker-compose)
-CMD ["bun", "run", "dev", "--hostname", "0.0.0.0"]
+# ---------- Stage 2: Run ----------
+FROM oven/bun:1 AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+
+# Copy only what's needed to run
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+CMD ["bun", "run", "start"]

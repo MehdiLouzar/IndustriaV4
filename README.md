@@ -62,13 +62,13 @@ container name and credentials with the environment variables `DB_CONTAINER`,
 `DB_NAME`, `DB_USER` and `DB_PASSWORD`.
 The backend validates JWT tokens issued by Keycloak. A Keycloak container is
 included in `docker-compose.yml` and exposes the realm `industria` on
-`http://localhost:8081`. Default admin credentials are `admin/admin`.
+`http://keycloak:8081`. Default admin credentials are `admin/admin`.
 When the container starts it imports `keycloak/realm-export.json` which defines
 demo users matching the accounts shown on the login page:
 
 ```
-- admin@zonespro.ma / password123 (ADMIN)
-- manager@zonespro.ma / password123 (ZONE_MANAGER)
+- admin@industria.ma / password123 (ADMIN)
+- manager@industria.ma / password123 (ZONE_MANAGER)
 - demo@entreprise.ma / password123 (USER)
 ```
 If you run Keycloak manually, pass `--import-realm` with the path to this file

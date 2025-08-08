@@ -35,6 +35,10 @@ public class Zone {
     private String geometry;
 
     private Integer srid;
+    
+    // Coordonnées calculées automatiquement à partir des vertices
+    private Double longitude;
+    private Double latitude;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -60,4 +64,7 @@ public class Zone {
 
     @OneToMany(mappedBy = "zone")
     private Set<ZoneAmenity> amenities;
+
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ZoneImage> images;
 }

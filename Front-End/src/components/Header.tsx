@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, MapPin, Building2 } from 'lucide-react';
 import AuthButton from '@/components/AuthButton';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import Image from 'next/image';
 
 export default function Header({ showAdminLink = false }: { showAdminLink?: boolean }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -42,7 +43,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
   return (
     <header className="w-full">
       {/* Top contact bar */}
-      <div className="header-red text-white py-2 px-4">
+      <div className="header-brown text-white py-2 px-4">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -55,7 +56,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="bg-white text-red-600 hover:bg-gray-100">
+            <Badge variant="secondary" className="bg-white text-industria-brown-gold hover:bg-gray-100">
               Zones B2B
             </Badge>
             <LanguageSwitcher />
@@ -70,9 +71,9 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <Building2 className="w-8 h-8 text-red-600" />
+                <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">ZonesPro</h1>
+                  <h1 className="text-xl font-bold text-gray-900">Industria</h1>
                   <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
                 </div>
               </div>
@@ -83,7 +84,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
               <NavigationMenuList>
                 {navItems.map((item, index) => (
                   <NavigationMenuItem key={index}>
-                    <NavigationMenuTrigger className="text-gray-700 hover:text-red-600">
+                    <NavigationMenuTrigger className="text-gray-700 hover:text-industria-brown-gold">
                       {item.title}
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
@@ -107,7 +108,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
             {/* Authentication section */}
             <div className="hidden md:flex items-center gap-4">
               {showAdminLink && (
-                <Link href="/admin" className="text-sm text-gray-700 hover:text-red-600">
+                <Link href="/admin" className="text-sm text-gray-700 hover:text-industria-brown-gold">
                   Dashboard admin
                 </Link>
               )}
@@ -128,7 +129,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
                     {showAdminLink && (
                       <a
                         href="/admin"
-                        className="block text-sm text-gray-600 hover:text-red-600"
+                        className="block text-sm text-gray-600 hover:text-industria-brown-gold"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Dashboard admin
@@ -145,7 +146,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
                           <a
                             key={subIndex}
                             href={subItem.href}
-                            className="block text-sm text-gray-600 hover:text-red-600 py-1"
+                            className="block text-sm text-gray-600 hover:text-industria-brown-gold py-1"
                             onClick={() => setIsMenuOpen(false)}
                           >
                             {subItem.title}

@@ -7,7 +7,7 @@ export default function AProposPage() {
       <Header />
       <div className="flex-grow container mx-auto px-4 py-12 space-y-6">
         <h1 className="text-3xl font-bold text-center">À propos</h1>
-        <p className="text-gray-600 text-center">Découvrez l'histoire de ZonesPro.</p>
+        <p className="text-gray-600 text-center">Découvrez l'histoire d'Industria.</p>
       </div>
       <Footer />
     </main>

@@ -33,6 +33,10 @@ public class Parcel {
     private String geometry;
 
     private Integer srid;
+    
+    // Coordonnées calculées automatiquement à partir des vertices
+    private Double longitude;
+    private Double latitude;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -51,4 +55,7 @@ public class Parcel {
 
     @OneToMany(mappedBy = "parcel")
     private Set<ParcelAmenity> amenities;
+
+    @OneToMany(mappedBy = "parcel", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ParcelImage> images;
 }

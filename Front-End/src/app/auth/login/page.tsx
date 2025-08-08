@@ -42,7 +42,8 @@ export default function LoginPage() {
       }
       const data = await res.json()
       localStorage.setItem('token', data.access_token)
-      router.push('/')
+      document.cookie = `token=${data.access_token}; path=/; max-age=3600; secure=${window.location.protocol === 'https:'}; samesite=lax`
+      router.push('/admin')
     } catch (error) {
       setError(
         error instanceof Error
@@ -55,8 +56,8 @@ export default function LoginPage() {
   }
 
   const demoAccounts = [
-    { email: 'admin@zonespro.ma', role: 'Administrateur', password: 'password123' },
-    { email: 'manager@zonespro.ma', role: 'Manager', password: 'password123' },
+    { email: 'admin@industria.ma', role: 'Administrateur', password: 'password123' },
+    { email: 'manager@industria.ma', role: 'Manager', password: 'password123' },
     { email: 'demo@entreprise.ma', role: 'Utilisateur', password: 'password123' },
   ];
 
@@ -66,13 +67,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-industria-gray-light to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Building2 className="w-8 h-8 text-red-600" />
-            <h1 className="text-2xl font-bold text-gray-900">ZonesPro</h1>
+            <Building2 className="w-8 h-8 text-industria-brown-gold" />
+            <h1 className="text-2xl font-bold text-gray-900">Industria</h1>
           </div>
           <p className="text-gray-600">Plateforme B2B Zones Industrielles</p>
         </div>
@@ -88,7 +89,7 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                <div className="flex items-center gap-2 p-3 bg-industria-gray-light border border-industria-brown-gold rounded-lg text-industria-brown-gold">
                   <AlertCircle className="w-4 h-4" />
                   <span className="text-sm">{error}</span>
                 </div>
@@ -145,7 +146,7 @@ export default function LoginPage() {
             <div className="mt-4 text-center">
               <Link
                 href="/auth/register"
-                className="text-sm text-red-600 hover:underline"
+                className="text-sm text-industria-brown-gold hover:underline"
               >
                 Pas encore de compte ? S'inscrire
               </Link>
@@ -184,7 +185,7 @@ export default function LoginPage() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-sm text-gray-600 hover:text-red-600"
+            className="text-sm text-gray-600 hover:text-industria-brown-gold"
           >
             ← Retour à l'accueil
           </Link>

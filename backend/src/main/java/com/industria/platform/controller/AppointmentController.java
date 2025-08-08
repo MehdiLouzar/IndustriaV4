@@ -5,7 +5,10 @@ import com.industria.platform.entity.Appointment;
 import com.industria.platform.repository.AppointmentRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.service.AppointmentService;
+import com.industria.platform.service.PermissionService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.format.DateTimeFormatter;
@@ -18,13 +21,16 @@ public class AppointmentController {
     private final AppointmentService appointmentService;
     private final AppointmentRepository appointmentRepository;
     private final ParcelRepository parcelRepository;
+    private final PermissionService permissionService;
 
     public AppointmentController(AppointmentService appointmentService,
                                  AppointmentRepository appointmentRepository,
-                                 ParcelRepository parcelRepository) {
+                                 ParcelRepository parcelRepository,
+                                 PermissionService permissionService) {
         this.appointmentService = appointmentService;
         this.appointmentRepository = appointmentRepository;
         this.parcelRepository = parcelRepository;
+        this.permissionService = permissionService;
     }
 
     @PostMapping("/public/appointments")
@@ -38,9 +44,18 @@ public class AppointmentController {
 
     @GetMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
-    public List<AppointmentDto> all() {
+    public List<AppointmentDto> all(Authentication authentication) {
         DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        return appointmentRepository.findAll().stream().map(a -> new AppointmentDto(
+        List<Appointment> appointments = appointmentRepository.findAll();
+        
+        // Filtrer pour les ZONE_MANAGER : seulement leurs rendez-vous
+        if (!permissionService.hasRole("ADMIN")) {
+            appointments = appointments.stream()
+                .filter(a -> a.getParcel() != null && permissionService.canModifyParcel(a.getParcel().getId()))
+                .toList();
+        }
+        
+        return appointments.stream().map(a -> new AppointmentDto(
                 a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
                 a.getCompanyName(), a.getMessage(),
                 a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
@@ -51,41 +66,76 @@ public class AppointmentController {
 
     @GetMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
-    public AppointmentDto get(@PathVariable String id) {
+    public ResponseEntity<AppointmentDto> get(@PathVariable String id) {
+        if (!permissionService.canManageAppointment(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
         Appointment a = appointmentRepository.findById(id).orElseThrow();
         DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        return new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
+        AppointmentDto dto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
                 a.getCompanyName(), a.getMessage(),
                 a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
                 a.getParcel() == null ? null : a.getParcel().getId(),
                 a.getStatus() == null ? null : a.getStatus().name());
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
-    public AppointmentDto createAdmin(@RequestBody AppointmentDto dto) {
+    public ResponseEntity<AppointmentDto> createAdmin(@RequestBody AppointmentDto dto) {
+        // Vérifier si l'utilisateur peut gérer la parcelle
+        if (dto.parcelId() != null && !permissionService.canModifyParcel(dto.parcelId())) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
         Appointment a = new Appointment();
         updateEntity(a, dto);
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
         appointmentRepository.save(a);
-        return get(a.getId());
+        
+        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        AppointmentDto createdDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
+                a.getCompanyName(), a.getMessage(),
+                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
+                a.getParcel() == null ? null : a.getParcel().getId(),
+                a.getStatus() == null ? null : a.getStatus().name());
+        return ResponseEntity.ok(createdDto);
     }
 
     @PutMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
-    public AppointmentDto update(@PathVariable String id, @RequestBody AppointmentDto dto) {
+    public ResponseEntity<AppointmentDto> update(@PathVariable String id, @RequestBody AppointmentDto dto) {
+        if (!permissionService.canManageAppointment(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
         Appointment a = appointmentRepository.findById(id).orElseThrow();
         updateEntity(a, dto);
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
         appointmentRepository.save(a);
-        return get(id);
+        
+        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        AppointmentDto updatedDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
+                a.getCompanyName(), a.getMessage(),
+                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
+                a.getParcel() == null ? null : a.getParcel().getId(),
+                a.getStatus() == null ? null : a.getStatus().name());
+        return ResponseEntity.ok(updatedDto);
     }
 
     @DeleteMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
-    public void delete(@PathVariable String id) { appointmentRepository.deleteById(id); }
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        if (!permissionService.canManageAppointment(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
+        appointmentRepository.deleteById(id);
+        return ResponseEntity.ok().build();
+    }
 
     private void updateEntity(Appointment a, AppointmentDto dto) {
         a.setContactName(dto.contactName());

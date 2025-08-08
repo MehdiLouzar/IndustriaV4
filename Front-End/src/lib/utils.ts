@@ -85,6 +85,17 @@ class SecureApiCache {
 }
 
 export const apiCache = new SecureApiCache()
+
+// Gestionnaire des requêtes en cours pour éviter les doublons
+const pendingRequests = new Map<string, Promise<any>>()
+
+// Fonction pour créer une clé unique pour une requête
+function createRequestKey(path: string, init?: RequestInit): string {
+  const method = init?.method || 'GET'
+  const body = init?.body ? JSON.stringify(init.body) : ''
+  return `${method}:${path}:${body}`
+}
+
 let cleanupTimer: NodeJS.Timeout | null = null
 if (typeof window !== 'undefined') {
   cleanupTimer = setInterval(() => apiCache.cleanup(), 60000)
@@ -102,56 +113,58 @@ if (typeof window !== 'undefined') {
   })
 }
 
+
 export async function fetchApi<T>(
-  path: string,
-  init?: RequestInit & { signal?: AbortSignal }
-): Promise<T | null> {
-  let abortController: AbortController | null = null
-  try {
-    if (!init?.signal) {
-      abortController = new AbortController()
-      init = { ...init, signal: abortController.signal }
-    }
-
-    const url = new URL(path, getBaseUrl())
-    const headers = new Headers(init?.headers)
-    const method = init?.method?.toUpperCase() || 'GET'
-    const cacheKey = `${method}:${url}`
-
-    if (method === 'GET') {
-      const cached = apiCache.get(cacheKey)
-      if (cached) return cached as T
-    }
-
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  // Get the token from localStorage
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  
+  // Prepare headers
+  const headers: HeadersInit = {
+    ...options.headers,
+  };
+  
+  // Add Authorization header if token exists and not uploading files
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  // Add Content-Type if not a FormData request
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  // Make the request with the full URL
+  const response = await fetch(`http://localhost:8080${url}`, {
+    ...options,
+    headers,
+  });
+  
+  // Handle 401 Unauthorized
+  if (response.status === 401) {
+    // Token is invalid or expired
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (token && method !== 'GET') {
-        headers.set('Authorization', `Bearer ${token}`)
-      }
+      localStorage.removeItem('token');
+      window.location.href = '/auth/login';
     }
-
-    const res = await fetch(url.toString(), { ...init, headers })
-    if (init.signal?.aborted) return null
-    if (!res.ok) {
-      if (res.status === 401 && typeof window !== 'undefined') {
-        localStorage.removeItem('token')
-      }
-      return null
-    }
-
-    const data = await res.json()
-    if (method === 'GET' && !init.signal?.aborted) {
-      apiCache.set(cacheKey, data)
-    }
-    return data
-  } catch (err) {
-    if (err instanceof Error && err.name !== 'AbortError') {
-      console.error('Fetch error:', err)
-    }
-    return null
-  } finally {
-    if (abortController) {
-      abortController = null
-    }
+    throw new Error('Unauthorized');
+  }
+  
+  // Handle other errors
+  if (!response.ok) {
+    const error = await response.text().catch(() => 'Request failed');
+    throw new Error(error);
+  }
+  
+  // Parse response
+  const text = await response.text();
+  if (!text) return {} as T;
+  
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text as unknown as T;
   }
 }

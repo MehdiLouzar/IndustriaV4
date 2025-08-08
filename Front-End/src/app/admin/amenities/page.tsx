@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 
 interface Amenity {
@@ -26,6 +27,7 @@ export default function AmenitiesAdmin() {
   const [selectedAmenityId, setSelectedAmenityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Amenity>({
@@ -37,8 +39,19 @@ export default function AmenitiesAdmin() {
   })
 
 
-  async function load(page = currentPage) {
-    const res = await fetchApi<ListResponse<Amenity>>(`/api/amenities?page=${page}&limit=${itemsPerPage}`).catch(() => null)
+  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
+    const res = await fetchApi<ListResponse<Amenity>>(
+      `/api/amenities?${params.toString()}`
+    ).catch(() => null)
     if (res) {
       const arr = Array.isArray(res.items) ? res.items : []
       setItems(arr)
@@ -47,9 +60,19 @@ export default function AmenitiesAdmin() {
     } else {
       setItems([])
     }
-  }
+  }, [currentPage, itemsPerPage, searchTerm])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(currentPage) }, [currentPage])
+
+  // Effet pour la recherche
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      load(1, searchTerm)
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm, load])
 
   useEffect(() => {
     fetchApi<ListResponse<Amenity>>("/api/amenities/all")
@@ -119,9 +142,17 @@ export default function AmenitiesAdmin() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">Équipements</h1>
-        <Button onClick={addNew}>Ajouter</Button>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Rechercher par nom, catégorie..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={addNew}>Ajouter</Button>
+        </div>
       </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
@@ -142,9 +173,11 @@ export default function AmenitiesAdmin() {
                   <td className="p-2 align-top">{a.icon}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(a)}>Éditer</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(a.id)}>
-                      Supprimer
-                    </Button>
+                    <DeleteConfirmDialog
+                      itemName={a.name}
+                      onConfirm={() => del(a.id)}
+                      description={`Êtes-vous sûr de vouloir supprimer l'équipement "${a.name}" ? Cette action est irréversible et supprimera toutes les associations avec les zones.`}
+                    />
                   </td>
                 </tr>
               ))}
