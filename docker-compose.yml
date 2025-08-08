@@ -116,34 +116,21 @@ services:
       context: ./Front-End
       dockerfile: Dockerfile
     container_name: industria-frontend
-    volumes:
-      - ./Front-End:/app
-      - /app/node_modules
-      - frontend_node_modules:/app/node_modules
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - HOSTNAME=0.0.0.0
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
-      - API_INTERNAL_URL=http://backend:8080
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=supersecretkey123456789
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=industria
-      - KEYCLOAK_CLIENT_ID=frontend
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://backend:8080
+      API_INTERNAL_URL: http://backend:8080
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: supersecretkey123456789
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: industria
+      KEYCLOAK_CLIENT_ID: frontend
     restart: unless-stopped
     depends_on:
       - backend
       - db-init
-    command: >
-      sh -c "
-        echo 'Installing dependencies...' &&
-        bun install &&
-        echo 'Starting development server...' &&
-        bun run dev --hostname 0.0.0.0
-      "
     networks:
       - industria-network
     healthcheck:
