@@ -1,5 +1,6 @@
 // Front-End/src/app/layout.tsx
 import type { Metadata } from "next";
+import 'leaflet/dist/leaflet.css';
 import "./globals.css";
 import Providers from "@/components/Providers";
 

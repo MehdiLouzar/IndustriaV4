@@ -208,7 +208,7 @@ export default function ZonePage() {
             </CardContent>
           </Card>
         )}
-        <Card className="shadow-md overflow-hidden">
+        <Card className="shadow-md ">
           <CardHeader className="bg-industria-gray-light">
             <CardTitle className="text-industria-brown-gold flex items-center gap-2">
               <DynamicIcon name="Map" className="w-5 h-5" />
@@ -216,7 +216,7 @@ export default function ZonePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="h-[600px] min-h-[500px]">
+            <div className="h-[600px] min-h-[500px] overflow-visible">
               <ZoneMap zone={zone} />
             </div>
           </CardContent>
