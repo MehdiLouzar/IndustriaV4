@@ -172,7 +172,7 @@ function AdminDashboardContent() {
       icon: FileText,
       href: '/admin/contact-requests',
       color: 'bg-blue-500',
-      permission: ['ADMIN', 'MANAGER']
+      permission: ['ADMIN']
     },
     {
       title: 'Journal d\'audit',
@@ -211,6 +211,14 @@ function AdminDashboardContent() {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => router.push('/')}
+                className="bg-industria-brown-gold text-white hover:bg-industria-olive-light"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                Retourner au site
+              </Button>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Se déconnecter

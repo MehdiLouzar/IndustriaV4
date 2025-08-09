@@ -70,7 +70,7 @@ public class ContactRequestController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ListResponse<ContactRequestDto> getAllContactRequests(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit,
@@ -90,7 +90,7 @@ public class ContactRequestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ContactRequestDto> getContactRequest(@PathVariable String id) {
         return contactRequestRepository.findById(id)
                 .map(request -> ResponseEntity.ok(toDto(request)))
@@ -98,7 +98,7 @@ public class ContactRequestController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ContactRequestDto> updateStatus(
             @PathVariable String id,
             @RequestBody UpdateStatusRequest request) {
