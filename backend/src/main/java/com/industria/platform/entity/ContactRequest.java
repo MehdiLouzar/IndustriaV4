@@ -1,0 +1,89 @@
+package com.industria.platform.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "contact_requests")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ContactRequest {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ContactType contactType;
+
+    // Champs communs
+    @Column(nullable = false)
+    private String raisonSociale;
+
+    @Column(nullable = false)
+    private String contactNom;
+
+    @Column(nullable = false)
+    private String contactPrenom;
+
+    @Column(nullable = false)
+    private String contactTelephone;
+
+    @Column(nullable = false)
+    private String contactEmail;
+
+    // Champs pour aménageur
+    private String regionImplantation;
+    private String prefectureImplantation;
+    private Double superficieNetHa;
+    private Integer nombreLotTotal;
+    private Integer nombreLotNonOccupe;
+
+    // Champs pour industriel/investisseur
+    @Column(length = 100)
+    private String descriptionActivite;
+    private BigDecimal montantInvestissement;
+    private Integer nombreEmploisPrevisionnel;
+    private Double superficieSouhaitee;
+    private String regionImplantationSouhaitee;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ContactRequestStatus status = ContactRequestStatus.NOUVEAU;
+
+    private String notes;
+
+    @ManyToOne
+    @JoinColumn(name = "zone_id")
+    private Zone zone;
+
+    @ManyToOne
+    @JoinColumn(name = "parcel_id")
+    private Parcel parcel;
+
+    @ManyToOne
+    @JoinColumn(name = "managed_by")
+    private User managedBy;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}

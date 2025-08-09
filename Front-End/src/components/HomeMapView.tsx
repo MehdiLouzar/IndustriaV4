@@ -383,11 +383,14 @@ export default function HomeMapView() {
                       </Link>
                     </Button>
                     <Button 
+                      asChild
                       variant="outline" 
                       size="sm" 
                       className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold"
                     >
-                      <Phone className="w-4 h-4 mr-1" /> Contact
+                      <Link href={`/contact?zone=${zone.properties.id}`}>
+                        <Phone className="w-4 h-4 mr-1" /> Contact
+                      </Link>
                     </Button>
                   </>
                 )}

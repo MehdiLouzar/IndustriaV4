@@ -203,8 +203,10 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
               </Link>
             </Button>
           )}
-          <Button variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold">
-            <Phone className="w-4 h-4 mr-1" /> Contact
+          <Button asChild variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold">
+            <Link href={`/contact?zone=${zone.id}`}>
+              <Phone className="w-4 h-4 mr-1" /> Contact
+            </Link>
           </Button>
         </div>
       </CardContent>

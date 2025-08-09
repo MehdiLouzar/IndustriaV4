@@ -113,5 +113,40 @@ public class PermissionService {
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 
-    // Méthode supprimée car déléguée au UserService
+    /**
+     * Vérifie si l'utilisateur peut accéder à l'interface d'administration
+     */
+    public boolean canAccessAdmin() {
+        return hasRole("ADMIN") || hasRole("ZONE_MANAGER") || hasRole("MANAGER");
+    }
+
+    /**
+     * Vérifie si l'utilisateur peut voir une fonction admin spécifique
+     */
+    public boolean canAccessAdminFunction(String function) {
+        return switch (function) {
+            case "users", "countries", "regions", "zone-types", "activities", "amenities", 
+                 "construction-types", "audit-logs", "reports" -> hasRole("ADMIN");
+            case "zones", "parcels", "appointments", "contact-requests", "notifications" -> 
+                 hasRole("ADMIN") || hasRole("ZONE_MANAGER") || hasRole("MANAGER");
+            default -> false;
+        };
+    }
+
+    /**
+     * Vérifie si l'utilisateur est un simple utilisateur (sans rôles admin)
+     */
+    public boolean isRegularUser() {
+        return !hasRole("ADMIN") && !hasRole("ZONE_MANAGER") && !hasRole("MANAGER");
+    }
+
+    /**
+     * Récupère le rôle le plus élevé de l'utilisateur
+     */
+    public String getHighestRole() {
+        if (hasRole("ADMIN")) return "ADMIN";
+        if (hasRole("ZONE_MANAGER")) return "ZONE_MANAGER";
+        if (hasRole("MANAGER")) return "MANAGER";
+        return "USER";
+    }
 }

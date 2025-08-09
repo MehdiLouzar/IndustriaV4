@@ -2,6 +2,7 @@ package com.industria.platform.controller;
 
 import com.industria.platform.dto.AppointmentDto;
 import com.industria.platform.entity.Appointment;
+import com.industria.platform.entity.AppointmentStatus;
 import com.industria.platform.repository.AppointmentRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.service.AppointmentService;
@@ -126,6 +127,29 @@ public class AppointmentController {
         return ResponseEntity.ok(updatedDto);
     }
 
+    @PutMapping("/appointments/{id}/status")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
+    public ResponseEntity<AppointmentDto> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest request) {
+        if (!permissionService.canManageAppointment(id)) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+        
+        Appointment updatedAppointment = appointmentService.updateAppointmentStatus(id, request.status(), request.notes());
+        
+        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        AppointmentDto updatedDto = new AppointmentDto(
+                updatedAppointment.getId(), 
+                updatedAppointment.getContactName(), 
+                updatedAppointment.getContactEmail(), 
+                updatedAppointment.getContactPhone(),
+                updatedAppointment.getCompanyName(), 
+                updatedAppointment.getMessage(),
+                updatedAppointment.getRequestedDate() == null ? null : updatedAppointment.getRequestedDate().format(fmt),
+                updatedAppointment.getParcel() == null ? null : updatedAppointment.getParcel().getId(),
+                updatedAppointment.getStatus() == null ? null : updatedAppointment.getStatus().name());
+        return ResponseEntity.ok(updatedDto);
+    }
+
     @DeleteMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
@@ -146,4 +170,6 @@ public class AppointmentController {
     }
 
     public record AppointmentRequest(String parcelId, String contactName, String contactEmail, String contactPhone) {}
+    
+    public record UpdateStatusRequest(AppointmentStatus status, String notes) {}
 }
