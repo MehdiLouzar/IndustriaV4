@@ -20,13 +20,17 @@ class AppointmentServiceTest {
 
     private AppointmentRepository appointmentRepository;
     private ParcelRepository parcelRepository;
+    private EmailService emailService;
+    private AuditService auditService;
     private AppointmentService appointmentService;
 
     @BeforeEach
     void setUp() {
         appointmentRepository = Mockito.mock(AppointmentRepository.class);
         parcelRepository = Mockito.mock(ParcelRepository.class);
-        appointmentService = new AppointmentService(appointmentRepository, parcelRepository);
+        emailService = Mockito.mock(EmailService.class);
+        auditService = Mockito.mock(AuditService.class);
+        appointmentService = new AppointmentService(appointmentRepository, parcelRepository, emailService, auditService);
     }
 
     @Test

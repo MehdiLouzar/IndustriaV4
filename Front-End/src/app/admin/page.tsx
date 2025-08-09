@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { fetchApi } from '@/lib/utils';
+import AdminGuard from '@/components/AdminGuard';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Users,
   MapPin,
@@ -50,9 +52,10 @@ const emptyStats: AdminStats = {
 };
 
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats>(emptyStats)
+  const { canAccessFunction, permissions } = usePermissions()
   
   // Fonction de déconnexion
   const handleLogout = () => {
@@ -164,6 +167,14 @@ export default function AdminDashboard() {
       permission: ['ADMIN', 'MANAGER']
     },
     {
+      title: 'Demandes de contact',
+      description: 'Gérer les demandes de rendez-vous',
+      icon: FileText,
+      href: '/admin/contact-requests',
+      color: 'bg-blue-500',
+      permission: ['ADMIN', 'MANAGER']
+    },
+    {
       title: 'Journal d\'audit',
       description: 'Logs d\'activité système',
       icon: Activity,
@@ -181,7 +192,11 @@ export default function AdminDashboard() {
     }
   ];
 
-  const filteredCards = adminCards;
+  // Filtrer les cartes selon les permissions
+  const filteredCards = adminCards.filter(card => {
+    const functionName = card.href.replace('/admin/', '')
+    return canAccessFunction(functionName)
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -191,7 +206,9 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-              <p className="text-gray-600">Tableau de bord</p>
+              <p className="text-gray-600">
+                Tableau de bord - Rôle: <Badge variant="outline">{permissions?.role}</Badge>
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="outline" onClick={handleLogout}>
@@ -349,4 +366,8 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+}
+
+export default function AdminDashboard() {
+  return <AdminDashboardContent />;
 }

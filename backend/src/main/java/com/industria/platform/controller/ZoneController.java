@@ -104,14 +104,36 @@ public class ZoneController {
         var pageable = PageRequest.of(p - 1, l);
         var res = zoneRepository.findAll(pageable);
         
+        // Filtrer selon les permissions pour les non-ADMIN
+        List<Zone> filteredZones;
+        if (permissionService.hasRole("ADMIN")) {
+            filteredZones = res.getContent();
+        } else {
+            String currentUserEmail = userService.getCurrentUserEmail();
+            filteredZones = res.getContent().stream()
+                .filter(zone -> zone.getCreatedBy() != null && 
+                              zone.getCreatedBy().getEmail().equals(currentUserEmail))
+                .toList();
+        }
+        
         // Filtrage basique par nom/adresse si search est fourni
         if (search != null && !search.trim().isEmpty()) {
             res = zoneRepository.findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
                 search.trim(), search.trim(), pageable);
+            // Réappliquer le filtre de permissions après la recherche
+            if (!permissionService.hasRole("ADMIN")) {
+                String currentUserEmail = userService.getCurrentUserEmail();
+                filteredZones = res.getContent().stream()
+                    .filter(zone -> zone.getCreatedBy() != null && 
+                                  zone.getCreatedBy().getEmail().equals(currentUserEmail))
+                    .toList();
+            } else {
+                filteredZones = res.getContent();
+            }
         }
         
-        // Application des filtres avancés côté application (pour simplicité)
-        var filteredZones = res.getContent().stream()
+        // Application des autres filtres avancés
+        var finalFilteredZones = filteredZones.stream()
             .filter(zone -> regionId == null || regionId.isEmpty() || 
                 (zone.getRegion() != null && regionId.equals(zone.getRegion().getId())))
             .filter(zone -> zoneTypeId == null || zoneTypeId.isEmpty() || 
@@ -128,8 +150,8 @@ public class ZoneController {
                 (zone.getPrice() != null && zone.getPrice() <= maxPrice))
             .toList();
             
-        var items = filteredZones.stream().map(this::toDto).toList();
-        long totalFiltered = filteredZones.size();
+        var items = finalFilteredZones.stream().map(this::toDto).toList();
+        long totalFiltered = finalFilteredZones.size();
         int totalPagesFiltered = (int) Math.ceil((double) totalFiltered / l);
         
         return new ListResponse<>(items, totalFiltered, totalPagesFiltered, p, l);
