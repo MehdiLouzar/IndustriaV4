@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -167,6 +168,23 @@ public class AppointmentController {
         a.setContactPhone(dto.contactPhone());
         a.setCompanyName(dto.companyName());
         a.setMessage(dto.message());
+        
+        // Traitement de la date
+        if (dto.requestedDate() != null && !dto.requestedDate().trim().isEmpty()) {
+            try {
+                // Si c'est juste une date (YYYY-MM-DD), ajouter une heure par défaut
+                String dateStr = dto.requestedDate().trim();
+                if (dateStr.length() == 10) { // Format date seulement
+                    dateStr = dateStr + "T09:00:00"; // 9h par défaut
+                }
+                a.setRequestedDate(LocalDateTime.parse(dateStr));
+            } catch (Exception e) {
+                System.err.println("Erreur lors du parsing de la date: " + dto.requestedDate() + " - " + e.getMessage());
+                a.setRequestedDate(null);
+            }
+        } else {
+            a.setRequestedDate(null);
+        }
     }
 
     public record AppointmentRequest(String parcelId, String contactName, String contactEmail, String contactPhone) {}

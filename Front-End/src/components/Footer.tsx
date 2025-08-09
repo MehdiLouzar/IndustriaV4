@@ -36,9 +36,11 @@ export default function Footer() {
               <Phone className="w-5 h-5" />
               Appel (Centre d'appel)
             </Button>
-            <Button variant="ghost" className="text-white hover:bg-gray-600 flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Être contacté
+            <Button asChild variant="ghost" className="text-white hover:bg-gray-600 flex items-center gap-2">
+              <a href="/contact">
+                <Mail className="w-5 h-5" />
+                Être contacté
+              </a>
             </Button>
             <Button
               className="header-brown text-white hover:opacity-90 flex items-center gap-2"

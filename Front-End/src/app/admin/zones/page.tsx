@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -121,6 +122,11 @@ const ZoneTableRow = memo(({
         </div>
       </td>
       <td className="p-2 space-x-2 whitespace-nowrap">
+        <Button asChild size="sm" variant="outline" className="bg-industria-brown-gold text-white hover:bg-industria-olive-light">
+          <Link href={`/zones/${zone.id}`}>
+            Voir la zone
+          </Link>
+        </Button>
         <Button size="sm" onClick={() => onEdit(zone)}>Éditer</Button>
         <DeleteConfirmDialog
           itemName={zone.name}

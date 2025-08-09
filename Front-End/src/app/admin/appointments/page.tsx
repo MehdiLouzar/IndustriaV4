@@ -111,12 +111,9 @@ export default function AppointmentsAdmin() {
   }, [searchTerm, load])
 
   useEffect(() => {
-    fetchApi<ListResponse<ParcelDto>>("/api/parcels/all")
+    fetchApi<ParcelDto[]>("/api/parcels/all")
       .then((data) => {
-        const arr = data && Array.isArray(data.items) ? data.items : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
-        }
+        const arr = Array.isArray(data) ? data : []
         setParcels(arr)
       })
       .catch(() => setParcels([]))
@@ -243,7 +240,7 @@ export default function AppointmentsAdmin() {
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(a)}>Éditer</Button>
                     <DeleteConfirmDialog
-                      itemName={`Rendez-vous du ${new Date(a.appointmentDate).toLocaleDateString()}`}
+                      itemName={`Rendez-vous de ${a.contactName}`}
                       onConfirm={() => del(a.id)}
                       description={`Êtes-vous sûr de vouloir supprimer ce rendez-vous ? Cette action est irréversible.`}
                     />

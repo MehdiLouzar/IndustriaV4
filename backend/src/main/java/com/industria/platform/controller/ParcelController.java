@@ -72,8 +72,18 @@ public class ParcelController {
 
     @GetMapping("/all")
     public List<ParcelDto> allParcels() {
-        return parcelRepository.findAll()
-                .stream()
+        List<Parcel> parcels = parcelRepository.findAll();
+        
+        // Filtrer selon les permissions pour les non-ADMIN
+        if (!permissionService.hasRole("ADMIN")) {
+            String currentUserEmail = userService.getCurrentUserEmail();
+            parcels = parcels.stream()
+                .filter(parcel -> parcel.getCreatedBy() != null && 
+                              parcel.getCreatedBy().getEmail().equals(currentUserEmail))
+                .toList();
+        }
+        
+        return parcels.stream()
                 .map(this::toDto)
                 .toList();
     }
