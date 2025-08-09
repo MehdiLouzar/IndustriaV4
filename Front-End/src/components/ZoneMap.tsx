@@ -299,7 +299,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
       <MapContainer
         key={`map-${zone.id}-${zone.vertices?.length || 0}-${isMapReady}`}
         center={center}
-        zoom={11} /* Réduit de 30% : 16 - (16 × 30%) ≈ 11 */
+        zoom={14} /* Zoom modéré pour un bon équilibre */
         style={{ height: "100%", width: "100%" }}
         whenCreated={(m) => {
           mapRef.current = m;
@@ -309,9 +309,19 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
               try {
                 const bounds = L.latLngBounds(zonePolygon);
                 m.fitBounds(bounds, { padding: [20, 20] });
+                // Force un zoom modéré après fitBounds
+                setTimeout(() => {
+                  const currentZoom = m.getZoom();
+                  if (currentZoom < 13) {
+                    m.setZoom(13);
+                  }
+                }, 100);
               } catch (e) {
                 console.warn('Erreur lors du centrage:', e);
               }
+            } else {
+              // Fallback: force zoom modéré si pas de polygone
+              m.setZoom(14);
             }
           }, 200);
         }}
