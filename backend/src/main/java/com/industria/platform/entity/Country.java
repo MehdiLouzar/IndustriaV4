@@ -24,6 +24,17 @@ public class Country {
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     @ManyToOne
     @JoinColumn(name = "srs_id")
     private SpatialReferenceSystem spatialReferenceSystem;

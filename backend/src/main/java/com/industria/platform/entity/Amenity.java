@@ -24,6 +24,17 @@ public class Amenity {
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     @OneToMany(mappedBy = "amenity")
     private Set<ZoneAmenity> zones;
 

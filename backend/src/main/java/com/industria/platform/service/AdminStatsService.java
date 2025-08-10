@@ -24,16 +24,22 @@ public class AdminStatsService {
     private final ZoneRepository zoneRepository;
     private final ParcelRepository parcelRepository;
     private final AppointmentRepository appointmentRepository;
+    private final PermissionService permissionService;
+    private final UserService userService;
     
     @Autowired
     public AdminStatsService(UserRepository userRepository, 
                            ZoneRepository zoneRepository, 
                            ParcelRepository parcelRepository,
-                           AppointmentRepository appointmentRepository) {
+                           AppointmentRepository appointmentRepository,
+                           PermissionService permissionService,
+                           UserService userService) {
         this.userRepository = userRepository;
         this.zoneRepository = zoneRepository;
         this.parcelRepository = parcelRepository;
         this.appointmentRepository = appointmentRepository;
+        this.permissionService = permissionService;
+        this.userService = userService;
     }
 
     /**
@@ -42,19 +48,44 @@ public class AdminStatsService {
      * @return Statistiques du système
      */
     public AdminStatsDto getAdminStats() {
-        // Compter les utilisateurs actifs
-        Long totalUsers = userRepository.count();
+        Long totalUsers, totalZones, totalParcels, availableParcels;
+        Long totalAppointments, pendingAppointments;
         
-        // Compter les zones
-        Long totalZones = zoneRepository.count();
-        
-        // Compter les parcelles
-        Long totalParcels = parcelRepository.count();
-        Long availableParcels = parcelRepository.countByStatus(ParcelStatus.LIBRE);
-        
-        // Compter les rendez-vous
-        Long totalAppointments = appointmentRepository.count();
-        Long pendingAppointments = appointmentRepository.countPendingAppointments();
+        // Si l'utilisateur est ADMIN, voir toutes les statistiques
+        if (permissionService.hasRole("ADMIN")) {
+            totalUsers = userRepository.count();
+            totalZones = zoneRepository.count();
+            totalParcels = parcelRepository.count();
+            availableParcels = parcelRepository.countByStatus(ParcelStatus.LIBRE);
+            totalAppointments = appointmentRepository.count();
+            pendingAppointments = appointmentRepository.countPendingAppointments();
+        } 
+        // Si l'utilisateur est ZONE_MANAGER, voir seulement ses parcelles
+        else if (permissionService.hasRole("ZONE_MANAGER")) {
+            String currentUserId = userService.getCurrentUser().getId();
+            
+            // Récupérer les parcelles créées par le manager et compter
+            List<com.industria.platform.entity.Parcel> userParcels = parcelRepository.findByCreatedById(currentUserId);
+            totalParcels = (long) userParcels.size();
+            availableParcels = userParcels.stream()
+                .filter(p -> ParcelStatus.LIBRE.equals(p.getStatus()))
+                .count();
+            
+            // Les Zone Managers ne voient que leurs propres créations
+            totalUsers = 0L; // Pas d'accès aux statistiques utilisateurs
+            totalZones = 0L;  // Pas d'accès aux statistiques zones globales
+            totalAppointments = 0L; // À implémenter si nécessaire
+            pendingAppointments = 0L;
+        }
+        // Par défaut (autres rôles), aucune statistique
+        else {
+            totalUsers = 0L;
+            totalZones = 0L;
+            totalParcels = 0L;
+            availableParcels = 0L;
+            totalAppointments = 0L;
+            pendingAppointments = 0L;
+        }
         
         // Générer des activités récentes (simulées pour l'instant)
         List<AdminStatsDto.RecentActivityDto> recentActivities = generateRecentActivities();

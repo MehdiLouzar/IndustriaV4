@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import L from "leaflet";
 import proj4 from "proj4";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapPin, Home, Building2 } from "lucide-react";
+import { MapPin, Square, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
@@ -195,7 +195,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   const PARCEL_ICONS = useMemo(() => {
     const createParcelIcon = (color: string, status: string) => {
       const isShowroom = status === "SHOWROOM";
-      const IconComponent = isShowroom ? Building2 : Home;
+      const IconComponent = isShowroom ? Building2 : Square;
       
       return L.divIcon({
         html: renderToStaticMarkup(
@@ -392,13 +392,13 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                           Lat: {p.latitude.toFixed(5)}, Lon: {p.longitude.toFixed(5)}
                         </div>
                       )}
-                      {(p.status === "AVAILABLE" || p.status === "LIBRE") && p.isFree && (
+                      {(p.status === "AVAILABLE" || p.status === "LIBRE") && (
                         <Button
                           size="sm"
                           className="mt-2 w-full bg-industria-brown-gold hover:bg-industria-olive-light"
                           onClick={() => setSelected(p)}
                         >
-                          Prendre rendez-vous
+                          Réserver cette parcelle
                         </Button>
                       )}
                     </div>

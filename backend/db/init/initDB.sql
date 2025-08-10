@@ -266,6 +266,137 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM zone_amenity WHERE id = d.id);
 
 
+-- ================================================
+-- ZONES ET PARCELLES DE TEST CASABLANCA
+-- ================================================
+
+-- Zone de test avec coordonnées Lambert réalistes pour Casablanca
+-- Projection Lambert Conformal Conic Maroc (EPSG:26191)
+
+-- 1. Zone principale Casablanca Test (1km x 1km) - Coordonnées réelles Casablanca
+INSERT INTO zone (
+    id, name, description, address, total_area, price, price_type, construction_type, status,
+    geometry, srid, region_id, zone_type_id, created_at, updated_at
+) VALUES (
+    'casa-test-zone-001',
+    'Parc Industriel Casablanca Test',
+    'Zone de test pour les réservations avec parcelles disponibles',
+    'Aín Sebaá, Casablanca, Maroc',
+    1000000.0,  -- 1 km²
+    1500.0,     -- 1500 DH/m²
+    'PER_SQUARE_METER',
+    'CUSTOM_BUILD',
+    'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((423000 373000, 424000 373000, 424000 374000, 423000 374000, 423000 373000))'), 26191),
+    26191,  -- EPSG Lambert Maroc
+    'region-cas',
+    'zt-private',
+    NOW(),
+    NOW()
+);
+
+-- 2. Zone supplémentaire Casablanca Test (5 hectares) - Coordonnées réelles Mohammedia
+INSERT INTO zone (
+    id, name, description, address, total_area, price, price_type, construction_type, status,
+    geometry, srid, region_id, zone_type_id, created_at, updated_at
+) VALUES (
+    'test-zone-casa-001',
+    'Parc Industriel Mohammedia Test',
+    'Deuxième zone de test avec parcelles variées',
+    'Mohammedia, Casablanca-Settat, Maroc',
+    50000.0,  -- 5 hectares
+    1800.0,   -- 1800 DH/m²
+    'PER_SQUARE_METER',
+    'CUSTOM_BUILD',
+    'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((425000 370000, 425500 370000, 425500 370500, 425000 370500, 425000 370000))'), 26191),
+    26191,
+    'region-cas',
+    'zt-private',
+    NOW(),
+    NOW()
+);
+
+-- Activités pour les zones de test
+INSERT INTO zone_activity (id, zone_id, activity_id) VALUES
+('casa-za-1', 'casa-test-zone-001', 'act-auto'),
+('casa-za-2', 'casa-test-zone-001', 'act-log'),
+('test-za-1', 'test-zone-casa-001', 'act-auto'),
+('test-za-2', 'test-zone-casa-001', 'act-log');
+
+-- Équipements pour les zones de test
+INSERT INTO zone_amenity (id, zone_id, amenity_id) VALUES
+('casa-zam-1', 'casa-test-zone-001', 'amn-electricity'),
+('casa-zam-2', 'casa-test-zone-001', 'amn-water'),
+('casa-zam-3', 'casa-test-zone-001', 'amn-internet'),
+('casa-zam-4', 'casa-test-zone-001', 'amn-security'),
+('test-zam-1', 'test-zone-casa-001', 'amn-electricity'),
+('test-zam-2', 'test-zone-casa-001', 'amn-water'),
+('test-zam-3', 'test-zone-casa-001', 'amn-internet'),
+('test-zam-4', 'test-zone-casa-001', 'amn-security');
+
+-- Parcelles pour zone casa-test-zone-001 (répartition 3x3 dans 1km x 1km) - Coordonnées Casablanca
+INSERT INTO parcel (
+    id, reference, area, status, is_showroom, zone_id,
+    geometry, srid, created_at, updated_at
+) VALUES
+-- Ligne du haut (nord)
+('casa-parcel-a1', 'CAS-A001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373666, 423333 373666, 423333 374000, 423000 374000, 423000 373666))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-a2', 'CAS-A002', 111111.11, 'LIBRE', true, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373666, 423666 373666, 423666 374000, 423333 374000, 423333 373666))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-a3', 'CAS-A003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373666, 424000 373666, 424000 374000, 423666 374000, 423666 373666))'), 26191), 26191, NOW(), NOW()),
+
+-- Ligne du milieu
+('casa-parcel-b1', 'CAS-B001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373333, 423333 373333, 423333 373666, 423000 373666, 423000 373333))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-b2', 'CAS-B002', 111111.11, 'RESERVEE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373333, 423666 373333, 423666 373666, 423333 373666, 423333 373333))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-b3', 'CAS-B003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373333, 424000 373333, 424000 373666, 423666 373666, 423666 373333))'), 26191), 26191, NOW(), NOW()),
+
+-- Ligne du bas (sud)
+('casa-parcel-c1', 'CAS-C001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373000, 423333 373000, 423333 373333, 423000 373333, 423000 373000))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-c2', 'CAS-C002', 111111.11, 'VENDU', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373000, 423666 373000, 423666 373333, 423333 373333, 423333 373000))'), 26191), 26191, NOW(), NOW()),
+('casa-parcel-c3', 'CAS-C003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373000, 424000 373000, 424000 373333, 423666 373333, 423666 373000))'), 26191), 26191, NOW(), NOW());
+
+-- Parcelles pour zone test-zone-casa-001 (parcelles variées) - Coordonnées Mohammedia
+INSERT INTO parcel (
+    id, reference, area, status, is_showroom, zone_id,
+    geometry, srid, created_at, updated_at
+) VALUES
+-- Parcelles de différentes tailles
+('test-parcel-a1', 'MOH-A001', 2500.0, 'LIBRE', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425000 370000, 425125 370000, 425125 370200, 425000 370200, 425000 370000))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-a2', 'MOH-A002', 3000.0, 'LIBRE', true, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425125 370000, 425250 370000, 425250 370200, 425125 370200, 425125 370000))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-b1', 'MOH-B001', 4000.0, 'LIBRE', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425250 370000, 425400 370000, 425400 370200, 425250 370200, 425250 370000))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-b2', 'MOH-B002', 2800.0, 'RESERVEE', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425400 370000, 425500 370000, 425500 370200, 425400 370200, 425400 370000))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-c1', 'MOH-C001', 6000.0, 'LIBRE', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425000 370200, 425200 370200, 425200 370400, 425000 370400, 425000 370200))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-c2', 'MOH-C002', 3500.0, 'LIBRE', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425200 370200, 425350 370200, 425350 370400, 425200 370400, 425200 370200))'), 26191), 26191, NOW(), NOW()),
+('test-parcel-d1', 'MOH-D001', 2200.0, 'VENDU', false, 'test-zone-casa-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((425350 370200, 425500 370200, 425500 370400, 425350 370400, 425350 370200))'), 26191), 26191, NOW(), NOW());
+
+-- Calculer automatiquement les coordonnées WGS84 avec PostGIS pour toutes les zones de test
+UPDATE zone SET 
+  longitude = ST_X(ST_Transform(ST_Centroid(geometry), 4326)),
+  latitude = ST_Y(ST_Transform(ST_Centroid(geometry), 4326))
+WHERE id IN ('casa-test-zone-001', 'test-zone-casa-001');
+
+-- Calculer automatiquement les coordonnées WGS84 avec PostGIS pour toutes les parcelles de test
+UPDATE parcel SET 
+  longitude = ST_X(ST_Transform(ST_Centroid(geometry), 4326)),
+  latitude = ST_Y(ST_Transform(ST_Centroid(geometry), 4326))
+WHERE zone_id IN ('casa-test-zone-001', 'test-zone-casa-001');
+
 -- Message de fin
 DO $$
 BEGIN
