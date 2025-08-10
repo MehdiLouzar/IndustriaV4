@@ -62,18 +62,29 @@ public class AdminStatsService {
         } 
         // Si l'utilisateur est ZONE_MANAGER, voir seulement ses parcelles
         else if (permissionService.hasRole("ZONE_MANAGER")) {
-            String currentUserId = userService.getCurrentUser().getId();
+            String currentUserEmail = userService.getCurrentUserEmail();
             
-            // Récupérer les parcelles créées par le manager et compter
-            List<com.industria.platform.entity.Parcel> userParcels = parcelRepository.findByCreatedById(currentUserId);
+            // Récupérer toutes les parcelles et filtrer par email du créateur
+            List<com.industria.platform.entity.Parcel> allParcels = parcelRepository.findAll();
+            List<com.industria.platform.entity.Parcel> userParcels = allParcels.stream()
+                .filter(parcel -> parcel.getCreatedBy() != null && 
+                              parcel.getCreatedBy().getEmail().equals(currentUserEmail))
+                .toList();
+            
             totalParcels = (long) userParcels.size();
             availableParcels = userParcels.stream()
                 .filter(p -> ParcelStatus.LIBRE.equals(p.getStatus()))
                 .count();
+                
+            // Compter les zones créées par le manager  
+            List<com.industria.platform.entity.Zone> allZones = zoneRepository.findAll();
+            totalZones = allZones.stream()
+                .filter(zone -> zone.getCreatedBy() != null && 
+                              zone.getCreatedBy().getEmail().equals(currentUserEmail))
+                .count();
             
             // Les Zone Managers ne voient que leurs propres créations
             totalUsers = 0L; // Pas d'accès aux statistiques utilisateurs
-            totalZones = 0L;  // Pas d'accès aux statistiques zones globales
             totalAppointments = 0L; // À implémenter si nécessaire
             pendingAppointments = 0L;
         }

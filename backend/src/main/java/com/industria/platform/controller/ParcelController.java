@@ -5,6 +5,7 @@ import com.industria.platform.dto.VertexDto;
 import com.industria.platform.entity.AuditAction;
 import com.industria.platform.entity.Parcel;
 import com.industria.platform.entity.ParcelStatus;
+import com.industria.platform.entity.User;
 import com.industria.platform.entity.Zone;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
@@ -66,9 +67,23 @@ public class ParcelController {
             : (zoneId != null ?
                 parcelRepository.findByZoneId(zoneId, pageable) :
                 parcelRepository.findAll(pageable));
+        
+        // Filtrer selon les permissions pour les non-ADMIN
+        List<Parcel> filteredParcels;
+        if (!permissionService.hasRole("ADMIN")) {
+            String currentUserEmail = userService.getCurrentUserEmail();
+            filteredParcels = res.getContent().stream()
+                .filter(parcel -> parcel.getCreatedBy() != null && 
+                              parcel.getCreatedBy().getEmail().equals(currentUserEmail))
+                .toList();
+        } else {
+            // ADMIN voit toutes les parcelles
+            filteredParcels = res.getContent();
+        }
                 
-        var items = res.getContent().stream().map(this::toDto).toList();
-        return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
+        var items = filteredParcels.stream().map(this::toDto).toList();
+        return new ListResponse<>(items, (long) filteredParcels.size(), 
+            (int) Math.ceil((double) filteredParcels.size() / l), res.getTotalPages(), p, l);
     }
 
     @GetMapping("/all")
@@ -83,6 +98,7 @@ public class ParcelController {
                               parcel.getCreatedBy().getEmail().equals(currentUserEmail))
                 .toList();
         }
+        // ADMIN voit toutes les parcelles (pas de filtrage)
         
         return parcels.stream()
                 .map(this::toDto)
@@ -106,7 +122,12 @@ public class ParcelController {
         updateEntity(p, dto);
         
         // Définir automatiquement le créateur
-        p.setCreatedBy(userService.getCurrentUser());
+        User currentUser = userService.getCurrentUser();
+        if (currentUser != null) {
+            p.setCreatedBy(currentUser);
+        } else {
+            throw new RuntimeException("Utilisateur non authentifié : impossible de créer une parcelle");
+        }
         
         parcelRepository.save(p);
         
@@ -187,7 +208,12 @@ public class ParcelController {
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
-                vertices, p.getLongitude(), p.getLatitude());
+                vertices, p.getLongitude(), p.getLatitude(),
+                p.getCos(), p.getCus(), p.getHeightLimit(), p.getSetback(),
+                p.getZone() == null ? null : p.getZone().getName(),
+                p.getZone() == null ? null : p.getZone().getAddress(),
+                p.getZone() == null ? null : p.getZone().getPrice(),
+                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()));
     }
 
     private void updateEntity(Parcel p, ParcelDto dto) {

@@ -2,6 +2,7 @@ package com.industria.platform.controller;
 
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.dto.ZoneDto;
+import com.industria.platform.dto.ParcelDto;
 import com.industria.platform.entity.*;
 import com.industria.platform.exception.EntityNotFoundException;
 import com.industria.platform.exception.ForbiddenException;
@@ -90,24 +91,29 @@ public class ZoneController {
         var pageable = PageRequest.of(p - 1, l);
         var res = zoneRepository.findAll(pageable);
         
-        // Filtrer selon les permissions pour les non-ADMIN
-        List<Zone> filteredZones;
-
-        filteredZones = res.getContent();
-
         if (search != null && !search.trim().isEmpty()) {
             res = zoneRepository.findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
                 search.trim(), search.trim(), pageable);
-            // Réappliquer le filtre de permissions après la recherche
-            if (!permissionService.hasRole("ADMIN")) {
+        }
+        
+        // Filtrer selon les permissions seulement pour les utilisateurs connectés non-ADMIN
+        List<Zone> filteredZones;
+        try {
+            // Vérifier si l'utilisateur est connecté et a un rôle spécifique
+            if (permissionService.hasRole("ZONE_MANAGER")) {
+                // ZONE_MANAGER voit seulement ses zones
                 String currentUserEmail = userService.getCurrentUserEmail();
                 filteredZones = res.getContent().stream()
                     .filter(zone -> zone.getCreatedBy() != null && 
                                   zone.getCreatedBy().getEmail().equals(currentUserEmail))
                     .toList();
             } else {
+                // ADMIN et utilisateurs non connectés voient toutes les zones
                 filteredZones = res.getContent();
             }
+        } catch (Exception e) {
+            // Utilisateur non connecté - voir toutes les zones
+            filteredZones = res.getContent();
         }
         
         // Application des autres filtres avancés
@@ -137,7 +143,30 @@ public class ZoneController {
 
     @GetMapping("/all")
     public List<ZoneDto> allZones() {
-        return zoneRepository.findAllWithParcels().stream().map(this::toDto).toList();
+        log.debug("Loading all zones with parcels");
+        List<Zone> zones = zoneRepository.findAllWithParcels();
+        log.debug("Loaded {} zones from repository", zones.size());
+        
+        // Filtrer selon les permissions seulement pour les ZONE_MANAGER connectés
+        try {
+            if (permissionService.hasRole("ZONE_MANAGER")) {
+                // ZONE_MANAGER voit seulement ses zones
+                String currentUserEmail = userService.getCurrentUserEmail();
+                zones = zones.stream()
+                    .filter(zone -> zone.getCreatedBy() != null && 
+                                  zone.getCreatedBy().getEmail().equals(currentUserEmail))
+                    .toList();
+                log.debug("Filtered to {} zones for ZONE_MANAGER {}", zones.size(), currentUserEmail);
+            }
+            // ADMIN et utilisateurs non connectés voient toutes les zones
+        } catch (Exception e) {
+            // Utilisateur non connecté - voir toutes les zones (pas de filtrage)
+            log.debug("No filtering applied - user not connected or no specific role");
+        }
+        
+        List<ZoneDto> result = zones.stream().map(this::toDto).toList();
+        log.debug("Returning {} zone DTOs", result.size());
+        return result;
     }
 
     @GetMapping("/{id}")
@@ -160,10 +189,10 @@ public class ZoneController {
             User currentUser = userService.getCurrentUser();
             if (currentUser != null) {
                 z.setCreatedBy(currentUser);
-                log.debug("DEBUG: Créateur défini: {}",currentUser.getEmail() );
+                log.debug("Créateur défini: {}", currentUser.getEmail());
             } else {
-
-                log.debug("Aucun utilisateur connecté, création sans créateur");
+                log.error("Aucun utilisateur connecté pour créer la zone");
+                throw new RuntimeException("Utilisateur non authentifié : impossible de créer une zone");
             }
             
             Zone saved = zoneRepository.save(z);
@@ -273,6 +302,23 @@ public class ZoneController {
             log.error("Error counting parcels for zone {}", z.getId(), e);
         }
         
+        // Convertir les parcelles en DTOs si elles existent
+        List<ParcelDto> parcelDtos = List.of();
+        log.debug("Zone {}: getParcels() = {}", z.getId(), z.getParcels() != null ? z.getParcels().size() : "null");
+        
+        if (z.getParcels() != null && !z.getParcels().isEmpty()) {
+            try {
+                parcelDtos = z.getParcels().stream()
+                    .map(this::convertParcelToDto)
+                    .toList();
+                log.debug("Zone {} has {} parcels converted to DTOs", z.getId(), parcelDtos.size());
+            } catch (Exception e) {
+                log.error("Error converting parcels for zone {}", z.getId(), e);
+            }
+        } else {
+            log.debug("Zone {} has no parcels or parcels is null", z.getId());
+        }
+
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -290,8 +336,72 @@ public class ZoneController {
                 z.getLatitude(),  // Utiliser les coordonnées pré-calculées
                 z.getLongitude(), // Utiliser les coordonnées pré-calculées
                 totalParcels,
-                availableParcels
+                availableParcels,
+                parcelDtos
         );
+    }
+
+    private ParcelDto convertParcelToDto(com.industria.platform.entity.Parcel p) {
+        List<VertexDto> vertices = List.of();
+        
+        // Récupérer la géométrie depuis PostGIS en format texte
+        try {
+            java.util.Optional<String> geometryText = parcelRepository.findGeometryAsText(p.getId());
+            if (geometryText.isPresent()) {
+                vertices = parseParcelGeometry(geometryText.get());
+            }
+        } catch (Exception e) {
+            log.error("Error extracting parcel geometry for {}", p.getId(), e);
+        }
+        
+        return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
+                p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
+                p.getZone() == null ? null : p.getZone().getId(),
+                vertices, p.getLongitude(), p.getLatitude(),
+                p.getCos(), p.getCus(), p.getHeightLimit(), p.getSetback(),
+                p.getZone() == null ? null : p.getZone().getName(),
+                p.getZone() == null ? null : p.getZone().getAddress(),
+                p.getZone() == null ? null : p.getZone().getPrice(),
+                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()));
+    }
+
+    private List<VertexDto> parseParcelGeometry(String wkt) {
+        if (wkt == null || wkt.trim().isEmpty()) return List.of();
+        
+        // Extraire les coordonnées du POLYGON((x1 y1, x2 y2, ...))
+        String coords = wkt;
+        if (coords.startsWith("POLYGON((")) {
+            coords = coords.substring(9); // Remove "POLYGON(("
+        }
+        if (coords.endsWith("))")) {
+            coords = coords.substring(0, coords.length() - 2); // Remove "))"
+        }
+        
+        List<VertexDto> verts = new ArrayList<>();
+        String[] coordPairs = coords.split(",");
+        
+        for (int i = 0; i < coordPairs.length; i++) {
+            String[] xy = coordPairs[i].trim().split("\\s+");
+            if (xy.length >= 2) {
+                try {
+                    double x = Double.parseDouble(xy[0]);
+                    double y = Double.parseDouble(xy[1]);
+                    
+                    // Éviter de dupliquer le premier point (qui ferme le polygone)
+                    if (i == coordPairs.length - 1 && verts.size() > 0) {
+                        VertexDto firstVertex = verts.get(0);
+                        if (Math.abs(firstVertex.lambertX() - x) < 0.001 && Math.abs(firstVertex.lambertY() - y) < 0.001) {
+                            break; // Skip the closing duplicate point
+                        }
+                    }
+                    
+                    verts.add(new VertexDto(i, x, y));
+                } catch (NumberFormatException e) {
+                    log.warn("Could not parse coordinates: {} {}", xy[0], xy.length > 1 ? xy[1] : "");
+                }
+            }
+        }
+        return verts;
     }
 
     private void updateEntity(Zone z, ZoneDto dto) {

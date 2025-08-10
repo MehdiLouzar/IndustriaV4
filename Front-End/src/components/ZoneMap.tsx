@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import L from "leaflet";
 import proj4 from "proj4";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapPin, Square, Building2 } from "lucide-react";
+import { MapPin, Home, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
@@ -195,7 +195,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   const PARCEL_ICONS = useMemo(() => {
     const createParcelIcon = (color: string, status: string) => {
       const isShowroom = status === "SHOWROOM";
-      const IconComponent = isShowroom ? Building2 : Square;
+      const IconComponent = isShowroom ? Building2 : Home;
       
       return L.divIcon({
         html: renderToStaticMarkup(

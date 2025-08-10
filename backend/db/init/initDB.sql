@@ -9,7 +9,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Users (avec gestion des conflits)
+-- Users de base pour les données de test (seront synchronisés avec Keycloak lors de la première connexion)
 INSERT INTO users (
     id, email, password, name, company, phone, role,
     created_at, updated_at, deleted_at
@@ -22,7 +22,7 @@ SELECT * FROM (VALUES
     ('user-demo', 'demo@entreprise.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
      'Utilisateur Démo', 'Entreprise Démo SA', '+212 6 12 34 56 78', 'USER', NOW(), NOW(), NULL::timestamp without time zone)
 ) AS data(id, email, password, name, company, phone, role, created_at, updated_at, deleted_at)
-WHERE NOT EXISTS (SELECT 1 FROM users);
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = data.email);
 
 -- Spatial reference systems
 INSERT INTO spatial_reference_system (
@@ -111,7 +111,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as latitude,
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as longitude,
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-private', 'region-cas', 'user-admin'
+    'zt-private', 'region-cas', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-demo')
 
 UNION ALL
@@ -125,7 +125,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424000 373500, 424200 373500, 424200 373700, 424000 373700, 424000 373500))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-public', 'region-cas', 'user-admin'
+    'zt-public', 'region-cas', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-casa-nord')
 
 UNION ALL
@@ -139,7 +139,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((409201.18 369451.53, 409639.39 368996.57, 409763.12 368701.53, 409854.56 368701.5, 409874.98 368535.76, 409901.57 368332.92, 409954.02 368056.56, 409957.84 368038.85, 410025.04 367870.11, 410201.81 367573.04, 410291.56 367448.47, 410374.16 367349.62, 410511.24 367195.09, 410533.95 367167.98, 409747.77 367450.59, 409177.19 367596.6, 409169.8 367713.76, 409079.41 367761.79, 409093.04 367817.5, 409207.3 368014.74, 409272.68 368149.4, 409154.81 368156.65, 409177.97 368416.89, 409297.11 368471.41, 409302.81 368473.53, 409295.06 368673.32, 409240.68 368810.94, 409439.13 368804.35, 409201.18 369451.53))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-public', 'region-rab', 'user-admin'
+    'zt-public', 'region-rab', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-piaj')
 
 UNION ALL
@@ -153,7 +153,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((356080.37 362485.7, 356300.3 362622.77, 356362.67 362678.46, 356382.85 362654.5, 356488.42 362741.75, 356414.57 362826.04, 356652.88 362572.56, 356402.7 362384.79, 356205.35 362159.02, 356069.83 362316.55, 356056.8 362334.26, 356051.06 362334.96, 355943.48 362290.95, 355924.29 362492.89, 355931.72 362495.13, 355940.2 362390.88, 355947.7 362297.1, 356063.49 362345.51, 356074.42 362421.96, 356082.49 362454.89, 356080.37 362485.7))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-free-zone', 'region-rab', 'user-admin'
+    'zt-free-zone', 'region-rab', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-zaina')
 
 UNION ALL
@@ -167,7 +167,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((351900.19 363533.59, 351989.68 363531.3, 351988.73 363461.25, 352188.64 363456.87, 352187.55 363381.01, 352384.73 363378.29, 352381.99 363232.45, 352287.38 363208.55, 352241.53 363105.9, 352244.52 363034.29, 352303.18 362994.99, 352241.33 362969.6, 352074.35 362901.55, 351963.88 362855.44, 351980.16 362887.19, 352030.09 363036.02, 352045.39 363088.39, 351909.06 363178.15, 351931.83 363461.12, 351900.19 363533.59))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-logistics', 'region-rab', 'user-admin'
+    'zt-logistics', 'region-rab', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-ottawa')
 
 UNION ALL
@@ -181,7 +181,7 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-private', 'region-mar', 'user-admin'
+    'zt-private', 'region-mar', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1');
 
 
@@ -199,7 +199,7 @@ SELECT
     26191,
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423450 372880, 423480 372880, 423480 372910, 423450 372910, 423450 372880))'), 26191)), 4326)),
-    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-1')
 
 UNION ALL
@@ -211,7 +211,7 @@ SELECT
     26191,
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423500 372890, 423530 372890, 423530 372920, 423500 372920, 423500 372890))'), 26191)), 4326)),
-    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'user-admin'
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-demo', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-2')
 
 UNION ALL
@@ -223,7 +223,7 @@ SELECT
     26191,
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
-    NOW(), NOW(), NULL::timestamp without time zone, 'zone-casa-nord', 'user-admin'
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-casa-nord', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-3');
 
 
@@ -276,7 +276,7 @@ WHERE NOT EXISTS (SELECT 1 FROM zone_amenity WHERE id = d.id);
 -- 1. Zone principale Casablanca Test (1km x 1km) - Coordonnées réelles Casablanca
 INSERT INTO zone (
     id, name, description, address, total_area, price, price_type, construction_type, status,
-    geometry, srid, region_id, zone_type_id, created_at, updated_at
+    geometry, srid, region_id, zone_type_id, created_by, created_at, updated_at
 ) VALUES (
     'casa-test-zone-001',
     'Parc Industriel Casablanca Test',
@@ -291,6 +291,7 @@ INSERT INTO zone (
     26191,  -- EPSG Lambert Maroc
     'region-cas',
     'zt-private',
+    'admin@industria.ma',
     NOW(),
     NOW()
 );
@@ -298,7 +299,7 @@ INSERT INTO zone (
 -- 2. Zone supplémentaire Casablanca Test (5 hectares) - Coordonnées réelles Mohammedia
 INSERT INTO zone (
     id, name, description, address, total_area, price, price_type, construction_type, status,
-    geometry, srid, region_id, zone_type_id, created_at, updated_at
+    geometry, srid, region_id, zone_type_id, created_by, created_at, updated_at
 ) VALUES (
     'test-zone-casa-001',
     'Parc Industriel Mohammedia Test',
@@ -313,6 +314,7 @@ INSERT INTO zone (
     26191,
     'region-cas',
     'zt-private',
+    'admin@industria.ma',
     NOW(),
     NOW()
 );
@@ -338,52 +340,52 @@ INSERT INTO zone_amenity (id, zone_id, amenity_id) VALUES
 -- Parcelles pour zone casa-test-zone-001 (répartition 3x3 dans 1km x 1km) - Coordonnées Casablanca
 INSERT INTO parcel (
     id, reference, area, status, is_showroom, zone_id,
-    geometry, srid, created_at, updated_at
+    geometry, srid, created_by, created_at, updated_at
 ) VALUES
 -- Ligne du haut (nord)
 ('casa-parcel-a1', 'CAS-A001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423000 373666, 423333 373666, 423333 374000, 423000 374000, 423000 373666))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373666, 423333 373666, 423333 374000, 423000 374000, 423000 373666))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-a2', 'CAS-A002', 111111.11, 'LIBRE', true, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423333 373666, 423666 373666, 423666 374000, 423333 374000, 423333 373666))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373666, 423666 373666, 423666 374000, 423333 374000, 423333 373666))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-a3', 'CAS-A003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423666 373666, 424000 373666, 424000 374000, 423666 374000, 423666 373666))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373666, 424000 373666, 424000 374000, 423666 374000, 423666 373666))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 
 -- Ligne du milieu
 ('casa-parcel-b1', 'CAS-B001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423000 373333, 423333 373333, 423333 373666, 423000 373666, 423000 373333))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373333, 423333 373333, 423333 373666, 423000 373666, 423000 373333))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-b2', 'CAS-B002', 111111.11, 'RESERVEE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423333 373333, 423666 373333, 423666 373666, 423333 373666, 423333 373333))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373333, 423666 373333, 423666 373666, 423333 373666, 423333 373333))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-b3', 'CAS-B003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423666 373333, 424000 373333, 424000 373666, 423666 373666, 423666 373333))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373333, 424000 373333, 424000 373666, 423666 373666, 423666 373333))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 
 -- Ligne du bas (sud)
 ('casa-parcel-c1', 'CAS-C001', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423000 373000, 423333 373000, 423333 373333, 423000 373333, 423000 373000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423000 373000, 423333 373000, 423333 373333, 423000 373333, 423000 373000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-c2', 'CAS-C002', 111111.11, 'VENDU', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423333 373000, 423666 373000, 423666 373333, 423333 373333, 423333 373000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((423333 373000, 423666 373000, 423666 373333, 423333 373333, 423333 373000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('casa-parcel-c3', 'CAS-C003', 111111.11, 'LIBRE', false, 'casa-test-zone-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((423666 373000, 424000 373000, 424000 373333, 423666 373333, 423666 373000))'), 26191), 26191, NOW(), NOW());
+ ST_SetSRID(ST_GeomFromText('POLYGON((423666 373000, 424000 373000, 424000 373333, 423666 373333, 423666 373000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW());
 
 -- Parcelles pour zone test-zone-casa-001 (parcelles variées) - Coordonnées Mohammedia
 INSERT INTO parcel (
     id, reference, area, status, is_showroom, zone_id,
-    geometry, srid, created_at, updated_at
+    geometry, srid, created_by, created_at, updated_at
 ) VALUES
 -- Parcelles de différentes tailles
 ('test-parcel-a1', 'MOH-A001', 2500.0, 'LIBRE', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425000 370000, 425125 370000, 425125 370200, 425000 370200, 425000 370000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425000 370000, 425125 370000, 425125 370200, 425000 370200, 425000 370000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-a2', 'MOH-A002', 3000.0, 'LIBRE', true, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425125 370000, 425250 370000, 425250 370200, 425125 370200, 425125 370000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425125 370000, 425250 370000, 425250 370200, 425125 370200, 425125 370000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-b1', 'MOH-B001', 4000.0, 'LIBRE', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425250 370000, 425400 370000, 425400 370200, 425250 370200, 425250 370000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425250 370000, 425400 370000, 425400 370200, 425250 370200, 425250 370000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-b2', 'MOH-B002', 2800.0, 'RESERVEE', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425400 370000, 425500 370000, 425500 370200, 425400 370200, 425400 370000))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425400 370000, 425500 370000, 425500 370200, 425400 370200, 425400 370000))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-c1', 'MOH-C001', 6000.0, 'LIBRE', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425000 370200, 425200 370200, 425200 370400, 425000 370400, 425000 370200))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425000 370200, 425200 370200, 425200 370400, 425000 370400, 425000 370200))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-c2', 'MOH-C002', 3500.0, 'LIBRE', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425200 370200, 425350 370200, 425350 370400, 425200 370400, 425200 370200))'), 26191), 26191, NOW(), NOW()),
+ ST_SetSRID(ST_GeomFromText('POLYGON((425200 370200, 425350 370200, 425350 370400, 425200 370400, 425200 370200))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW()),
 ('test-parcel-d1', 'MOH-D001', 2200.0, 'VENDU', false, 'test-zone-casa-001',
- ST_SetSRID(ST_GeomFromText('POLYGON((425350 370200, 425500 370200, 425500 370400, 425350 370400, 425350 370200))'), 26191), 26191, NOW(), NOW());
+ ST_SetSRID(ST_GeomFromText('POLYGON((425350 370200, 425500 370200, 425500 370400, 425350 370400, 425350 370200))'), 26191), 26191, 'admin@industria.ma', NOW(), NOW());
 
 -- Calculer automatiquement les coordonnées WGS84 avec PostGIS pour toutes les zones de test
 UPDATE zone SET 
@@ -391,11 +393,68 @@ UPDATE zone SET
   latitude = ST_Y(ST_Transform(ST_Centroid(geometry), 4326))
 WHERE id IN ('casa-test-zone-001', 'test-zone-casa-001');
 
+-- Zone et parcelles de test pour le ZONE_MANAGER (user-manager)
+INSERT INTO zone (
+    id, name, description, address, total_area, price, price_type, construction_type, status,
+    geometry, srid, region_id, zone_type_id, created_by, created_at, updated_at
+) VALUES (
+    'manager-zone-001',
+    'Zone Manager Test',
+    'Zone de test créée par le Zone Manager',
+    'Zone Test Manager, Casablanca',
+    25000.0,  -- 2.5 hectares
+    2000.0,   -- 2000 DH/m²
+    'PER_SQUARE_METER',
+    'CUSTOM_BUILD',
+    'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((426000 375000, 426500 375000, 426500 375500, 426000 375500, 426000 375000))'), 26191),
+    26191,
+    'region-cas',
+    'zt-private',
+    'manager@industria.ma',  -- Créé par le manager
+    NOW(),
+    NOW()
+);
+
+-- Parcelles pour le zone manager
+INSERT INTO parcel (
+    id, reference, area, status, is_showroom, zone_id,
+    geometry, srid, created_by, created_at, updated_at
+) VALUES
+('manager-parcel-1', 'MGR-001', 5000.0, 'LIBRE', false, 'manager-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((426000 375000, 426250 375000, 426250 375250, 426000 375250, 426000 375000))'), 26191), 
+ 26191, 'manager@industria.ma', NOW(), NOW()),
+('manager-parcel-2', 'MGR-002', 7500.0, 'RESERVEE', false, 'manager-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((426250 375000, 426500 375000, 426500 375250, 426250 375250, 426250 375000))'), 26191), 
+ 26191, 'manager@industria.ma', NOW(), NOW()),
+('manager-parcel-3', 'MGR-003', 6000.0, 'LIBRE', true, 'manager-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((426000 375250, 426300 375250, 426300 375500, 426000 375500, 426000 375250))'), 26191), 
+ 26191, 'manager@industria.ma', NOW(), NOW()),
+('manager-parcel-4', 'MGR-004', 6500.0, 'VENDU', false, 'manager-zone-001',
+ ST_SetSRID(ST_GeomFromText('POLYGON((426300 375250, 426500 375250, 426500 375500, 426300 375500, 426300 375250))'), 26191), 
+ 26191, 'manager@industria.ma', NOW(), NOW());
+
+-- Activités pour la zone du manager
+INSERT INTO zone_activity (id, zone_id, activity_id) VALUES
+('manager-za-1', 'manager-zone-001', 'act-textile'),
+('manager-za-2', 'manager-zone-001', 'act-log');
+
+-- Équipements pour la zone du manager
+INSERT INTO zone_amenity (id, zone_id, amenity_id) VALUES
+('manager-zam-1', 'manager-zone-001', 'amn-electricity'),
+('manager-zam-2', 'manager-zone-001', 'amn-water'),
+('manager-zam-3', 'manager-zone-001', 'amn-internet');
+
 -- Calculer automatiquement les coordonnées WGS84 avec PostGIS pour toutes les parcelles de test
 UPDATE parcel SET 
   longitude = ST_X(ST_Transform(ST_Centroid(geometry), 4326)),
   latitude = ST_Y(ST_Transform(ST_Centroid(geometry), 4326))
-WHERE zone_id IN ('casa-test-zone-001', 'test-zone-casa-001');
+WHERE zone_id IN ('casa-test-zone-001', 'test-zone-casa-001', 'manager-zone-001');
+
+UPDATE zone SET 
+  longitude = ST_X(ST_Transform(ST_Centroid(geometry), 4326)),
+  latitude = ST_Y(ST_Transform(ST_Centroid(geometry), 4326))
+WHERE id IN ('casa-test-zone-001', 'test-zone-casa-001', 'manager-zone-001');
 
 -- Message de fin
 DO $$

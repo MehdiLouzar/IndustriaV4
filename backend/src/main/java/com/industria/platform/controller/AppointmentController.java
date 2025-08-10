@@ -41,13 +41,19 @@ public class AppointmentController {
         appointment.setContactName(request.contactName());
         appointment.setContactEmail(request.contactEmail());
         appointment.setContactPhone(request.contactPhone());
+        appointment.setCompanyName(request.company());
+        appointment.setActivityType(request.activityType());
+        appointment.setProjectDescription(request.projectDescription());
+        appointment.setInvestmentBudget(request.investmentBudget());
+        appointment.setPreferredDate(request.preferredDate());
+        appointment.setPreferredTime(request.preferredTime());
+        appointment.setUrgency(request.urgency());
         return appointmentService.createAppointment(appointment, request.parcelId());
     }
 
     @GetMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public List<AppointmentDto> all(Authentication authentication) {
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
         List<Appointment> appointments = appointmentRepository.findAll();
         
         // Filtrer pour les ZONE_MANAGER : seulement leurs rendez-vous
@@ -57,13 +63,7 @@ public class AppointmentController {
                 .toList();
         }
         
-        return appointments.stream().map(a -> new AppointmentDto(
-                a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name()
-        )).toList();
+        return appointments.stream().map(this::toDto).toList();
     }
 
     @GetMapping("/appointments/{id}")
@@ -74,13 +74,7 @@ public class AppointmentController {
         }
         
         Appointment a = appointmentRepository.findById(id).orElseThrow();
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto dto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(toDto(a));
     }
 
     @PostMapping("/appointments")
@@ -96,14 +90,7 @@ public class AppointmentController {
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
         appointmentRepository.save(a);
-        
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto createdDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(createdDto);
+        return ResponseEntity.ok(toDto(a));
     }
 
     @PutMapping("/appointments/{id}")
@@ -118,14 +105,7 @@ public class AppointmentController {
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
         appointmentRepository.save(a);
-        
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto updatedDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(updatedDto);
+        return ResponseEntity.ok(toDto(a));
     }
 
     @PutMapping("/appointments/{id}/status")
@@ -136,19 +116,7 @@ public class AppointmentController {
         }
         
         Appointment updatedAppointment = appointmentService.updateAppointmentStatus(id, request.status(), request.notes());
-        
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto updatedDto = new AppointmentDto(
-                updatedAppointment.getId(), 
-                updatedAppointment.getContactName(), 
-                updatedAppointment.getContactEmail(), 
-                updatedAppointment.getContactPhone(),
-                updatedAppointment.getCompanyName(), 
-                updatedAppointment.getMessage(),
-                updatedAppointment.getRequestedDate() == null ? null : updatedAppointment.getRequestedDate().format(fmt),
-                updatedAppointment.getParcel() == null ? null : updatedAppointment.getParcel().getId(),
-                updatedAppointment.getStatus() == null ? null : updatedAppointment.getStatus().name());
-        return ResponseEntity.ok(updatedDto);
+        return ResponseEntity.ok(toDto(updatedAppointment));
     }
 
     @DeleteMapping("/appointments/{id}")
@@ -162,12 +130,39 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
+    private AppointmentDto toDto(Appointment a) {
+        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        return new AppointmentDto(
+            a.getId(), 
+            a.getContactName(), 
+            a.getContactEmail(), 
+            a.getContactPhone(),
+            a.getCompanyName(), 
+            a.getMessage(),
+            a.getActivityType(),
+            a.getProjectDescription(),
+            a.getInvestmentBudget(),
+            a.getPreferredDate(),
+            a.getPreferredTime(),
+            a.getUrgency(),
+            a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
+            a.getParcel() == null ? null : a.getParcel().getId(),
+            a.getStatus() == null ? null : a.getStatus().name()
+        );
+    }
+
     private void updateEntity(Appointment a, AppointmentDto dto) {
         a.setContactName(dto.contactName());
         a.setContactEmail(dto.contactEmail());
         a.setContactPhone(dto.contactPhone());
         a.setCompanyName(dto.companyName());
         a.setMessage(dto.message());
+        a.setActivityType(dto.activityType());
+        a.setProjectDescription(dto.projectDescription());
+        a.setInvestmentBudget(dto.investmentBudget());
+        a.setPreferredDate(dto.preferredDate());
+        a.setPreferredTime(dto.preferredTime());
+        a.setUrgency(dto.urgency());
         
         // Traitement de la date
         if (dto.requestedDate() != null && !dto.requestedDate().trim().isEmpty()) {
@@ -187,7 +182,19 @@ public class AppointmentController {
         }
     }
 
-    public record AppointmentRequest(String parcelId, String contactName, String contactEmail, String contactPhone) {}
+    public record AppointmentRequest(
+        String parcelId, 
+        String contactName, 
+        String contactEmail, 
+        String contactPhone,
+        String company,
+        String activityType,
+        String projectDescription,
+        String investmentBudget,
+        String preferredDate,
+        String preferredTime,
+        String urgency
+    ) {}
     
     public record UpdateStatusRequest(AppointmentStatus status, String notes) {}
 }

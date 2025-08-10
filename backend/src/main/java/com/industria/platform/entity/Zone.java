@@ -67,7 +67,7 @@ public class Zone {
     private Region region;
 
     @ManyToOne
-    @JoinColumn(name = "created_by")
+    @JoinColumn(name = "created_by", referencedColumnName = "email")
     private User createdBy;
 
     @OneToMany(mappedBy = "zone")

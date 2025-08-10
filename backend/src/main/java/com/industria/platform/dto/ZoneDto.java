@@ -18,4 +18,5 @@ public record ZoneDto(String id,
                       Double latitude,
                       Double longitude,
                       Integer totalParcels,
-                      Integer availableParcels) {}
+                      Integer availableParcels,
+                      List<ParcelDto> parcels) {}

@@ -14,6 +14,6 @@ public interface ZoneRepository extends JpaRepository<Zone, String> {
     Page<Zone> findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
         String nameKeyword, String addressKeyword, Pageable pageable);
     
-    @Query("SELECT z FROM Zone z LEFT JOIN FETCH z.parcels")
+    @Query("SELECT DISTINCT z FROM Zone z LEFT JOIN FETCH z.parcels p LEFT JOIN FETCH p.createdBy")
     List<Zone> findAllWithParcels();
 }

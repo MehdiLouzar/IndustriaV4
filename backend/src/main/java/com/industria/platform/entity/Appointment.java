@@ -20,6 +20,15 @@ public class Appointment {
     private String contactPhone;
     private String companyName;
     private String message;
+    
+    // Nouveaux champs ajoutés pour le formulaire amélioré
+    private String activityType;
+    private String projectDescription;
+    private String investmentBudget;
+    private String preferredDate;
+    private String preferredTime;
+    private String urgency;
+    
     private LocalDateTime requestedDate;
     private LocalDateTime confirmedDate;
 

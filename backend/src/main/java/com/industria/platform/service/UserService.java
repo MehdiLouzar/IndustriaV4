@@ -17,6 +17,7 @@ public class UserService {
 
     /**
      * Obtient l'utilisateur actuel depuis le contexte de sécurité
+     * Crée automatiquement l'utilisateur local s'il n'existe pas (synchronisation Keycloak)
      */
     public User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -26,9 +27,63 @@ public class UserService {
 
         String userEmail = getCurrentUserEmail(auth);
         if (userEmail != null) {
-            return userRepository.findByEmail(userEmail).orElse(null);
+            // Chercher l'utilisateur local
+            return userRepository.findByEmail(userEmail)
+                .orElseGet(() -> createUserFromKeycloak(auth, userEmail));
         }
 
+        return null;
+    }
+
+    /**
+     * Crée ou met à jour un utilisateur local à partir des informations Keycloak JWT
+     */
+    private User createUserFromKeycloak(Authentication auth, String email) {
+        try {
+            if (auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+                // Vérifier si l'utilisateur existe déjà (créé par initDB.sql par exemple)
+                User user = userRepository.findByEmail(email).orElse(new User());
+                user.setEmail(email);
+                
+                // Construire le nom complet de manière sûre
+                String firstName = jwt.getClaimAsString("given_name");
+                String lastName = jwt.getClaimAsString("family_name");
+                String fullName = "";
+                if (firstName != null && !firstName.isEmpty()) {
+                    fullName = firstName;
+                }
+                if (lastName != null && !lastName.isEmpty()) {
+                    if (!fullName.isEmpty()) fullName += " ";
+                    fullName += lastName;
+                }
+                user.setName(fullName.isEmpty() ? email : fullName);
+                
+                user.setCompany("Keycloak Import");
+                user.setPhone(jwt.getClaimAsString("phone_number"));
+                
+                // Extraire le rôle depuis les claims Keycloak
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+                if (realmAccess != null && realmAccess.get("roles") instanceof java.util.List<?> roles) {
+                    // Définir le rôle le plus élevé trouvé
+                    if (roles.contains("ADMIN")) {
+                        user.setRole(com.industria.platform.entity.UserRole.ADMIN);
+                    } else if (roles.contains("ZONE_MANAGER")) {
+                        user.setRole(com.industria.platform.entity.UserRole.ZONE_MANAGER);
+                    } else {
+                        user.setRole(com.industria.platform.entity.UserRole.USER);
+                    }
+                } else {
+                    // Rôle par défaut si aucun rôle trouvé
+                    user.setRole(com.industria.platform.entity.UserRole.USER);
+                }
+                
+                return userRepository.save(user);
+            }
+        } catch (Exception e) {
+            // Log l'erreur mais continue avec null
+            System.err.println("Erreur lors de la création d'utilisateur depuis Keycloak: " + e.getMessage());
+        }
         return null;
     }
 
