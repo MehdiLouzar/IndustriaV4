@@ -3,6 +3,8 @@ package com.industria.platform.controller;
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.dto.ZoneDto;
 import com.industria.platform.entity.*;
+import com.industria.platform.exception.EntityNotFoundException;
+import com.industria.platform.exception.ForbiddenException;
 import com.industria.platform.repository.*;
 import com.industria.platform.service.StatusService;
 import com.industria.platform.service.GeometryUpdateService;
@@ -10,7 +12,9 @@ import com.industria.platform.service.PermissionService;
 import com.industria.platform.service.UserService;
 import com.industria.platform.service.PostGISGeometryService;
 import com.industria.platform.service.AuditService;
-import jakarta.persistence.EntityNotFoundException;
+import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,7 +27,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/zones")
+@AllArgsConstructor
 public class ZoneController {
+    private static final Logger log = LoggerFactory.getLogger(ZoneController.class);
 
     private final StatusService statusService;
     private final ZoneRepository zoneRepository;
@@ -40,50 +46,28 @@ public class ZoneController {
     private final PostGISGeometryService postGISGeometryService;
     private final AuditService auditService;
 
-    public ZoneController(StatusService statusService,
-                          ZoneRepository zoneRepository,
-                          ParcelRepository parcelRepository,
-                          ActivityRepository activityRepository,
-                          AmenityRepository amenityRepository,
-                          ZoneActivityRepository zoneActivityRepository,
-                          ZoneAmenityRepository zoneAmenityRepository,
-                          ZoneTypeRepository zoneTypeRepository,
-                          RegionRepository regionRepository,
-                          GeometryUpdateService geometryUpdateService,
-                          PermissionService permissionService,
-                          UserService userService,
-                          PostGISGeometryService postGISGeometryService,
-                          AuditService auditService) {
-        this.statusService = statusService;
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.activityRepository = activityRepository;
-        this.amenityRepository = amenityRepository;
-        this.zoneActivityRepository = zoneActivityRepository;
-        this.zoneAmenityRepository = zoneAmenityRepository;
-        this.zoneTypeRepository = zoneTypeRepository;
-        this.regionRepository = regionRepository;
-        this.geometryUpdateService = geometryUpdateService;
-        this.permissionService = permissionService;
-        this.userService = userService;
-        this.postGISGeometryService = postGISGeometryService;
-        this.auditService = auditService;
-    }
+
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<Zone> updateStatus(@PathVariable String id, @RequestBody StatusRequest request) {
+        log.debug("Updating status for zone: {} to {}", id, request.status());
+
         if (!permissionService.canModifyZone(id)) {
-            return ResponseEntity.status(403).build(); // Forbidden
+            log.warn("User attempted to modify zone {} without permission", id);
+            throw new ForbiddenException("Zone", "modify");
         }
-        Zone oldZone = zoneRepository.findById(id).orElse(null);
+        Zone oldZone = zoneRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Zone", id));
         Zone zone = statusService.updateZoneStatus(id, request.status());
         
         auditService.log(AuditAction.UPDATE, "Zone", id, 
             oldZone != null ? oldZone.getStatus() : null, 
             zone.getStatus(), 
             "Changement de statut de la zone: " + zone.getName());
-        
+
+        assert oldZone != null;
+        log.info("Zone {} status updated from {} to {}", id, oldZone.getStatus(), zone.getStatus());
+
         return ResponseEntity.ok(zone);
     }
 
@@ -98,6 +82,8 @@ public class ZoneController {
                                      @RequestParam(required = false) Double maxArea,
                                      @RequestParam(required = false) Double minPrice,
                                      @RequestParam(required = false) Double maxPrice) {
+        log.debug("Fetching zones - page: {}, limit: {}, search: {}", page, limit, search);
+
         int p = Math.max(1, page);
         int l = Math.min(Math.max(1, limit), 100);
         
@@ -106,17 +92,9 @@ public class ZoneController {
         
         // Filtrer selon les permissions pour les non-ADMIN
         List<Zone> filteredZones;
-        if (permissionService.hasRole("ADMIN")) {
-            filteredZones = res.getContent();
-        } else {
-            String currentUserEmail = userService.getCurrentUserEmail();
-            filteredZones = res.getContent().stream()
-                .filter(zone -> zone.getCreatedBy() != null && 
-                              zone.getCreatedBy().getEmail().equals(currentUserEmail))
-                .toList();
-        }
-        
-        // Filtrage basique par nom/adresse si search est fourni
+
+        filteredZones = res.getContent();
+
         if (search != null && !search.trim().isEmpty()) {
             res = zoneRepository.findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
                 search.trim(), search.trim(), pageable);
@@ -172,7 +150,9 @@ public class ZoneController {
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ZoneDto create(@RequestBody ZoneDto dto) {
         try {
-            System.out.println("DEBUG: Création d'une nouvelle zone: " + dto.name());
+
+            log.debug("Création d'une nouvelle zone: {}", dto.name());
+
             Zone z = new Zone();
             updateEntity(z, dto);
             
@@ -180,13 +160,15 @@ public class ZoneController {
             User currentUser = userService.getCurrentUser();
             if (currentUser != null) {
                 z.setCreatedBy(currentUser);
-                System.out.println("DEBUG: Créateur défini: " + currentUser.getEmail());
+                log.debug("DEBUG: Créateur défini: {}",currentUser.getEmail() );
             } else {
-                System.out.println("DEBUG: Aucun utilisateur connecté, création sans créateur");
+
+                log.debug("Aucun utilisateur connecté, création sans créateur");
             }
             
             Zone saved = zoneRepository.save(z);
-            System.out.println("DEBUG: Zone sauvegardée avec ID: " + saved.getId());
+
+            log.debug("Zone sauvegardée avec ID: {}",saved.getId());
             
             auditService.log(AuditAction.CREATE, "Zone", saved.getId(), 
                 null, saved, 
@@ -194,7 +176,8 @@ public class ZoneController {
             
             return toDto(saved);
         } catch (Exception e) {
-            System.err.println("ERREUR lors de la création de la zone: " + e.getMessage());
+
+            log.error("ERREUR lors de la création de la zone: {} ",e.getMessage());
             e.printStackTrace();
             throw e;
         }
@@ -203,9 +186,10 @@ public class ZoneController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<ZoneDto> update(@PathVariable String id, @RequestBody ZoneDto dto) {
+        log.info("Updating zone: {}", id);
         if (!permissionService.canModifyZone(id)) {
-            return ResponseEntity.status(403).build(); // Forbidden
-        }
+            log.warn("User attempted to modify zone {} without permission", id);
+            throw new ForbiddenException("Zone", "modify");        }
         
         Zone oldZone = zoneRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found with id: " + id));
@@ -220,6 +204,8 @@ public class ZoneController {
         auditService.log(AuditAction.UPDATE, "Zone", id, 
             zoneClone, oldZone, 
             "Modification de la zone: " + oldZone.getName());
+        log.info("Zone {} updated successfully", id);
+
         
         return ResponseEntity.ok(toDto(oldZone));
     }
@@ -227,11 +213,13 @@ public class ZoneController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
+        log.info("Deleting zone: {}", id);
         if (!permissionService.canModifyZone(id)) {
-            return ResponseEntity.status(403).build(); // Forbidden
+            log.warn("User attempted to delete zone {} without permission", id);
+            throw new ForbiddenException("Zone", "delete");
         }
         
-        Zone zone = zoneRepository.findById(id).orElse(null);
+        Zone zone = zoneRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Zone not found with id: " + id));
         if (zone == null) {
             return ResponseEntity.notFound().build();
         }
@@ -240,9 +228,11 @@ public class ZoneController {
             // Nettoyer manuellement les relations zone_activities et zone_amenities
             // car elles n'ont pas de cascade delete
             if (zone.getActivities() != null && !zone.getActivities().isEmpty()) {
+                log.debug("Deleting {} zone activities", zone.getActivities().size());
                 zoneActivityRepository.deleteAll(zone.getActivities());
             }
             if (zone.getAmenities() != null && !zone.getAmenities().isEmpty()) {
+                log.debug("Deleting {} zone amenities", zone.getAmenities().size());
                 zoneAmenityRepository.deleteAll(zone.getAmenities());
             }
             
@@ -252,12 +242,11 @@ public class ZoneController {
             auditService.log(AuditAction.DELETE, "Zone", id, 
                 zone, null, 
                 "Suppression de la zone: " + zone.getName());
-            
+            log.info("Zone {} deleted successfully", id);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            System.err.println("Erreur lors de la suppression de la zone " + id + ": " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).build();
+            log.error("Error deleting zone {}", id, e);
+            throw new RuntimeException("Failed to delete zone: " + e.getMessage());
         }
     }
 
@@ -267,8 +256,8 @@ public class ZoneController {
         try {
             vertices = postGISGeometryService.extractZoneVertices(z.getId());
         } catch (Exception e) {
-            System.err.println("Erreur lors de l'extraction des vertices pour zone " + z.getId() + ": " + e.getMessage());
-            // Fallback vers les coordonnées stockées dans les colonnes latitude/longitude
+            log.error("Error extracting vertices for zone {}", z.getId(), e);
+
         }
         
         // Calculer le nombre total de parcelles et parcelles disponibles directement depuis le repository
@@ -279,9 +268,9 @@ public class ZoneController {
             // Utiliser le ParcelRepository pour compter les parcelles
             totalParcels = parcelRepository.countByZoneId(z.getId());
             availableParcels = parcelRepository.countByZoneIdAndStatus(z.getId(), ParcelStatus.LIBRE);
-            System.err.println("DEBUG: Zone " + z.getId() + " has " + totalParcels + " total parcels and " + availableParcels + " available parcels");
+            log.trace("Zone {} has {} total parcels, {} available", z.getId(), totalParcels, availableParcels);
         } catch (Exception e) {
-            System.err.println("Erreur lors du comptage des parcelles pour zone " + z.getId() + ": " + e.getMessage());
+            log.error("Error counting parcels for zone {}", z.getId(), e);
         }
         
         return new ZoneDto(
@@ -306,7 +295,7 @@ public class ZoneController {
     }
 
     private void updateEntity(Zone z, ZoneDto dto) {
-        System.out.println("DEBUG: updateEntity appelé pour zone " + z.getId());
+        log.trace("Updating zone entity with data from DTO");
         z.setName(dto.name());
         z.setDescription(dto.description());
         z.setAddress(dto.address());
@@ -334,18 +323,17 @@ public class ZoneController {
             if (newGeometry != null) {
                 z.setGeometry(newGeometry);
                 z.setSrid(4326);
-                
-                System.out.println("DEBUG: Vertices reçus: " + dto.vertices());
-                System.out.println("DEBUG: Nouvelle géométrie générée: " + newGeometry);
+
+                log.debug("Updating zone geometry with {} vertices", dto.vertices().size());
+
                 // Calculer automatiquement les coordonnées WGS84
                 geometryUpdateService.updateZoneCoordinates(z, dto.vertices());
             } else {
-                System.out.println("DEBUG: Géométrie générée nulle, conservation de l'existante");
+                log.warn("Failed to build geometry from vertices");
             }
         } else {
-            System.out.println("DEBUG: Aucun vertex fourni, conservation de la géométrie existante");
-            System.out.println("DEBUG: Géométrie actuelle préservée pour zone " + z.getId());
-            // Ne pas appeler geometryUpdateService pour éviter de réinitialiser les coordonnées
+            log.trace("No vertices provided, preserving existing geometry");
+
         }
 
         // Initialiser les collections si nécessaire
@@ -389,22 +377,7 @@ public class ZoneController {
         }
     }
 
-    // Méthode parseGeometry() supprimée - remplacée par PostGISGeometryService.extractZoneVertices()
-    // pour éviter la corruption des coordonnées Lambert
 
-    private double[] parseCentroid(String wkt) {
-        if (wkt == null) return new double[]{0, 0};
-        String numbers = wkt.replaceAll("[^0-9.\\- ]", " ");
-        String[] parts = numbers.trim().split(" +");
-        double sumX = 0, sumY = 0; int count = 0;
-        for (int i = 0; i + 1 < parts.length; i += 2) {
-            sumX += Double.parseDouble(parts[i]);
-            sumY += Double.parseDouble(parts[i + 1]);
-            count++;
-        }
-        if (count == 0) return new double[]{0, 0};
-        return new double[]{sumX / count, sumY / count};
-    }
 
     private String buildGeometry(List<VertexDto> verts) {
         if (verts == null || verts.isEmpty()) return null;
