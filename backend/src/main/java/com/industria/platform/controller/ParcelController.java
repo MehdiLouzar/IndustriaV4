@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Optional;
 import org.springframework.data.domain.PageRequest;
 import com.industria.platform.dto.ListResponse;
 
@@ -175,7 +176,14 @@ public class ParcelController {
     }
 
     private ParcelDto toDto(Parcel p) {
-        List<VertexDto> vertices = parseGeometry(p.getGeometry());
+        List<VertexDto> vertices = List.of();
+        
+        // Récupérer la géométrie depuis PostGIS en format texte
+        Optional<String> geometryText = parcelRepository.findGeometryAsText(p.getId());
+        if (geometryText.isPresent()) {
+            vertices = parseGeometry(geometryText.get());
+        }
+        
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -215,10 +223,38 @@ public class ParcelController {
     private List<VertexDto> parseGeometry(String wkt) {
         if (wkt == null || wkt.trim().isEmpty()) return List.of();
         
+        System.out.println("DEBUG: Parsing WKT: " + wkt);
+        
+        // Extraire les coordonnées du POLYGON((x1 y1, x2 y2, ...))
+        String coords = wkt;
+        if (coords.startsWith("POLYGON((")) {
+            coords = coords.substring(9); // Remove "POLYGON(("
+        }
+        if (coords.endsWith("))")) {
+            coords = coords.substring(0, coords.length() - 2); // Remove "))"
+        }
+        
+        System.out.println("DEBUG: Extracted coords: " + coords);
+        
         List<VertexDto> verts = new ArrayList<>();
-        String[] parts = wkt.replaceAll("[^0-9. ]", "").trim().split("\\s+");
-        for (int i = 0; i < parts.length - 1; i += 2) {
-            verts.add(new VertexDto(i / 2, Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
+        String[] coordPairs = coords.split(",");
+        
+        for (int i = 0; i < coordPairs.length; i++) {
+            String[] xy = coordPairs[i].trim().split("\\s+");
+            if (xy.length >= 2) {
+                double x = Double.parseDouble(xy[0]);
+                double y = Double.parseDouble(xy[1]);
+                
+                // Éviter de dupliquer le premier point (qui ferme le polygone)
+                if (i == coordPairs.length - 1 && verts.size() > 0) {
+                    VertexDto firstVertex = verts.get(0);
+                    if (Math.abs(firstVertex.lambertX() - x) < 0.001 && Math.abs(firstVertex.lambertY() - y) < 0.001) {
+                        break; // Skip the closing duplicate point
+                    }
+                }
+                
+                verts.add(new VertexDto(i, x, y));
+            }
         }
         return verts;
     }

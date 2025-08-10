@@ -24,6 +24,9 @@ interface Parcel {
   isShowroom?: boolean
   area?: number | null;
   zoneId?: string | null
+  vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
+  latitude?: number | null
+  longitude?: number | null
 }
 
 interface ZoneResponse {
@@ -258,13 +261,6 @@ export default function ZonePage() {
                           <span className="text-sm font-medium text-industria-olive-light">Showroom disponible</span>
                         </div>
                       )}
-                      <Button 
-                        onClick={() => setShowForm(true)}
-                        className="w-full bg-industria-brown-gold hover:bg-industria-olive-light text-white mt-3"
-                        disabled={parcel.status !== 'LIBRE'}
-                      >
-                        {parcel.status === 'LIBRE' ? 'Demander info' : 'Non disponible'}
-                      </Button>
                     </div>
                   </div>
                 ))}

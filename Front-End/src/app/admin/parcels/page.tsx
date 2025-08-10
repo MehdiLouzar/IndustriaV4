@@ -161,7 +161,7 @@ export default function ParcelsAdmin() {
     }
   }, [])
 
-  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+  const load = useCallback(async (page: number, search: string) => {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: itemsPerPage.toString()
@@ -178,23 +178,27 @@ export default function ParcelsAdmin() {
       const arr = Array.isArray(p.items) ? p.items : []
       setItems(arr)
       setTotalPages(p.totalPages || 1)
-      setCurrentPage(p.page || 1)
+      // Ne pas mettre à jour currentPage ici pour éviter les boucles
     } else {
       setItems([])
     }
-  }, [currentPage, itemsPerPage, searchTerm])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(currentPage) }, [currentPage])
+  }, [itemsPerPage])
 
-  // Effet pour la recherche
+  // Effet principal pour charger les données
   useEffect(() => {
+    load(currentPage, searchTerm)
+  }, [currentPage, load, searchTerm])
+
+  // Effet pour la recherche - retour à la page 1 avec debounce
+  useEffect(() => {
+    if (searchTerm === '') return // Pas de debounce si pas de recherche
+    
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
-      load(1, searchTerm)
-    }, 300) // Debounce de 300ms
+      setCurrentPage(1) // Force le retour à la page 1 lors d'une recherche
+    }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, load])
+  }, [searchTerm])
 
 
   useEffect(() => {

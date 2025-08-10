@@ -28,6 +28,11 @@ public class AuditLog {
     private String userAgent;
     private LocalDateTime createdAt;
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
