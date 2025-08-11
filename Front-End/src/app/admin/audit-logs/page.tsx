@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { fetchApi, downloadFile } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
 import {
@@ -186,19 +186,25 @@ export default function AuditLogsAdmin() {
   }
 
   async function exportLogs() {
-    const params = new URLSearchParams({
-      format: 'csv'
-    })
-    
-    // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
-    if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
-    if (filters.entity) params.append('entity', filters.entity)
-    if (filters.userId) params.append('userId', filters.userId)
-    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
-    if (filters.dateTo) params.append('dateTo', filters.dateTo)
-    if (filters.search) params.append('search', filters.search)
-    
-    window.open(`/api/admin/audit-logs/export?${params}`, '_blank')
+    try {
+      const params = new URLSearchParams({
+        format: 'csv'
+      })
+      
+      // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
+      if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
+      if (filters.entity) params.append('entity', filters.entity)
+      if (filters.userId) params.append('userId', filters.userId)
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
+      if (filters.dateTo) params.append('dateTo', filters.dateTo)
+      if (filters.search) params.append('search', filters.search)
+      
+      await downloadFile('/api/admin/audit-logs/export', params, 'audit_logs_export.csv')
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'export des logs d\'audit:', error)
+      alert('Erreur lors de l\'export. Veuillez réessayer.')
+    }
   }
 
   return (

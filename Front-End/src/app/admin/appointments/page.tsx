@@ -25,7 +25,6 @@ interface Appointment {
   contactEmail: string
   contactPhone: string
   companyName: string
-  message: string
   activityType: string
   projectDescription: string
   investmentBudget: string
@@ -59,7 +58,6 @@ export default function AppointmentsAdmin() {
     contactEmail: '',
     contactPhone: '',
     companyName: '',
-    message: '',
     activityType: '',
     projectDescription: '',
     investmentBudget: '',
@@ -150,7 +148,6 @@ export default function AppointmentsAdmin() {
       contactEmail: form.contactEmail || undefined,
       contactPhone: form.contactPhone || undefined,
       companyName: form.companyName || undefined,
-      message: form.message || undefined,
       activityType: form.activityType || undefined,
       projectDescription: form.projectDescription || undefined,
       investmentBudget: form.investmentBudget || undefined,
@@ -181,7 +178,6 @@ export default function AppointmentsAdmin() {
       contactEmail: '',
       contactPhone: '',
       companyName: '',
-      message: '',
       activityType: '',
       projectDescription: '',
       investmentBudget: '',
@@ -203,7 +199,6 @@ export default function AppointmentsAdmin() {
       contactEmail: it.contactEmail ?? '',
       contactPhone: it.contactPhone ?? '',
       companyName: it.companyName ?? '',
-      message: it.message ?? '',
       activityType: it.activityType ?? '',
       projectDescription: it.projectDescription ?? '',
       investmentBudget: it.investmentBudget ?? '',
@@ -228,7 +223,6 @@ export default function AppointmentsAdmin() {
       contactEmail: '',
       contactPhone: '',
       companyName: '',
-      message: '',
       activityType: '',
       projectDescription: '',
       investmentBudget: '',
@@ -353,10 +347,6 @@ export default function AppointmentsAdmin() {
             <div>
               <Label htmlFor="companyName">Société</Label>
               <Input id="companyName" name="companyName" value={form.companyName} onChange={handleChange} />
-            </div>
-            <div>
-              <Label htmlFor="message">Message</Label>
-              <Input id="message" name="message" value={form.message} onChange={handleChange} />
             </div>
             <div>
               <Label htmlFor="activityType">Type d'activité</Label>

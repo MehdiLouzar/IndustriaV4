@@ -168,3 +168,56 @@ export async function fetchApi<T>(
     return text as unknown as T;
   }
 }
+
+/**
+ * Fonction utilitaire pour télécharger des fichiers depuis l'API avec authentification
+ */
+export async function downloadFile(
+  endpoint: string,
+  params: URLSearchParams = new URLSearchParams(),
+  defaultFilename: string = 'export.csv'
+): Promise<void> {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('Token d\'authentification manquant')
+    }
+
+    const response = await fetch(`http://localhost:8080${endpoint}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+
+    // Extraire le nom de fichier depuis les headers si disponible
+    const contentDisposition = response.headers.get('content-disposition')
+    let filename = defaultFilename
+    if (contentDisposition) {
+      const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition)
+      if (matches != null && matches[1]) {
+        filename = matches[1].replace(/['"]/g, '')
+      }
+    }
+
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+    console.error('Erreur lors du téléchargement:', error)
+    throw error
+  }
+}

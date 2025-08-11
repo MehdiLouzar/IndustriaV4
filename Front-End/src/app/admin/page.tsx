@@ -135,8 +135,8 @@ function AdminDashboardContent() {
       permission: ['ADMIN']
     },
     {
-      title: 'Activités & Équipements',
-      description: 'Gérer les types d\'activités et équipements',
+      title: 'Activités',
+      description: 'Gérer les types d\'activités',
       icon: Settings,
       href: '/admin/activities',
       color: 'bg-red-500',

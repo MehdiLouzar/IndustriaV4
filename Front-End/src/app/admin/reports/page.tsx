@@ -13,7 +13,7 @@ import {
   BarChart3, Calendar, Download, Filter, TrendingUp, Users, 
   Building2, MapPin, Eye, FileText, PieChart, Activity
 } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { fetchApi, downloadFile } from '@/lib/utils'
 
 interface ReportStats {
   totalZones: number
@@ -79,7 +79,9 @@ export default function ReportsPage() {
         to: dateRange.to
       })
       
-      window.open(`/api/admin/reports/export?${params}`, '_blank')
+      const defaultFilename = `rapport_${format}.${format === 'excel' ? 'xlsx' : format}`
+      await downloadFile('/api/admin/reports/export', params, defaultFilename)
+      
     } catch (error) {
       console.error('Erreur lors de l\'export:', error)
       setError('Erreur lors de l\'export du rapport')
