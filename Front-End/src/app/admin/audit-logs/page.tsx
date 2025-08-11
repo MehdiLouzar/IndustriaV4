@@ -56,7 +56,7 @@ export default function AuditLogsAdmin() {
   
   // Filtres
   const [filters, setFilters] = useState({
-    action: '',
+    action: 'ALL',
     entity: '',
     userId: '',
     dateFrom: '',
@@ -66,13 +66,20 @@ export default function AuditLogsAdmin() {
 
   async function loadLogs(page = currentPage) {
     const params = new URLSearchParams({
-      page: page.toString(),
-      limit: itemsPerPage.toString(),
-      ...filters
+      page: (page - 1).toString(),
+      size: itemsPerPage.toString()
     })
     
+    // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
+    if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
+    if (filters.entity) params.append('entity', filters.entity)
+    if (filters.userId) params.append('userId', filters.userId)
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
+    if (filters.dateTo) params.append('dateTo', filters.dateTo)
+    if (filters.search) params.append('search', filters.search)
+    
     const response = await fetchApi<any>(
-      `/api/audit-logs?page=${page - 1}&size=${itemsPerPage}`
+      `/api/audit-logs?${params}`
     ).catch(() => null)
     
     if (response && Array.isArray(response.content)) {
@@ -169,7 +176,7 @@ export default function AuditLogsAdmin() {
 
   function resetFilters() {
     setFilters({
-      action: '',
+      action: 'ALL',
       entity: '',
       userId: '',
       dateFrom: '',
@@ -180,9 +187,16 @@ export default function AuditLogsAdmin() {
 
   async function exportLogs() {
     const params = new URLSearchParams({
-      format: 'csv',
-      ...filters
+      format: 'csv'
     })
+    
+    // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
+    if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
+    if (filters.entity) params.append('entity', filters.entity)
+    if (filters.userId) params.append('userId', filters.userId)
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
+    if (filters.dateTo) params.append('dateTo', filters.dateTo)
+    if (filters.search) params.append('search', filters.search)
     
     window.open(`/api/admin/audit-logs/export?${params}`, '_blank')
   }
@@ -224,7 +238,7 @@ export default function AuditLogsAdmin() {
                     <SelectValue placeholder="Toutes les actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Toutes les actions</SelectItem>
+                    <SelectItem value="ALL">Toutes les actions</SelectItem>
                     {AUDIT_ACTIONS.map((action) => (
                       <SelectItem key={action.value} value={action.value}>
                         {action.label}

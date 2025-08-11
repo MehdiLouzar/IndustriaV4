@@ -26,6 +26,12 @@ interface Appointment {
   contactPhone: string
   companyName: string
   message: string
+  activityType: string
+  projectDescription: string
+  investmentBudget: string
+  preferredDate: string
+  preferredTime: string
+  urgency: string
   requestedDate: string
   parcelId: string
   status: string
@@ -54,6 +60,12 @@ export default function AppointmentsAdmin() {
     contactPhone: '',
     companyName: '',
     message: '',
+    activityType: '',
+    projectDescription: '',
+    investmentBudget: '',
+    preferredDate: '',
+    preferredTime: '',
+    urgency: '',
     requestedDate: '',
     parcelId: '',
     status: 'PENDING',
@@ -139,6 +151,12 @@ export default function AppointmentsAdmin() {
       contactPhone: form.contactPhone || undefined,
       companyName: form.companyName || undefined,
       message: form.message || undefined,
+      activityType: form.activityType || undefined,
+      projectDescription: form.projectDescription || undefined,
+      investmentBudget: form.investmentBudget || undefined,
+      preferredDate: form.preferredDate || undefined,
+      preferredTime: form.preferredTime || undefined,
+      urgency: form.urgency || undefined,
       requestedDate: form.requestedDate || undefined,
       parcelId: form.parcelId || undefined,
       status: form.status,
@@ -164,6 +182,12 @@ export default function AppointmentsAdmin() {
       contactPhone: '',
       companyName: '',
       message: '',
+      activityType: '',
+      projectDescription: '',
+      investmentBudget: '',
+      preferredDate: '',
+      preferredTime: '',
+      urgency: '',
       requestedDate: '',
       parcelId: '',
       status: 'PENDING',
@@ -180,6 +204,12 @@ export default function AppointmentsAdmin() {
       contactPhone: it.contactPhone ?? '',
       companyName: it.companyName ?? '',
       message: it.message ?? '',
+      activityType: it.activityType ?? '',
+      projectDescription: it.projectDescription ?? '',
+      investmentBudget: it.investmentBudget ?? '',
+      preferredDate: it.preferredDate ?? '',
+      preferredTime: it.preferredTime ?? '',
+      urgency: it.urgency ?? '',
       requestedDate: it.requestedDate ? it.requestedDate.slice(0, 10) : '',
       parcelId: it.parcelId ?? '',
       status: it.status,
@@ -199,6 +229,12 @@ export default function AppointmentsAdmin() {
       contactPhone: '',
       companyName: '',
       message: '',
+      activityType: '',
+      projectDescription: '',
+      investmentBudget: '',
+      preferredDate: '',
+      preferredTime: '',
+      urgency: '',
       requestedDate: '',
       parcelId: '',
       status: 'PENDING',
@@ -226,6 +262,10 @@ export default function AppointmentsAdmin() {
             <thead>
               <tr className="border-b text-left">
                 <th className="p-2">Contact</th>
+                <th className="p-2">Société</th>
+                <th className="p-2">Activité</th>
+                <th className="p-2">Description du projet</th>
+                <th className="p-2">Urgence</th>
                 <th className="p-2">Statut</th>
                 <th className="p-2">Parcelle</th>
                 <th className="p-2 w-32"></th>
@@ -234,8 +274,39 @@ export default function AppointmentsAdmin() {
             <tbody>
               {(Array.isArray(items) ? items : []).map((a) => (
                 <tr key={a.id} className="border-b last:border-0">
-                  <td className="p-2 align-top">{a.contactName}</td>
-                  <td className="p-2 align-top">{a.status}</td>
+                  <td className="p-2 align-top">
+                    <div className="font-medium">{a.contactName}</div>
+                    <div className="text-xs text-gray-500">{a.contactEmail}</div>
+                  </td>
+                  <td className="p-2 align-top">{a.companyName}</td>
+                  <td className="p-2 align-top">{a.activityType}</td>
+                  <td className="p-2 align-top">
+                    <div className="max-w-xs">
+                      <p className="text-sm text-gray-900 truncate" title={a.projectDescription || 'Aucune description'}>
+                        {a.projectDescription || 'Aucune description'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="p-2 align-top">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      a.urgency === 'urgent' ? 'bg-red-100 text-red-800' :
+                      a.urgency === 'moyen-terme' ? 'bg-yellow-100 text-yellow-800' :
+                      a.urgency === 'long-terme' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {a.urgency}
+                    </span>
+                  </td>
+                  <td className="p-2 align-top">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      a.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                      a.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
+                      a.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {a.status}
+                    </span>
+                  </td>
                   <td className="p-2 align-top">{a.parcelId}</td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(a)}>Éditer</Button>
@@ -286,6 +357,30 @@ export default function AppointmentsAdmin() {
             <div>
               <Label htmlFor="message">Message</Label>
               <Input id="message" name="message" value={form.message} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="activityType">Type d'activité</Label>
+              <Input id="activityType" name="activityType" value={form.activityType} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="projectDescription">Description du projet</Label>
+              <Input id="projectDescription" name="projectDescription" value={form.projectDescription} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="investmentBudget">Budget d'investissement</Label>
+              <Input id="investmentBudget" name="investmentBudget" value={form.investmentBudget} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="preferredDate">Date préférée</Label>
+              <Input id="preferredDate" name="preferredDate" type="date" value={form.preferredDate} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="preferredTime">Créneau préféré</Label>
+              <Input id="preferredTime" name="preferredTime" value={form.preferredTime} onChange={handleChange} />
+            </div>
+            <div>
+              <Label htmlFor="urgency">Urgence</Label>
+              <Input id="urgency" name="urgency" value={form.urgency} onChange={handleChange} />
             </div>
             <div>
               <Label htmlFor="requestedDate">Date souhaitée</Label>

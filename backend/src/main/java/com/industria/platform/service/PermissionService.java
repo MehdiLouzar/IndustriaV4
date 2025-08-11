@@ -109,6 +109,9 @@ public class PermissionService {
     }
 
     private boolean hasRole(Authentication auth, String role) {
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
         return auth.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }

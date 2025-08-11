@@ -13,7 +13,7 @@ import com.industria.platform.service.PermissionService;
 import com.industria.platform.service.UserService;
 import com.industria.platform.service.PostGISGeometryService;
 import com.industria.platform.service.AuditService;
-import lombok.AllArgsConstructor;
+import com.industria.platform.service.GeometryParsingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,7 +28,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/zones")
-@AllArgsConstructor
 public class ZoneController {
     private static final Logger log = LoggerFactory.getLogger(ZoneController.class);
 
@@ -46,6 +45,39 @@ public class ZoneController {
     private final UserService userService;
     private final PostGISGeometryService postGISGeometryService;
     private final AuditService auditService;
+    private final GeometryParsingService geometryParsingService;
+
+    public ZoneController(StatusService statusService,
+                         ZoneRepository zoneRepository,
+                         ParcelRepository parcelRepository,
+                         ActivityRepository activityRepository,
+                         AmenityRepository amenityRepository,
+                         ZoneActivityRepository zoneActivityRepository,
+                         ZoneAmenityRepository zoneAmenityRepository,
+                         ZoneTypeRepository zoneTypeRepository,
+                         RegionRepository regionRepository,
+                         GeometryUpdateService geometryUpdateService,
+                         PermissionService permissionService,
+                         UserService userService,
+                         PostGISGeometryService postGISGeometryService,
+                         AuditService auditService,
+                         GeometryParsingService geometryParsingService) {
+        this.statusService = statusService;
+        this.zoneRepository = zoneRepository;
+        this.parcelRepository = parcelRepository;
+        this.activityRepository = activityRepository;
+        this.amenityRepository = amenityRepository;
+        this.zoneActivityRepository = zoneActivityRepository;
+        this.zoneAmenityRepository = zoneAmenityRepository;
+        this.zoneTypeRepository = zoneTypeRepository;
+        this.regionRepository = regionRepository;
+        this.geometryUpdateService = geometryUpdateService;
+        this.permissionService = permissionService;
+        this.userService = userService;
+        this.postGISGeometryService = postGISGeometryService;
+        this.auditService = auditService;
+        this.geometryParsingService = geometryParsingService;
+    }
 
 
 
@@ -88,36 +120,40 @@ public class ZoneController {
         int p = Math.max(1, page);
         int l = Math.min(Math.max(1, limit), 100);
         
-        var pageable = PageRequest.of(p - 1, l);
-        var res = zoneRepository.findAll(pageable);
+        // Récupérer TOUTES les zones d'abord (pas de pagination initiale)
+        List<Zone> allZones;
         
         if (search != null && !search.trim().isEmpty()) {
-            res = zoneRepository.findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
-                search.trim(), search.trim(), pageable);
+            // Pour la recherche, récupérer toutes les zones qui correspondent
+            var searchPageable = PageRequest.of(0, Integer.MAX_VALUE); // Récupérer toutes
+            allZones = zoneRepository.findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
+                search.trim(), search.trim(), searchPageable).getContent();
+        } else {
+            allZones = zoneRepository.findAll();
         }
         
         // Filtrer selon les permissions seulement pour les utilisateurs connectés non-ADMIN
-        List<Zone> filteredZones;
+        List<Zone> permissionFilteredZones;
         try {
             // Vérifier si l'utilisateur est connecté et a un rôle spécifique
             if (permissionService.hasRole("ZONE_MANAGER")) {
                 // ZONE_MANAGER voit seulement ses zones
                 String currentUserEmail = userService.getCurrentUserEmail();
-                filteredZones = res.getContent().stream()
+                permissionFilteredZones = allZones.stream()
                     .filter(zone -> zone.getCreatedBy() != null && 
                                   zone.getCreatedBy().getEmail().equals(currentUserEmail))
                     .toList();
             } else {
                 // ADMIN et utilisateurs non connectés voient toutes les zones
-                filteredZones = res.getContent();
+                permissionFilteredZones = allZones;
             }
         } catch (Exception e) {
             // Utilisateur non connecté - voir toutes les zones
-            filteredZones = res.getContent();
+            permissionFilteredZones = allZones;
         }
         
         // Application des autres filtres avancés
-        var finalFilteredZones = filteredZones.stream()
+        var finalFilteredZones = permissionFilteredZones.stream()
             .filter(zone -> regionId == null || regionId.isEmpty() || 
                 (zone.getRegion() != null && regionId.equals(zone.getRegion().getId())))
             .filter(zone -> zoneTypeId == null || zoneTypeId.isEmpty() || 
@@ -133,10 +169,18 @@ public class ZoneController {
             .filter(zone -> maxPrice == null || 
                 (zone.getPrice() != null && zone.getPrice() <= maxPrice))
             .toList();
-            
-        var items = finalFilteredZones.stream().map(this::toDto).toList();
+        
+        // MAINTENANT appliquer la pagination sur les résultats filtrés
         long totalFiltered = finalFilteredZones.size();
         int totalPagesFiltered = (int) Math.ceil((double) totalFiltered / l);
+        
+        int startIndex = (p - 1) * l;
+        int endIndex = Math.min(startIndex + l, (int) totalFiltered);
+        
+        List<Zone> paginatedZones = startIndex < totalFiltered ? 
+            finalFilteredZones.subList(startIndex, endIndex) : List.of();
+            
+        var items = paginatedZones.stream().map(this::toDto).toList();
         
         return new ListResponse<>(items, totalFiltered, totalPagesFiltered, p, l);
     }
@@ -144,7 +188,7 @@ public class ZoneController {
     @GetMapping("/all")
     public List<ZoneDto> allZones() {
         log.debug("Loading all zones with parcels");
-        List<Zone> zones = zoneRepository.findAllWithParcels();
+        List<Zone> zones = zoneRepository.findAllWithParcelsAndCreators();
         log.debug("Loaded {} zones from repository", zones.size());
         
         // Filtrer selon les permissions seulement pour les ZONE_MANAGER connectés
@@ -327,6 +371,7 @@ public class ZoneController {
                 z.getTotalArea(),
                 z.getPrice(),
                 z.getPriceType() == null ? null : z.getPriceType().name(),
+                z.getConstructionType() == null ? null : z.getConstructionType().name(),
                 z.getStatus() == null ? null : z.getStatus().name(),
                 z.getRegion() == null ? null : z.getRegion().getId(),
                 z.getZoneType() == null ? null : z.getZoneType().getId(),
@@ -344,11 +389,19 @@ public class ZoneController {
     private ParcelDto convertParcelToDto(com.industria.platform.entity.Parcel p) {
         List<VertexDto> vertices = List.of();
         
-        // Récupérer la géométrie depuis PostGIS en format texte
+        // Récupérer la géométrie - d'abord depuis l'entity, puis via PostGIS service
         try {
-            java.util.Optional<String> geometryText = parcelRepository.findGeometryAsText(p.getId());
-            if (geometryText.isPresent()) {
-                vertices = parseParcelGeometry(geometryText.get());
+            String geometry = p.getGeometry();
+            log.debug("Zone parcel {} geometry: {}", p.getId(), (geometry != null ? geometry.substring(0, Math.min(50, geometry.length())) + "..." : "null"));
+            
+            if (geometry != null && !geometry.trim().isEmpty()) {
+                vertices = geometryParsingService.parseWKTGeometry(geometry);
+                log.debug("Zone parcel {} parsed {} vertices via entity", p.getId(), vertices.size());
+            } else {
+                // Fallback: essayer via PostGIS service  
+                log.debug("Zone parcel {} trying PostGIS service fallback", p.getId());
+                vertices = postGISGeometryService.extractParcelVertices(p.getId());
+                log.debug("Zone parcel {} parsed {} vertices via PostGIS", p.getId(), vertices.size());
             }
         } catch (Exception e) {
             log.error("Error extracting parcel geometry for {}", p.getId(), e);
@@ -415,6 +468,11 @@ public class ZoneController {
         // Gérer le priceType
         if (dto.priceType() != null) {
             z.setPriceType(PriceType.valueOf(dto.priceType()));
+        }
+        
+        // Gérer le constructionType
+        if (dto.constructionType() != null) {
+            z.setConstructionType(ConstructionType.valueOf(dto.constructionType()));
         }
         
         if (dto.status() != null) {

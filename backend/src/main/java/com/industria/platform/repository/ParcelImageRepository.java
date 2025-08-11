@@ -2,7 +2,6 @@ package com.industria.platform.repository;
 
 import com.industria.platform.entity.ParcelImage;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,7 +17,7 @@ public interface ParcelImageRepository extends JpaRepository<ParcelImage, String
     
     void deleteByParcelId(String parcelId);
     
-    @Query("SELECT pi FROM ParcelImage pi WHERE pi.parcel.id IN :parcelIds ORDER BY pi.isPrimary DESC, pi.displayOrder ASC")
+    // Méthode JPA standard pour chercher par liste d'IDs
     List<ParcelImage> findByParcelIdInOrderByIsPrimaryDescDisplayOrderAsc(List<String> parcelIds);
     
     long countByParcelId(String parcelId);

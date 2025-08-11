@@ -1,11 +1,11 @@
 package com.industria.platform.repository;
 
 import com.industria.platform.entity.Zone;
+import com.industria.platform.entity.ZoneStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ZoneRepository extends JpaRepository<Zone, String> {
@@ -14,6 +14,16 @@ public interface ZoneRepository extends JpaRepository<Zone, String> {
     Page<Zone> findByNameContainingIgnoreCaseOrAddressContainingIgnoreCase(
         String nameKeyword, String addressKeyword, Pageable pageable);
     
-    @Query("SELECT DISTINCT z FROM Zone z LEFT JOIN FETCH z.parcels p LEFT JOIN FETCH p.createdBy")
-    List<Zone> findAllWithParcels();
+    // Méthode par défaut - les parcelles seront chargées via lazy loading
+    default List<Zone> findAllWithParcelsAndCreators() {
+        return findAll();
+    }
+    
+    @Override
+    List<Zone> findAll();
+    
+    // Méthodes pour les rapports
+    long countByStatus(ZoneStatus status);
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+    long countByRegionId(String regionId);
 }

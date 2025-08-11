@@ -51,8 +51,8 @@ export default function ContactRequestsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<ContactRequestStatus | ''>('')
-  const [typeFilter, setTypeFilter] = useState<ContactType | ''>('')
+  const [statusFilter, setStatusFilter] = useState<ContactRequestStatus | 'ALL'>('ALL')
+  const [typeFilter, setTypeFilter] = useState<ContactType | 'ALL'>('ALL')
   const [selectedRequest, setSelectedRequest] = useState<ContactRequest | null>(null)
   const [error, setError] = useState('')
 
@@ -65,8 +65,8 @@ export default function ContactRequestsPage() {
       })
       
       if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter) params.append('status', statusFilter)
-      if (typeFilter) params.append('contactType', typeFilter)
+      if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter)
+      if (typeFilter && typeFilter !== 'ALL') params.append('contactType', typeFilter)
       
       const response = await fetchApi<ListResponse<ContactRequest>>(`/api/contact-requests?${params}`)
       
@@ -174,12 +174,12 @@ export default function ContactRequestsPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Statut</label>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ContactRequestStatus | '')}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ContactRequestStatus | 'ALL')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous les statuts</SelectItem>
+                  <SelectItem value="ALL">Tous les statuts</SelectItem>
                   <SelectItem value="NOUVEAU">Nouveau</SelectItem>
                   <SelectItem value="EN_COURS">En cours</SelectItem>
                   <SelectItem value="TRAITE">Traité</SelectItem>
@@ -189,12 +189,12 @@ export default function ContactRequestsPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Type</label>
-              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ContactType | '')}>
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ContactType | 'ALL')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tous les types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous les types</SelectItem>
+                  <SelectItem value="ALL">Tous les types</SelectItem>
                   <SelectItem value="AMENAGEUR">Aménageur</SelectItem>
                   <SelectItem value="INDUSTRIEL_INVESTISSEUR">Industriel/Investisseur</SelectItem>
                 </SelectContent>
@@ -204,8 +204,8 @@ export default function ContactRequestsPage() {
               <Button 
                 onClick={() => {
                   setSearchTerm('')
-                  setStatusFilter('')
-                  setTypeFilter('')
+                  setStatusFilter('ALL')
+                  setTypeFilter('ALL')
                   setPage(1)
                 }}
                 variant="outline"

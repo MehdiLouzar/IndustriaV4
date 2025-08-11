@@ -30,6 +30,7 @@ public class Parcel {
     private Double setback;
 
     @Column(columnDefinition = "text")
+    @Convert(converter = com.industria.platform.converter.GeometryConverter.class)
     private String geometry;
 
     private Integer srid;

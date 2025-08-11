@@ -42,6 +42,10 @@ interface Parcel {
   vertices?: Vertex[]
   longitude?: number | null  // Coordonnées calculées côté backend
   latitude?: number | null   // Coordonnées calculées côté backend
+  cos?: number | null        // Coefficient d'occupation du sol
+  cus?: number | null        // Coefficient d'utilisation du sol
+  heightLimit?: number | null // Limite de hauteur en mètres
+  setback?: number | null     // Recul en mètres
 }
 
 interface ZoneDto {
@@ -57,6 +61,10 @@ interface ParcelForm {
   isShowroom: boolean
   zoneId: string
   vertices: { lambertX: string; lambertY: string }[]
+  cos: string        // Coefficient d'occupation du sol
+  cus: string        // Coefficient d'utilisation du sol
+  heightLimit: string // Limite de hauteur en mètres
+  setback: string     // Recul en mètres
 }
 
 // Composant mémorisé pour les lignes de la table des parcelles
@@ -136,6 +144,10 @@ export default function ParcelsAdmin() {
     isShowroom: false,
     zoneId: '',
     vertices: [],
+    cos: '',
+    cus: '',
+    heightLimit: '',
+    setback: '',
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
 
@@ -284,6 +296,10 @@ export default function ParcelsAdmin() {
       status: form.status,
       isShowroom: form.isShowroom,
       zoneId: form.zoneId,
+      cos: form.cos ? parseFloat(form.cos) : undefined,
+      cus: form.cus ? parseFloat(form.cus) : undefined,
+      heightLimit: form.heightLimit ? parseFloat(form.heightLimit) : undefined,
+      setback: form.setback ? parseFloat(form.setback) : undefined,
       vertices: form.vertices.map((v, i) => ({
         seq: i,
         lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
@@ -327,6 +343,10 @@ export default function ParcelsAdmin() {
       status: it.status,
       isShowroom: it.isShowroom ?? false,
       zoneId: it.zoneId,
+      cos: it.cos?.toString() ?? '',
+      cus: it.cus?.toString() ?? '',
+      heightLimit: it.heightLimit?.toString() ?? '',
+      setback: it.setback?.toString() ?? '',
       vertices: it.vertices ? it.vertices.sort((a,b)=>a.seq-b.seq).map(v => ({
         lambertX: v.lambertX.toString(),
         lambertY: v.lambertY.toString(),
@@ -350,6 +370,10 @@ export default function ParcelsAdmin() {
       isShowroom: false,
       zoneId: '',
       vertices: [],
+      cos: '',
+      cus: '',
+      heightLimit: '',
+      setback: '',
     })
     setImages([])
     setOpen(true)
@@ -422,6 +446,29 @@ export default function ParcelsAdmin() {
               </div>
             </div>
             
+            {/* Contraintes techniques */}
+            <div>
+              <Label className="text-base font-semibold">Contraintes techniques</Label>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div>
+                  <Label htmlFor="cos">COS (Coefficient d'occupation du sol)</Label>
+                  <Input id="cos" name="cos" value={form.cos} onChange={handleChange} placeholder="Ex: 0.7" />
+                </div>
+                <div>
+                  <Label htmlFor="cus">CUS (Coefficient d'utilisation du sol)</Label>
+                  <Input id="cus" name="cus" value={form.cus} onChange={handleChange} placeholder="Ex: 2.5" />
+                </div>
+                <div>
+                  <Label htmlFor="heightLimit">Limite de hauteur (m)</Label>
+                  <Input id="heightLimit" name="heightLimit" value={form.heightLimit} onChange={handleChange} placeholder="Ex: 12" />
+                </div>
+                <div>
+                  <Label htmlFor="setback">Recul (m)</Label>
+                  <Input id="setback" name="setback" value={form.setback} onChange={handleChange} placeholder="Ex: 5" />
+                </div>
+              </div>
+            </div>
+            
             <div className="flex items-center gap-2">
               <input type="checkbox" id="isShowroom" name="isShowroom" checked={form.isShowroom} onChange={handleToggle} />
               <Label htmlFor="isShowroom">Showroom</Label>
@@ -460,7 +507,7 @@ export default function ParcelsAdmin() {
                 </SelectTrigger>
                 <SelectContent>
                   {zones.length === 0 ? (
-                    <SelectItem value="" disabled>
+                    <SelectItem value="NO_ZONES" disabled>
                       Aucune zone disponible
                     </SelectItem>
                   ) : (

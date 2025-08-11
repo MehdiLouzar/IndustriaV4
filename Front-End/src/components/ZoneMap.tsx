@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import L from "leaflet";
 import proj4 from "proj4";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapPin, Home, Building2 } from "lucide-react";
+import { MapPin, Square, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
@@ -21,6 +21,14 @@ interface Parcel {
   area?: number | null;
   price?: number | null;
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  cos?: number | null;
+  cus?: number | null;
+  heightLimit?: number | null;
+  setback?: number | null;
+  zoneName?: string | null;
+  zoneAddress?: string | null;
+  zonePrice?: number | null;
+  zonePriceType?: string | null;
 }
 
 interface Zone {
@@ -195,7 +203,7 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   const PARCEL_ICONS = useMemo(() => {
     const createParcelIcon = (color: string, status: string) => {
       const isShowroom = status === "SHOWROOM";
-      const IconComponent = isShowroom ? Building2 : Home;
+      const IconComponent = isShowroom ? Building2 : Square;
       
       return L.divIcon({
         html: renderToStaticMarkup(
@@ -376,30 +384,134 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                   icon={parcelIcon}
                 >
                   <Popup>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full border border-white shadow"
-                          style={{ backgroundColor: parcelColor(p.status) }}
-                        />
-                        <strong>{p.reference}</strong>
+                    <div className="space-y-3 text-sm max-w-sm">
+                      {/* En-tête avec statut et design amélioré */}
+                      <div className="bg-gradient-to-r from-industria-brown-gold/10 to-industria-olive-light/10 -m-3 p-3 mb-3 rounded-t-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div 
+                            className="w-4 h-4 rounded-full border-2 border-white shadow-md"
+                            style={{ backgroundColor: parcelColor(p.status) }}
+                          />
+                          <strong className="text-lg text-industria-brown-gold">{p.reference}</strong>
+                        </div>
+                        <div className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                          p.status === 'LIBRE' || p.status === 'AVAILABLE' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : p.status === 'RESERVEE' || p.status === 'RESERVED'
+                            ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                            : 'bg-red-100 text-red-700 border border-red-200'
+                        }`}>
+                          {p.status === 'LIBRE' || p.status === 'AVAILABLE' ? '✓ Disponible' :
+                           p.status === 'RESERVEE' || p.status === 'RESERVED' ? '⏳ Réservée' :
+                           p.status === 'VENDU' || p.status === 'OCCUPIED' ? '✗ Vendue' :
+                           p.status}
+                        </div>
                       </div>
-                      {p.area && <div><span className="font-medium">Surface:</span> {p.area} m²</div>}
-                      {p.price && <div><span className="font-medium">Prix:</span> {p.price} DH</div>}
-                      <div><span className="font-medium">Statut:</span> {p.status}</div>
-                      {p.latitude != null && p.longitude != null && (
-                        <div className="text-xs text-gray-600">
-                          Lat: {p.latitude.toFixed(5)}, Lon: {p.longitude.toFixed(5)}
+                      
+                      {/* Informations générales avec design amélioré */}
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                          <Square className="w-4 h-4 text-industria-brown-gold" />
+                          Informations
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2 ml-6">
+                          {p.area && (
+                            <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                              <span className="text-gray-600">Surface</span>
+                              <span className="font-bold text-industria-brown-gold">{p.area.toLocaleString()} m²</span>
+                            </div>
+                          )}
+                          {p.price && (
+                            <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                              <span className="text-gray-600">Prix parcelle</span>
+                              <span className="font-bold text-blue-600">{p.price.toLocaleString()} DH</span>
+                            </div>
+                          )}
+                          {p.zoneName && (
+                            <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                              <span className="text-gray-600">Zone</span>
+                              <span className="font-medium text-green-600">{p.zoneName}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Contraintes techniques avec meilleur design */}
+                      {(p.cos || p.cus || p.heightLimit || p.setback) && (
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-industria-olive-light" />
+                            Contraintes
+                          </h4>
+                          <div className="grid grid-cols-2 gap-2 ml-6">
+                            {p.cos && (
+                              <div className="text-center p-2 bg-orange-50 rounded">
+                                <div className="text-xs text-gray-500">COS</div>
+                                <div className="font-bold text-orange-600">{p.cos}</div>
+                              </div>
+                            )}
+                            {p.cus && (
+                              <div className="text-center p-2 bg-purple-50 rounded">
+                                <div className="text-xs text-gray-500">CUS</div>
+                                <div className="font-bold text-purple-600">{p.cus}</div>
+                              </div>
+                            )}
+                            {p.heightLimit && (
+                              <div className="text-center p-2 bg-red-50 rounded">
+                                <div className="text-xs text-gray-500">Hauteur max</div>
+                                <div className="font-bold text-red-600">{p.heightLimit}m</div>
+                              </div>
+                            )}
+                            {p.setback && (
+                              <div className="text-center p-2 bg-yellow-50 rounded">
+                                <div className="text-xs text-gray-500">Recul</div>
+                                <div className="font-bold text-yellow-600">{p.setback}m</div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
+
+                      {/* Informations financières zone */}
+                      {(p.zonePrice || p.zonePriceType) && (
+                        <div className="space-y-2">
+                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-green-600" />
+                            Tarification zone
+                          </h4>
+                          <div className="ml-6">
+                            {p.zonePrice && (
+                              <div className="p-2 bg-emerald-50 rounded">
+                                <span className="text-gray-600">Prix zone: </span>
+                                <span className="font-bold text-emerald-600">{p.zonePrice.toLocaleString()} DH</span>
+                                {p.zonePriceType && (
+                                  <span className="text-xs text-gray-500 ml-1">({p.zonePriceType})</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Adresse si disponible */}
+                      {p.zoneAddress && (
+                        <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded border-l-2 border-industria-brown-gold">
+                          📍 {p.zoneAddress}
+                        </div>
+                      )}
+
+                      {/* Bouton de réservation amélioré */}
                       {(p.status === "AVAILABLE" || p.status === "LIBRE") && (
-                        <Button
-                          size="sm"
-                          className="mt-2 w-full bg-industria-brown-gold hover:bg-industria-olive-light"
-                          onClick={() => setSelected(p)}
-                        >
-                          Réserver cette parcelle
-                        </Button>
+                        <div className="pt-3 border-t">
+                          <Button
+                            size="sm"
+                            className="w-full bg-gradient-to-r from-industria-brown-gold to-industria-olive-light hover:from-industria-olive-light hover:to-industria-brown-gold text-white font-semibold py-2 shadow-lg hover:shadow-xl transition-all duration-300"
+                            onClick={() => setSelected(p)}
+                          >
+                            <span className="mr-2">📅</span>
+                            Réserver cette parcelle
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </Popup>

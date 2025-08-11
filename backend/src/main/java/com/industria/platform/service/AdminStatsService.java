@@ -2,6 +2,7 @@ package com.industria.platform.service;
 
 import com.industria.platform.dto.AdminStatsDto;
 import com.industria.platform.entity.ParcelStatus;
+import com.industria.platform.entity.AppointmentStatus;
 import com.industria.platform.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -58,7 +59,7 @@ public class AdminStatsService {
             totalParcels = parcelRepository.count();
             availableParcels = parcelRepository.countByStatus(ParcelStatus.LIBRE);
             totalAppointments = appointmentRepository.count();
-            pendingAppointments = appointmentRepository.countPendingAppointments();
+            pendingAppointments = appointmentRepository.countByStatus(AppointmentStatus.PENDING);
         } 
         // Si l'utilisateur est ZONE_MANAGER, voir seulement ses parcelles
         else if (permissionService.hasRole("ZONE_MANAGER")) {

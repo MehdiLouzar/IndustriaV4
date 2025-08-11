@@ -48,6 +48,7 @@ public class AppointmentController {
         appointment.setPreferredDate(request.preferredDate());
         appointment.setPreferredTime(request.preferredTime());
         appointment.setUrgency(request.urgency());
+        appointment.setStatus(AppointmentStatus.PENDING); // Statut par défaut
         return appointmentService.createAppointment(appointment, request.parcelId());
     }
 
@@ -101,11 +102,19 @@ public class AppointmentController {
         }
         
         Appointment a = appointmentRepository.findById(id).orElseThrow();
+        AppointmentStatus oldStatus = a.getStatus();
+        
         updateEntity(a, dto);
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
-        appointmentRepository.save(a);
-        return ResponseEntity.ok(toDto(a));
+        
+        // Si le statut a changé, utiliser le service pour déclencher les notifications email
+        if (oldStatus != a.getStatus() && a.getStatus() != null) {
+            return ResponseEntity.ok(toDto(appointmentService.updateAppointmentStatus(id, a.getStatus(), a.getNotes())));
+        } else {
+            appointmentRepository.save(a);
+            return ResponseEntity.ok(toDto(a));
+        }
     }
 
     @PutMapping("/appointments/{id}/status")
@@ -163,6 +172,15 @@ public class AppointmentController {
         a.setPreferredDate(dto.preferredDate());
         a.setPreferredTime(dto.preferredTime());
         a.setUrgency(dto.urgency());
+        
+        // Traitement du statut
+        if (dto.status() != null && !dto.status().trim().isEmpty()) {
+            try {
+                a.setStatus(AppointmentStatus.valueOf(dto.status()));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Statut invalide: " + dto.status());
+            }
+        }
         
         // Traitement de la date
         if (dto.requestedDate() != null && !dto.requestedDate().trim().isEmpty()) {

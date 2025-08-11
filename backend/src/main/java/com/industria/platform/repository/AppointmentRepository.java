@@ -3,8 +3,7 @@ package com.industria.platform.repository;
 import com.industria.platform.entity.Appointment;
 import com.industria.platform.entity.AppointmentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-
+import java.time.LocalDateTime;
 /**
  * Repository pour la gestion des rendez-vous.
  * 
@@ -18,14 +17,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
      * 
      * @return Nombre de rendez-vous avec statut PENDING
      */
-    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.status = 'PENDING'")
-    Long countPendingAppointments();
+    Long countByStatus(AppointmentStatus status);
     
     /**
-     * Compte les rendez-vous par statut.
-     * 
-     * @param status Statut des rendez-vous à compter
-     * @return Nombre de rendez-vous avec ce statut
+     * Méthodes pour les rapports
      */
-    Long countByStatus(AppointmentStatus status);
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }

@@ -32,6 +32,7 @@ public class Zone {
     private ZoneStatus status;
 
     @Column(columnDefinition = "text")
+    @Convert(converter = com.industria.platform.converter.GeometryConverter.class)
     private String geometry;
 
     private Integer srid;

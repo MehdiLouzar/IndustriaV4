@@ -1,151 +1,165 @@
 package com.industria.platform.service;
 
 import com.industria.platform.dto.VertexDto;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.industria.platform.entity.Parcel;
+import com.industria.platform.entity.Zone;
+import com.industria.platform.repository.ParcelRepository;
+import com.industria.platform.repository.ZoneRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
+import java.util.Optional;
 
 @Service
 public class PostGISGeometryService {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final ParcelRepository parcelRepository;
+    private final ZoneRepository zoneRepository;
+    private final GeometryParsingService geometryParsingService;
+
+    public PostGISGeometryService(ParcelRepository parcelRepository,
+                                 ZoneRepository zoneRepository,
+                                 GeometryParsingService geometryParsingService) {
+        this.parcelRepository = parcelRepository;
+        this.zoneRepository = zoneRepository;
+        this.geometryParsingService = geometryParsingService;
+    }
 
     /**
-     * Extrait les vertices d'une zone directement depuis PostGIS
-     * Retourne les coordonnées Lambert correctes (EPSG:26191)
+     * Extrait les vertices d'une zone en convertissant WKB vers WKT avec JTS
      */
     public List<VertexDto> extractZoneVertices(String zoneId) {
-        String sql = """
-            SELECT 
-                (ST_DumpPoints(geometry)).path[1] as seq,
-                ST_X((ST_DumpPoints(geometry)).geom) as lambert_x,
-                ST_Y((ST_DumpPoints(geometry)).geom) as lambert_y,
-                ST_X(ST_Transform((ST_DumpPoints(geometry)).geom, 4326)) as longitude,
-                ST_Y(ST_Transform((ST_DumpPoints(geometry)).geom, 4326)) as latitude
-            FROM zone 
-            WHERE id = ?
-            AND geometry IS NOT NULL
-            ORDER BY seq
-            """;
-
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, zoneId);
-        List<VertexDto> vertices = new ArrayList<>();
-
-        for (Map<String, Object> row : results) {
-            // Éviter les doublons (premier et dernier point identiques dans les polygones)
-            int seq = ((Number) row.get("seq")).intValue();
-            double lambertX = ((Number) row.get("lambert_x")).doubleValue();
-            double lambertY = ((Number) row.get("lambert_y")).doubleValue();
-            Double longitude = row.get("longitude") != null ? ((Number) row.get("longitude")).doubleValue() : null;
-            Double latitude = row.get("latitude") != null ? ((Number) row.get("latitude")).doubleValue() : null;
-
-            // Ne pas inclure le dernier point s'il est identique au premier (fermeture du polygone)
-            if (seq == results.size() && vertices.size() > 0) {
-                VertexDto first = vertices.get(0);
-                if (Math.abs(lambertX - first.lambertX()) < 0.01 && 
-                    Math.abs(lambertY - first.lambertY()) < 0.01) {
-                    continue; // Skip le point de fermeture
-                }
-            }
-
-            vertices.add(new VertexDto(seq, lambertX, lambertY, latitude, longitude));
+        Optional<Zone> zoneOpt = zoneRepository.findById(zoneId);
+        if (zoneOpt.isEmpty()) {
+            return List.of();
         }
-
-        return vertices;
+        
+        Zone zone = zoneOpt.get();
+        String geometry = zone.getGeometry();
+        
+        if (geometry == null || geometry.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        // Convertir WKB vers WKT avec l'utilitaire JTS
+        String wktGeometry = com.industria.platform.util.WKBToWKTUtil.convertWKBToWKT(geometry);
+        
+        if (wktGeometry == null) {
+            return List.of();
+        }
+        
+        // Parser la géométrie WKT transformée
+        return geometryParsingService.parseWKTGeometry(wktGeometry);
     }
 
     /**
-     * Extrait les vertices d'une parcelle directement depuis PostGIS
+     * Extrait les vertices d'une parcelle en convertissant WKB vers WKT avec JTS
      */
     public List<VertexDto> extractParcelVertices(String parcelId) {
-        String sql = """
-            SELECT 
-                (ST_DumpPoints(geometry)).path[1] as seq,
-                ST_X((ST_DumpPoints(geometry)).geom) as lambert_x,
-                ST_Y((ST_DumpPoints(geometry)).geom) as lambert_y,
-                ST_X(ST_Transform((ST_DumpPoints(geometry)).geom, 4326)) as longitude,
-                ST_Y(ST_Transform((ST_DumpPoints(geometry)).geom, 4326)) as latitude
-            FROM parcel 
-            WHERE id = ?
-            AND geometry IS NOT NULL
-            ORDER BY seq
-            """;
-
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, parcelId);
-        List<VertexDto> vertices = new ArrayList<>();
-
-        for (Map<String, Object> row : results) {
-            int seq = ((Number) row.get("seq")).intValue();
-            double lambertX = ((Number) row.get("lambert_x")).doubleValue();
-            double lambertY = ((Number) row.get("lambert_y")).doubleValue();
-            Double longitude = row.get("longitude") != null ? ((Number) row.get("longitude")).doubleValue() : null;
-            Double latitude = row.get("latitude") != null ? ((Number) row.get("latitude")).doubleValue() : null;
-
-            // Ne pas inclure le point de fermeture
-            if (seq == results.size() && vertices.size() > 0) {
-                VertexDto first = vertices.get(0);
-                if (Math.abs(lambertX - first.lambertX()) < 0.01 && 
-                    Math.abs(lambertY - first.lambertY()) < 0.01) {
-                    continue;
-                }
-            }
-
-            vertices.add(new VertexDto(seq, lambertX, lambertY, latitude, longitude));
+        Optional<Parcel> parcelOpt = parcelRepository.findById(parcelId);
+        if (parcelOpt.isEmpty()) {
+            return List.of();
         }
-
-        return vertices;
+        
+        Parcel parcel = parcelOpt.get();
+        String geometry = parcel.getGeometry();
+        
+        if (geometry == null || geometry.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        // Convertir WKB vers WKT avec l'utilitaire JTS
+        String wktGeometry = com.industria.platform.util.WKBToWKTUtil.convertWKBToWKT(geometry);
+        
+        if (wktGeometry == null) {
+            return List.of();
+        }
+        
+        // Parser la géométrie WKT transformée
+        return geometryParsingService.parseWKTGeometry(wktGeometry);
     }
 
     /**
-     * Calcule le centroïde d'une zone directement depuis PostGIS
+     * Calcule le centroïde d'une zone
      */
     public double[] getZoneCentroid(String zoneId) {
-        String sql = """
-            SELECT 
-                ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as longitude,
-                ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as latitude,
-                ST_X(ST_Centroid(geometry)) as lambert_x,
-                ST_Y(ST_Centroid(geometry)) as lambert_y
-            FROM zone 
-            WHERE id = ? AND geometry IS NOT NULL
-            """;
-
-        Map<String, Object> result = jdbcTemplate.queryForMap(sql, zoneId);
+        Optional<Zone> zoneOpt = zoneRepository.findById(zoneId);
+        if (zoneOpt.isEmpty()) {
+            return new double[]{0.0, 0.0, 0.0, 0.0};
+        }
         
-        return new double[]{
-            ((Number) result.get("longitude")).doubleValue(),
-            ((Number) result.get("latitude")).doubleValue(),
-            ((Number) result.get("lambert_x")).doubleValue(),
-            ((Number) result.get("lambert_y")).doubleValue()
-        };
+        Zone zone = zoneOpt.get();
+        
+        // Utiliser les coordonnées pré-calculées stockées dans l'entity
+        double longitude = zone.getLongitude() != null ? zone.getLongitude() : 0.0;
+        double latitude = zone.getLatitude() != null ? zone.getLatitude() : 0.0;
+        
+        // Pour les coordonnées Lambert, calculer le centroïde depuis les vertices
+        List<VertexDto> vertices = extractZoneVertices(zoneId);
+        double lambertX = 0.0, lambertY = 0.0;
+        
+        if (!vertices.isEmpty()) {
+            for (VertexDto vertex : vertices) {
+                lambertX += vertex.lambertX();
+                lambertY += vertex.lambertY();
+            }
+            lambertX /= vertices.size();
+            lambertY /= vertices.size();
+        }
+        
+        return new double[]{longitude, latitude, lambertX, lambertY};
     }
 
     /**
-     * Calcule le centroïde d'une parcelle directement depuis PostGIS
+     * Calcule le centroïde d'une parcelle 
      */
     public double[] getParcelCentroid(String parcelId) {
-        String sql = """
-            SELECT 
-                ST_X(ST_Transform(ST_Centroid(geometry), 4326)) as longitude,
-                ST_Y(ST_Transform(ST_Centroid(geometry), 4326)) as latitude,
-                ST_X(ST_Centroid(geometry)) as lambert_x,
-                ST_Y(ST_Centroid(geometry)) as lambert_y
-            FROM parcel 
-            WHERE id = ? AND geometry IS NOT NULL
-            """;
-
-        Map<String, Object> result = jdbcTemplate.queryForMap(sql, parcelId);
+        Optional<Parcel> parcelOpt = parcelRepository.findById(parcelId);
+        if (parcelOpt.isEmpty()) {
+            return new double[]{0.0, 0.0, 0.0, 0.0};
+        }
         
-        return new double[]{
-            ((Number) result.get("longitude")).doubleValue(),
-            ((Number) result.get("latitude")).doubleValue(),
-            ((Number) result.get("lambert_x")).doubleValue(),
-            ((Number) result.get("lambert_y")).doubleValue()
-        };
+        Parcel parcel = parcelOpt.get();
+        
+        // Utiliser les coordonnées pré-calculées stockées dans l'entity
+        double longitude = parcel.getLongitude() != null ? parcel.getLongitude() : 0.0;
+        double latitude = parcel.getLatitude() != null ? parcel.getLatitude() : 0.0;
+        
+        // Pour les coordonnées Lambert, calculer le centroïde depuis les vertices
+        List<VertexDto> vertices = extractParcelVertices(parcelId);
+        double lambertX = 0.0, lambertY = 0.0;
+        
+        if (!vertices.isEmpty()) {
+            for (VertexDto vertex : vertices) {
+                lambertX += vertex.lambertX();
+                lambertY += vertex.lambertY();
+            }
+            lambertX /= vertices.size();
+            lambertY /= vertices.size();
+        }
+        
+        return new double[]{longitude, latitude, lambertX, lambertY};
+    }
+    
+    /**
+     * Convertit WKB (format binaire) en WKT si nécessaire
+     */
+    private String convertToWKTIfNeeded(String geometry) {
+        if (geometry == null || geometry.trim().isEmpty()) {
+            return geometry;
+        }
+        
+        // Si c'est déjà du WKT, retourner tel quel
+        if (geometry.startsWith("POLYGON")) {
+            return geometry;
+        }
+        
+        // Si c'est du WKB (format hexadécimal commençant par 0103...), indiquer qu'on ne peut pas le convertir sans SQL
+        if (geometry.matches("^[0-9A-Fa-f]+$")) {
+            System.err.println("ERREUR: Géométrie en format WKB détectée, impossible de convertir sans requête SQL PostGIS");
+            return null;
+        }
+        
+        return geometry;
     }
 }

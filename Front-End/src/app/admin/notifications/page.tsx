@@ -76,7 +76,7 @@ export default function NotificationsAdmin() {
     textBody: '',
     status: 'PENDING',
     maxRetries: '3',
-    templateId: ''
+    templateId: 'NONE'
   })
 
   const loadNotifications = useCallback(async (page = currentPage, search = searchTerm) => {
@@ -139,7 +139,8 @@ export default function NotificationsAdmin() {
     
     const payload = {
       ...form,
-      maxRetries: parseInt(form.maxRetries) || 3
+      maxRetries: parseInt(form.maxRetries) || 3,
+      templateId: form.templateId === 'NONE' ? null : form.templateId
     }
     
     const method = form.id ? 'PUT' : 'POST'
@@ -183,7 +184,7 @@ export default function NotificationsAdmin() {
       textBody: '',
       status: 'PENDING',
       maxRetries: '3',
-      templateId: ''
+      templateId: 'NONE'
     })
   }
 
@@ -434,7 +435,7 @@ export default function NotificationsAdmin() {
                     <SelectValue placeholder="Sélectionner un template" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun template</SelectItem>
+                    <SelectItem value="NONE">Aucun template</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}

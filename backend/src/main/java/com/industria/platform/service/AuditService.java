@@ -80,7 +80,41 @@ public class AuditService {
     }
     
     public List<AuditLog> getAuditLogsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        return auditLogRepository.findByDateRange(startDate, endDate);
+        return auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(startDate, endDate);
+    }
+    
+    /**
+     * Récupère les logs d'audit avec filtres et pagination
+     */
+    public Page<AuditLog> getFilteredAuditLogs(Pageable pageable, String action, String entity, 
+                                               String userId, LocalDateTime dateFrom, 
+                                               LocalDateTime dateTo, String search) {
+        // Si aucun filtre n'est appliqué, utiliser la méthode existante
+        if (action == null && entity == null && userId == null && 
+            dateFrom == null && dateTo == null && search == null) {
+            return getAllAuditLogs(pageable);
+        }
+        
+        // Utiliser le repository pour les filtres complexes
+        return auditLogRepository.findWithFilters(pageable, action, entity, userId, 
+                                                  dateFrom, dateTo, search);
+    }
+    
+    /**
+     * Récupère tous les logs d'audit avec filtres (sans pagination, pour l'export)
+     */
+    public List<AuditLog> getAllFilteredAuditLogs(String action, String entity, String userId, 
+                                                  LocalDateTime dateFrom, LocalDateTime dateTo, 
+                                                  String search) {
+        // Si aucun filtre n'est appliqué, retourner tous les logs
+        if (action == null && entity == null && userId == null && 
+            dateFrom == null && dateTo == null && search == null) {
+            return auditLogRepository.findAllByOrderByCreatedAtDesc();
+        }
+        
+        // Utiliser le repository pour les filtres complexes
+        return auditLogRepository.findAllWithFilters(action, entity, userId, 
+                                                     dateFrom, dateTo, search);
     }
     
     private User getCurrentUser(Authentication auth) {

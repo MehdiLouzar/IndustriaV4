@@ -7,6 +7,7 @@ import com.industria.platform.entity.*;
 import com.industria.platform.repository.*;
 import com.industria.platform.service.EmailService;
 import com.industria.platform.service.AuditService;
+import com.industria.platform.service.ContactRequestFilterService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,18 +26,21 @@ public class ContactRequestController {
     private final ParcelRepository parcelRepository;
     private final EmailService emailService;
     private final AuditService auditService;
+    private final ContactRequestFilterService contactRequestFilterService;
 
     public ContactRequestController(
             ContactRequestRepository contactRequestRepository,
             ZoneRepository zoneRepository,
             ParcelRepository parcelRepository,
             EmailService emailService,
-            AuditService auditService) {
+            AuditService auditService,
+            ContactRequestFilterService contactRequestFilterService) {
         this.contactRequestRepository = contactRequestRepository;
         this.zoneRepository = zoneRepository;
         this.parcelRepository = parcelRepository;
         this.emailService = emailService;
         this.auditService = auditService;
+        this.contactRequestFilterService = contactRequestFilterService;
     }
 
     @PostMapping
@@ -82,7 +86,7 @@ public class ContactRequestController {
         int l = Math.min(Math.max(1, limit), 100);
         Pageable pageable = PageRequest.of(p - 1, l);
         
-        var result = contactRequestRepository.findWithFilters(status, contactType, search, pageable);
+        var result = contactRequestFilterService.findWithFilters(status, contactType, search, pageable);
         var items = result.getContent().stream().map(this::toDto).toList();
         
         return new ListResponse<>(items, result.getTotalElements(), 
