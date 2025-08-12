@@ -3,6 +3,8 @@ package com.industria.platform.controller;
 import com.industria.platform.entity.AuditLog;
 import com.industria.platform.service.AuditService;
 import com.industria.platform.service.PermissionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,18 +21,21 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Contrôleur REST pour la gestion des fonctionnalités d'administration.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor
+@Slf4j
 public class AdminController {
 
     private final PermissionService permissionService;
     private final AuditService auditService;
-
-    public AdminController(PermissionService permissionService, 
-                          AuditService auditService) {
-        this.permissionService = permissionService;
-        this.auditService = auditService;
-    }
 
     /**
      * Vérifie si l'utilisateur peut accéder à l'administration

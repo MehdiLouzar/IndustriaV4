@@ -13,6 +13,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Contrôleur REST pour la gestion des modèles de notifications.
+ * 
+ * Permet la création, modification et gestion des templates d'emails
+ * utilisés par la plateforme pour les communications automatiques.
+ * 
+ * Accès réservé aux administrateurs.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/admin/notification-templates")
 @PreAuthorize("hasRole('ADMIN')")

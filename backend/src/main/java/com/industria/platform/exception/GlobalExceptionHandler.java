@@ -29,6 +29,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Gestionnaire global des exceptions pour l'API REST.
+ * 
+ * Intercepte et traite toutes les exceptions non gérées dans l'application
+ * pour retourner des réponses d'erreur uniformes avec traçabilité.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

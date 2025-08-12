@@ -67,6 +67,8 @@ function ContactForm() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   useEffect(() => {
     // Récupérer les paramètres URL
@@ -115,16 +117,136 @@ function ContactForm() {
     }
   }
   
+  // Fonction de validation complète
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation des champs généraux
+    if (!formData.raisonSociale.trim()) {
+      newErrors.raisonSociale = 'La raison sociale est obligatoire'
+    } else if (formData.raisonSociale.length < 2) {
+      newErrors.raisonSociale = 'La raison sociale doit contenir au moins 2 caractères'
+    }
+    
+    if (!formData.contactPrenom.trim()) {
+      newErrors.contactPrenom = 'Le prénom est obligatoire'
+    } else if (formData.contactPrenom.length < 2) {
+      newErrors.contactPrenom = 'Le prénom doit contenir au moins 2 caractères'
+    }
+    
+    if (!formData.contactNom.trim()) {
+      newErrors.contactNom = 'Le nom est obligatoire'
+    } else if (formData.contactNom.length < 2) {
+      newErrors.contactNom = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation de l'email
+    if (!formData.contactEmail.trim()) {
+      newErrors.contactEmail = 'L\'adresse email est obligatoire'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
+      newErrors.contactEmail = 'Format d\'email invalide'
+    }
+    
+    // Validation du téléphone
+    if (!formData.contactTelephone.trim()) {
+      newErrors.contactTelephone = 'Le numéro de téléphone est obligatoire'
+    } else if (!/^(\+212|0)[567]\d{8}$/.test(formData.contactTelephone.replace(/\s/g, ''))) {
+      newErrors.contactTelephone = 'Format de téléphone marocain invalide (ex: +212 6 XX XX XX XX)'
+    }
+    
+    // Validations spécifiques aux aménageurs
+    if (formData.contactType === 'AMENAGEUR') {
+      if (!formData.regionImplantation) {
+        newErrors.regionImplantation = 'La région d\'implantation est obligatoire'
+      }
+      if (!formData.prefectureImplantation) {
+        newErrors.prefectureImplantation = 'La préfecture d\'implantation est obligatoire'
+      }
+      if (!formData.superficieNetHa || formData.superficieNetHa <= 0) {
+        newErrors.superficieNetHa = 'La superficie nette doit être supérieure à 0'
+      }
+      if (!formData.nombreLotTotal || formData.nombreLotTotal <= 0) {
+        newErrors.nombreLotTotal = 'Le nombre de lots total doit être supérieur à 0'
+      }
+      if (!formData.nombreLotNonOccupe || formData.nombreLotNonOccupe < 0) {
+        newErrors.nombreLotNonOccupe = 'Le nombre de lots non occupés ne peut pas être négatif'
+      }
+      if (formData.nombreLotNonOccupe && formData.nombreLotTotal && formData.nombreLotNonOccupe > formData.nombreLotTotal) {
+        newErrors.nombreLotNonOccupe = 'Le nombre de lots non occupés ne peut pas être supérieur au total'
+      }
+    }
+    
+    // Validations spécifiques aux industriels/investisseurs
+    if (formData.contactType === 'INDUSTRIEL_INVESTISSEUR') {
+      if (!formData.descriptionActivite?.trim()) {
+        newErrors.descriptionActivite = 'La description de l\'activité est obligatoire'
+      } else if (formData.descriptionActivite.length < 10) {
+        newErrors.descriptionActivite = 'La description doit contenir au moins 10 caractères'
+      }
+      
+      if (!formData.montantInvestissement || formData.montantInvestissement <= 0) {
+        newErrors.montantInvestissement = 'Le montant d\'investissement doit être supérieur à 0'
+      }
+      
+      if (!formData.nombreEmploisPrevisionnel || formData.nombreEmploisPrevisionnel <= 0) {
+        newErrors.nombreEmploisPrevisionnel = 'Le nombre d\'emplois prévisionnels doit être supérieur à 0'
+      }
+      
+      if (!formData.superficieSouhaitee || formData.superficieSouhaitee <= 0) {
+        newErrors.superficieSouhaitee = 'La superficie souhaitée doit être supérieure à 0'
+      }
+      
+      if (!formData.regionImplantationSouhaitee) {
+        newErrors.regionImplantationSouhaitee = 'La région d\'implantation souhaitée est obligatoire'
+      }
+    }
+    
+    // Vérification d'unicité de l'email
+    if (formData.contactEmail && !newErrors.contactEmail) {
+      try {
+        const response = await fetchApi(`/api/contact-requests/check-email?email=${encodeURIComponent(formData.contactEmail)}`)
+        if (response && response.exists) {
+          newErrors.contactEmail = 'Une demande avec cette adresse email existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité de l\'email:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsSubmitting(true)
     setError('')
     
     try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      setLoading(true)
+      
+      // Nettoyer les données avant envoi
+      const cleanedData = {
+        ...formData,
+        raisonSociale: formData.raisonSociale.trim(),
+        contactNom: formData.contactNom.trim(),
+        contactPrenom: formData.contactPrenom.trim(),
+        contactTelephone: formData.contactTelephone.trim(),
+        contactEmail: formData.contactEmail.trim().toLowerCase(),
+        descriptionActivite: formData.descriptionActivite?.trim() || undefined,
+      }
+      
       await fetchApi('/api/contact-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanedData)
       })
       
       setSuccess(true)
@@ -138,11 +260,17 @@ function ContactForm() {
       setError('Une erreur est survenue lors de l\'envoi de votre demande. Veuillez réessayer.')
     } finally {
       setLoading(false)
+      setIsSubmitting(false)
     }
   }
   
   const updateFormData = (field: keyof ContactFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
     
     // Reset des préfectures quand on change de région
     if (field === 'regionImplantation' || field === 'regionImplantationSouhaitee') {
@@ -154,6 +282,9 @@ function ContactForm() {
     
     // Reset des champs non pertinents quand on change de type
     if (field === 'contactType') {
+      // Effacer toutes les erreurs lors du changement de type
+      setErrors({})
+      
       if (value === 'AMENAGEUR') {
         setFormData(prev => ({
           ...prev,
@@ -261,6 +392,14 @@ function ContactForm() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {(errors.raisonSociale || errors.contactPrenom || errors.contactNom || errors.contactTelephone || errors.contactEmail) && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Veuillez corriger les erreurs dans les champs marqués en rouge ci-dessous.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <div>
                 <Label htmlFor="raisonSociale">Raison sociale *</Label>
                 <Input
@@ -268,7 +407,10 @@ function ContactForm() {
                   value={formData.raisonSociale}
                   onChange={(e) => updateFormData('raisonSociale', e.target.value)}
                   required
+                  className={errors.raisonSociale ? 'border-red-500' : ''}
+                  placeholder="Nom de votre entreprise"
                 />
+                {errors.raisonSociale && <span className="text-red-500 text-sm mt-1">{errors.raisonSociale}</span>}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -279,7 +421,10 @@ function ContactForm() {
                     value={formData.contactPrenom}
                     onChange={(e) => updateFormData('contactPrenom', e.target.value)}
                     required
+                    className={errors.contactPrenom ? 'border-red-500' : ''}
+                    placeholder="Prénom"
                   />
+                  {errors.contactPrenom && <span className="text-red-500 text-sm mt-1">{errors.contactPrenom}</span>}
                 </div>
                 <div>
                   <Label htmlFor="contactNom">Nom du contact *</Label>
@@ -288,7 +433,10 @@ function ContactForm() {
                     value={formData.contactNom}
                     onChange={(e) => updateFormData('contactNom', e.target.value)}
                     required
+                    className={errors.contactNom ? 'border-red-500' : ''}
+                    placeholder="Nom de famille"
                   />
+                  {errors.contactNom && <span className="text-red-500 text-sm mt-1">{errors.contactNom}</span>}
                 </div>
               </div>
               
@@ -301,7 +449,10 @@ function ContactForm() {
                     value={formData.contactTelephone}
                     onChange={(e) => updateFormData('contactTelephone', e.target.value)}
                     required
+                    className={errors.contactTelephone ? 'border-red-500' : ''}
+                    placeholder="+212 6 XX XX XX XX"
                   />
+                  {errors.contactTelephone && <span className="text-red-500 text-sm mt-1">{errors.contactTelephone}</span>}
                 </div>
                 <div>
                   <Label htmlFor="contactEmail">Adresse email *</Label>
@@ -311,7 +462,10 @@ function ContactForm() {
                     value={formData.contactEmail}
                     onChange={(e) => updateFormData('contactEmail', e.target.value)}
                     required
+                    className={errors.contactEmail ? 'border-red-500' : ''}
+                    placeholder="votre.email@entreprise.com"
                   />
+                  {errors.contactEmail && <span className="text-red-500 text-sm mt-1">{errors.contactEmail}</span>}
                 </div>
               </div>
             </CardContent>
@@ -334,7 +488,7 @@ function ContactForm() {
                   <div>
                     <Label htmlFor="regionImplantation">Région d'implantation *</Label>
                     <Select value={formData.regionImplantation} onValueChange={(value) => updateFormData('regionImplantation', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.regionImplantation ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Sélectionnez une région" />
                       </SelectTrigger>
                       <SelectContent>
@@ -345,6 +499,7 @@ function ContactForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.regionImplantation && <span className="text-red-500 text-sm mt-1">{errors.regionImplantation}</span>}
                   </div>
                   <div>
                     <Label htmlFor="prefectureImplantation">Préfecture d'implantation *</Label>
@@ -353,7 +508,7 @@ function ContactForm() {
                       onValueChange={(value) => updateFormData('prefectureImplantation', value)}
                       disabled={!formData.regionImplantation}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.prefectureImplantation ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Sélectionnez une préfecture" />
                       </SelectTrigger>
                       <SelectContent>
@@ -364,6 +519,7 @@ function ContactForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.prefectureImplantation && <span className="text-red-500 text-sm mt-1">{errors.prefectureImplantation}</span>}
                   </div>
                 </div>
                 
@@ -374,22 +530,28 @@ function ContactForm() {
                       id="superficieNetHa"
                       type="number"
                       step="0.01"
-                      min="0"
+                      min="0.01"
                       value={formData.superficieNetHa || ''}
                       onChange={(e) => updateFormData('superficieNetHa', parseFloat(e.target.value) || undefined)}
                       required
+                      className={errors.superficieNetHa ? 'border-red-500' : ''}
+                      placeholder="Ex: 10.5"
                     />
+                    {errors.superficieNetHa && <span className="text-red-500 text-sm mt-1">{errors.superficieNetHa}</span>}
                   </div>
                   <div>
                     <Label htmlFor="nombreLotTotal">Nombre de lots total *</Label>
                     <Input
                       id="nombreLotTotal"
                       type="number"
-                      min="0"
+                      min="1"
                       value={formData.nombreLotTotal || ''}
                       onChange={(e) => updateFormData('nombreLotTotal', parseInt(e.target.value) || undefined)}
                       required
+                      className={errors.nombreLotTotal ? 'border-red-500' : ''}
+                      placeholder="Ex: 50"
                     />
+                    {errors.nombreLotTotal && <span className="text-red-500 text-sm mt-1">{errors.nombreLotTotal}</span>}
                   </div>
                   <div>
                     <Label htmlFor="nombreLotNonOccupe">Nombre de lots non occupés *</Label>
@@ -397,10 +559,14 @@ function ContactForm() {
                       id="nombreLotNonOccupe"
                       type="number"
                       min="0"
+                      max={formData.nombreLotTotal || undefined}
                       value={formData.nombreLotNonOccupe || ''}
                       onChange={(e) => updateFormData('nombreLotNonOccupe', parseInt(e.target.value) || undefined)}
                       required
+                      className={errors.nombreLotNonOccupe ? 'border-red-500' : ''}
+                      placeholder="Ex: 25"
                     />
+                    {errors.nombreLotNonOccupe && <span className="text-red-500 text-sm mt-1">{errors.nombreLotNonOccupe}</span>}
                   </div>
                 </div>
               </CardContent>
@@ -421,18 +587,23 @@ function ContactForm() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="descriptionActivite">Description de l'activité * (max 100 caractères)</Label>
+                  <Label htmlFor="descriptionActivite">Description de l'activité * (10-100 caractères)</Label>
                   <Textarea
                     id="descriptionActivite"
                     maxLength={100}
                     value={formData.descriptionActivite || ''}
                     onChange={(e) => updateFormData('descriptionActivite', e.target.value)}
-                    placeholder="Décrivez brièvement votre activité..."
+                    placeholder="Décrivez brièvement votre activité industrielle..."
                     required
+                    className={errors.descriptionActivite ? 'border-red-500' : ''}
+                    rows={3}
                   />
-                  <p className="text-sm text-gray-500 mt-1">
-                    {(formData.descriptionActivite || '').length}/100 caractères
-                  </p>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm text-gray-500">
+                      {(formData.descriptionActivite || '').length}/100 caractères (min. 10)
+                    </span>
+                  </div>
+                  {errors.descriptionActivite && <span className="text-red-500 text-sm">{errors.descriptionActivite}</span>}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -441,22 +612,28 @@ function ContactForm() {
                     <Input
                       id="montantInvestissement"
                       type="number"
-                      min="0"
+                      min="1"
                       value={formData.montantInvestissement || ''}
                       onChange={(e) => updateFormData('montantInvestissement', parseFloat(e.target.value) || undefined)}
                       required
+                      className={errors.montantInvestissement ? 'border-red-500' : ''}
+                      placeholder="Ex: 5000000"
                     />
+                    {errors.montantInvestissement && <span className="text-red-500 text-sm mt-1">{errors.montantInvestissement}</span>}
                   </div>
                   <div>
                     <Label htmlFor="nombreEmploisPrevisionnel">Nombre d'emplois prévisionnels *</Label>
                     <Input
                       id="nombreEmploisPrevisionnel"
                       type="number"
-                      min="0"
+                      min="1"
                       value={formData.nombreEmploisPrevisionnel || ''}
                       onChange={(e) => updateFormData('nombreEmploisPrevisionnel', parseInt(e.target.value) || undefined)}
                       required
+                      className={errors.nombreEmploisPrevisionnel ? 'border-red-500' : ''}
+                      placeholder="Ex: 50"
                     />
+                    {errors.nombreEmploisPrevisionnel && <span className="text-red-500 text-sm mt-1">{errors.nombreEmploisPrevisionnel}</span>}
                   </div>
                 </div>
                 
@@ -466,11 +643,14 @@ function ContactForm() {
                     <Input
                       id="superficieSouhaitee"
                       type="number"
-                      min="0"
+                      min="1"
                       value={formData.superficieSouhaitee || ''}
                       onChange={(e) => updateFormData('superficieSouhaitee', parseFloat(e.target.value) || undefined)}
                       required
+                      className={errors.superficieSouhaitee ? 'border-red-500' : ''}
+                      placeholder="Ex: 2000"
                     />
+                    {errors.superficieSouhaitee && <span className="text-red-500 text-sm mt-1">{errors.superficieSouhaitee}</span>}
                   </div>
                   <div>
                     <Label htmlFor="regionImplantationSouhaitee">Région d'implantation souhaitée *</Label>
@@ -478,7 +658,7 @@ function ContactForm() {
                       value={formData.regionImplantationSouhaitee} 
                       onValueChange={(value) => updateFormData('regionImplantationSouhaitee', value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={errors.regionImplantationSouhaitee ? 'border-red-500' : ''}>
                         <SelectValue placeholder="Sélectionnez une région" />
                       </SelectTrigger>
                       <SelectContent>
@@ -489,6 +669,7 @@ function ContactForm() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.regionImplantationSouhaitee && <span className="text-red-500 text-sm mt-1">{errors.regionImplantationSouhaitee}</span>}
                   </div>
                 </div>
               </CardContent>
@@ -502,11 +683,20 @@ function ContactForm() {
           )}
 
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Envoi en cours...' : 'Envoyer la demande'}
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || loading}
+              className="min-w-[200px]"
+            >
+              {isSubmitting ? 'Validation en cours...' : loading ? 'Envoi en cours...' : 'Envoyer la demande'}
             </Button>
           </div>
         </form>

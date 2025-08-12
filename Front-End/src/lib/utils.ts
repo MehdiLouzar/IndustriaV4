@@ -1,38 +1,84 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+/**
+ * Utilitaires généraux du frontend Industria
+ * 
+ * Regroupe les fonctions utilitaires essentielles :
+ * - Fusion de classes CSS avec TailwindCSS
+ * - Client API sécurisé avec authentification JWT
+ * - Système de cache mémoire avec TTL et limites
+ * - Gestion sécurisée des téléchargements de fichiers
+ * - Configuration d'URLs d'API selon l'environnement
+ * 
+ * Le cache API inclut des protections contre les fuites mémoire
+ * et un nettoyage automatique périodique.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/**
+ * Fusionne les classes CSS de manière intelligente
+ * 
+ * Combine clsx pour la logique conditionnelle et tailwind-merge
+ * pour résoudre les conflits entre classes TailwindCSS.
+ * 
+ * @param inputs Liste des classes à fusionner
+ * @returns Chaîne de classes CSS optimisée
+ * 
+ * @example
+ * cn('px-4 py-2', condition && 'bg-blue-500', 'px-2') // 'py-2 bg-blue-500 px-2'
+ */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
+/**
+ * Récupère l'URL de base de l'API selon l'environnement
+ * 
+ * En mode SSR (server-side), utilise API_INTERNAL_URL pour éviter
+ * les problèmes de réseau interne. En mode client, utilise l'URL publique.
+ * 
+ * @returns URL de base pour les appels API
+ */
 export function getBaseUrl() {
   if (typeof window === 'undefined') {
-    return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || ''
+    return process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || '';
   }
-  return process.env.NEXT_PUBLIC_API_URL || ''
+  return process.env.NEXT_PUBLIC_API_URL || '';
 }
 
-// Memory-safe cache with strict limits and TTL
+/**
+ * Cache API sécurisé avec gestion mémoire et TTL
+ * 
+ * Implémente un cache en mémoire avec :
+ * - Limite stricte du nombre d'entrées (15 max)
+ * - Limite de taille totale (8MB max)
+ * - TTL de 10 minutes avec nettoyage automatique
+ * - Éviction des entrées les plus anciennes (LRU)
+ * - Protection contre les objets trop volumineux (2MB max)
+ */
 class SecureApiCache {
   private cache = new Map<string, { data: unknown; timestamp: number; size: number }>()
-  private readonly MAX_SIZE = 15
-  private readonly TTL = 600000 // 10 minutes
-  private totalSize = 0
-  private readonly MAX_TOTAL_SIZE = 8 * 1024 * 1024 // 8MB
+  private readonly MAX_SIZE = 15;
+  private readonly TTL = 600000; // 10 minutes
+  private totalSize = 0;
+  private readonly MAX_TOTAL_SIZE = 8 * 1024 * 1024; // 8MB
 
   private estimateSize(data: unknown): number {
     try {
-      return JSON.stringify(data).length * 2
+      return JSON.stringify(data).length * 2;
     } catch {
-      return 1024
+      return 1024;
     }
   }
 
   set(key: string, data: unknown) {
     const size = this.estimateSize(data)
     if (size > 2 * 1024 * 1024) {
-      console.warn('Cache: objet rejeté (trop volumineux)')
-      return
+      return;
     }
     while (this.cache.size >= this.MAX_SIZE || this.totalSize + size > this.MAX_TOTAL_SIZE) {
       this.evictOldest()
@@ -78,9 +124,7 @@ class SecureApiCache {
         cleaned++
       }
     }
-    if (cleaned > 0) {
-      console.log(`Cache cleanup: ${cleaned} entrées supprimées`)
-    }
+    // Cleanup completed silently
   }
 }
 
@@ -114,6 +158,23 @@ if (typeof window !== 'undefined') {
 }
 
 
+/**
+ * Client API principal avec authentification JWT
+ * 
+ * Gère automatiquement :
+ * - Authentification Bearer token depuis localStorage
+ * - Headers appropriés selon le type de contenu
+ * - Redirection automatique en cas d'expiration de token (401)
+ * - Gestion d'erreurs robuste
+ * - Support des uploads de fichiers (FormData)
+ * 
+ * @template T Type de la réponse attendue
+ * @param url Endpoint API relatif (ex: '/api/zones')
+ * @param options Options de requête (méthode, body, headers, etc.)
+ * @returns Promise résolue avec les données typées
+ * 
+ * @throws Error si non-autorisé ou si la requête échoue
+ */
 export async function fetchApi<T>(
   url: string,
   options: RequestInit = {}
@@ -137,7 +198,8 @@ export async function fetchApi<T>(
   }
   
   // Make the request with the full URL
-  const response = await fetch(`http://localhost:8080${url}`, {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}${url}`, {
     ...options,
     headers,
   });
@@ -170,7 +232,19 @@ export async function fetchApi<T>(
 }
 
 /**
- * Fonction utilitaire pour télécharger des fichiers depuis l'API avec authentification
+ * Téléchargement sécurisé de fichiers depuis l'API
+ * 
+ * Gère le téléchargement de fichiers avec authentification JWT :
+ * - Vérification du token d'authentification
+ * - Création automatique du lien de téléchargement
+ * - Extraction du nom de fichier depuis les headers HTTP
+ * - Nettoyage automatique des ressources
+ * 
+ * @param endpoint Endpoint de téléchargement (ex: '/api/export/zones')
+ * @param params Paramètres de requête optionnels
+ * @param defaultFilename Nom de fichier par défaut si non spécifié par l'API
+ * 
+ * @throws Error si le token est manquant ou si la requête échoue
  */
 export async function downloadFile(
   endpoint: string,
@@ -183,7 +257,8 @@ export async function downloadFile(
       throw new Error('Token d\'authentification manquant')
     }
 
-    const response = await fetch(`http://localhost:8080${endpoint}?${params.toString()}`, {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}${endpoint}?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -217,7 +292,6 @@ export async function downloadFile(
     window.URL.revokeObjectURL(url)
 
   } catch (error) {
-    console.error('Erreur lors du téléchargement:', error)
-    throw error
+    throw error;
   }
 }

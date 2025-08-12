@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant un type de zone industrielle.
+ * 
+ * Classification des zones selon leur vocation
+ * (zone franche, zone d'économie spéciale, parc industriel, etc.).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

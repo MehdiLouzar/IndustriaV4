@@ -1,5 +1,19 @@
 'use client'
 
+/**
+ * Composant MapView - Carte interactive des zones industrielles
+ * 
+ * Affiche une carte Leaflet interactive avec :
+ * - Marqueurs clusterisés des zones industrielles
+ * - Popups avec informations détaillées
+ * - Icônes personnalisées selon le statut
+ * - Intégration avec l'API backend pour les données géospatiales
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Link from 'next/link'
@@ -21,29 +35,58 @@ import { TrainFront, Ship, Plane } from 'lucide-react'
 // Utilitaires simplifiés - suppression du cache Overpass qui causait des conflits
 
 
+/**
+ * Type représentant une zone au format GeoJSON Feature
+ */
 type ZoneFeature = {
+  /** Géométrie de la zone (point avec coordonnées) */
   geometry: { type: string; coordinates: [number, number] }
+  /** Propriétés métier de la zone */
   properties: {
+    /** Identifiant unique */
     id: string
+    /** Nom de la zone */
     name: string
+    /** Statut (LIBRE, OCCUPE, etc.) */
     status: string
+    /** Nombre de parcelles disponibles */
     availableParcels: number
+    /** Icônes des activités autorisées */
     activityIcons: string[]
+    /** Icônes des équipements disponibles */
     amenityIcons: string[]
   }
 }
 
+/**
+ * Type représentant la réponse API pour une zone (format simplifié)
+ */
 type ZoneFeatureResp = {
+  /** Coordonnées géographiques [longitude, latitude] */
   coordinates: [number, number]
+  /** Identifiant unique */
   id: string
+  /** Nom de la zone */
   name: string
+  /** Statut actuel */
   status: string
+  /** Nombre de parcelles disponibles */
   availableParcels: number
+  /** Liste des icônes d'activités */
   activityIcons: string[]
+  /** Liste des icônes d'équipements */
   amenityIcons: string[]
 }
 
 
+/**
+ * Composant carte interactive principal
+ * 
+ * Affiche les zones industrielles sur une carte Leaflet avec clustering,
+ * popups informatifs et marqueurs personnalisés selon le statut.
+ * 
+ * @returns Composant React de la carte
+ */
 export default function MapView() {
   const [zones, setZones] = useState<ZoneFeature[]>([])
   type Poi = { id: string; coordinates: [number, number]; type: 'station' | 'port' | 'airport' }

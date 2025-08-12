@@ -6,11 +6,30 @@ import com.industria.platform.entity.Appointment;
 import com.industria.platform.repository.ZoneRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.AppointmentRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service de gestion des permissions et autorisations.
+ * 
+ * Gère les contrôles d'accès basés sur les rôles utilisateur
+ * pour les zones, parcelles, rendez-vous et fonctionnalités administratives.
+ * 
+ * Hiérarchie des rôles :
+ * - ADMIN : accès complet à tout
+ * - ZONE_MANAGER : gestion de ses propres zones/parcelles
+ * - USER : accès en lecture seule
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class PermissionService {
 
     private final ZoneRepository zoneRepository;
@@ -18,18 +37,15 @@ public class PermissionService {
     private final AppointmentRepository appointmentRepository;
     private final UserService userService;
 
-    public PermissionService(ZoneRepository zoneRepository, 
-                           ParcelRepository parcelRepository,
-                           AppointmentRepository appointmentRepository,
-                           UserService userService) {
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.appointmentRepository = appointmentRepository;
-        this.userService = userService;
-    }
-
     /**
-     * Vérifie si l'utilisateur actuel peut modifier une zone
+     * Vérifie si l'utilisateur actuel peut modifier une zone.
+     * 
+     * Règles :
+     * - ADMIN : peut modifier toutes les zones
+     * - ZONE_MANAGER : peut modifier uniquement ses zones créées
+     * 
+     * @param zoneId identifiant de la zone
+     * @return true si la modification est autorisée
      */
     public boolean canModifyZone(String zoneId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -53,7 +69,14 @@ public class PermissionService {
     }
 
     /**
-     * Vérifie si l'utilisateur actuel peut modifier une parcelle
+     * Vérifie si l'utilisateur actuel peut modifier une parcelle.
+     * 
+     * Règles :
+     * - ADMIN : peut modifier toutes les parcelles
+     * - ZONE_MANAGER : peut modifier uniquement ses parcelles créées
+     * 
+     * @param parcelId identifiant de la parcelle
+     * @return true si la modification est autorisée
      */
     public boolean canModifyParcel(String parcelId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -77,8 +100,16 @@ public class PermissionService {
     }
 
     /**
-     * Vérifie si l'utilisateur actuel peut gérer un rendez-vous
-     * (basé sur la parcelle/zone associée au rendez-vous)
+     * Vérifie si l'utilisateur actuel peut gérer un rendez-vous.
+     * 
+     * Basé sur la propriété de la parcelle/zone associée au rendez-vous.
+     * 
+     * Règles :
+     * - ADMIN : peut gérer tous les rendez-vous
+     * - ZONE_MANAGER : peut gérer les rendez-vous de ses parcelles/zones
+     * 
+     * @param appointmentId identifiant du rendez-vous
+     * @return true si la gestion est autorisée
      */
     public boolean canManageAppointment(String appointmentId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -101,7 +132,10 @@ public class PermissionService {
     }
 
     /**
-     * Vérifie si l'utilisateur a un rôle spécifique
+     * Vérifie si l'utilisateur a un rôle spécifique.
+     * 
+     * @param role rôle à vérifier (sans le préfixe ROLE_)
+     * @return true si l'utilisateur possède ce rôle
      */
     public boolean hasRole(String role) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -117,14 +151,26 @@ public class PermissionService {
     }
 
     /**
-     * Vérifie si l'utilisateur peut accéder à l'interface d'administration
+     * Vérifie si l'utilisateur peut accéder à l'interface d'administration.
+     * 
+     * @return true si l'accès admin est autorisé
      */
     public boolean canAccessAdmin() {
         return hasRole("ADMIN") || hasRole("ZONE_MANAGER") || hasRole("MANAGER");
     }
 
     /**
-     * Vérifie si l'utilisateur peut voir une fonction admin spécifique
+     * Vérifie si l'utilisateur peut accéder à une fonction admin spécifique.
+     * 
+     * Fonctions ADMIN uniquement :
+     * - users, countries, regions, zone-types, activities, amenities, 
+     *   construction-types, audit-logs, reports
+     * 
+     * Fonctions ADMIN/ZONE_MANAGER/MANAGER :
+     * - zones, parcels, appointments, contact-requests, notifications
+     * 
+     * @param function nom de la fonction admin
+     * @return true si l'accès est autorisé
      */
     public boolean canAccessAdminFunction(String function) {
         return switch (function) {
@@ -137,14 +183,21 @@ public class PermissionService {
     }
 
     /**
-     * Vérifie si l'utilisateur est un simple utilisateur (sans rôles admin)
+     * Vérifie si l'utilisateur est un simple utilisateur (sans rôles admin).
+     * 
+     * @return true si l'utilisateur n'a aucun rôle administratif
      */
     public boolean isRegularUser() {
         return !hasRole("ADMIN") && !hasRole("ZONE_MANAGER") && !hasRole("MANAGER");
     }
 
     /**
-     * Récupère le rôle le plus élevé de l'utilisateur
+     * Récupère le rôle le plus élevé de l'utilisateur.
+     * 
+     * Hiérarchie (du plus élevé au plus bas) :
+     * ADMIN > ZONE_MANAGER > MANAGER > USER
+     * 
+     * @return le rôle le plus élevé
      */
     public String getHighestRole() {
         if (hasRole("ADMIN")) return "ADMIN";

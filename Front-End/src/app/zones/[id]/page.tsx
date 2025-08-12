@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import DynamicIcon from "@/components/DynamicIcon";
 import { fetchApi } from "@/lib/utils";
 import { fetchPublicApi } from "@/lib/publicApi";
+import { Zap, Wifi, Car, Wrench, Factory, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
 import type { ListResponse } from "@/types";
 
 interface Parcel {
@@ -64,12 +65,81 @@ interface Zone {
   constructionType?: string | null
   region?: { name: string } | null
   zoneType?: { name: string } | null
-  activities?: { activity: { name: string } }[]
-  amenities?: string[]
+  activities?: { activity: { name: string; icon?: string } }[]
+  amenities?: { name: string; icon?: string }[]
   parcels?: Parcel[]
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[]
   latitude?: number | null
   longitude?: number | null
+}
+
+// Fonction pour obtenir l'icône Lucide React appropriée
+function getLucideIcon(iconName?: string) {
+  if (!iconName) return Factory
+  
+  const iconMap: { [key: string]: any } = {
+    // Électricité et énergie
+    'Zap': Zap,
+    'Power': Power,
+    'Battery': Battery,
+    'Lightbulb': Zap,
+    'Sun': Power,
+    'Flame': Zap,
+    
+    // Internet et communication
+    'Wifi': Wifi,
+    'Globe': Globe,
+    'Mail': Globe,
+    'Server': Server,
+    'Database': Database,
+    'HardDrive': HardDrive,
+    'Monitor': Monitor,
+    
+    // Transport et parking
+    'Car': Car,
+    'Truck': Truck,
+    'Plane': Plane,
+    'ParkingCircle': Car,
+    
+    // Bâtiments et infrastructure
+    'Building': Building2,
+    'Building2': Building2,
+    'Factory': Factory,
+    'Home': Home,
+    'Briefcase': Briefcase,
+    'Hospital': Building2,
+    'CreditCard': Package,
+    
+    // Technologie et outils
+    'Cpu': Cpu,
+    'Wrench': Wrench,
+    'Settings': Settings,
+    'Cog': Settings,
+    'Tool': Tool,
+    'Gauge': Gauge,
+    'Settings2': Settings2,
+    
+    // Sécurité et services
+    'Shield': Shield,
+    'shield': Shield,
+    'Droplets': Droplets,
+    'droplet': Droplet,
+    'droplets': Droplets,
+    'Coffee': Coffee,
+    'Users': Users,
+    'Package': Package,
+    'package': Package,
+    'UtensilsCrossed': Coffee,
+    
+    // Icônes spécifiques de la base
+    'car': Car,
+    'zap': Zap,
+    'wifi': Wifi,
+    'shirt': Shirt,
+    'pill': Pill
+  }
+  
+  return iconMap[iconName] || Factory
 }
 
 export default function ZonePage() {
@@ -88,8 +158,8 @@ export default function ZonePage() {
       const zoneType = z.zoneTypeId ? await fetchPublicApi<{ name: string }>(`/api/zone-types/${z.zoneTypeId}`) : null
 
       const [activities, amenities, parcelsRes] = await Promise.all([
-        Promise.all((z.activityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/activities/${aid}`))),
-        Promise.all((z.amenityIds || []).map(aid => fetchPublicApi<{ name: string }>(`/api/amenities/${aid}`))),
+        Promise.all((z.activityIds || []).map(aid => fetchPublicApi<{ id: string; name: string; icon?: string }>(`/api/activities/${aid}`))),
+        Promise.all((z.amenityIds || []).map(aid => fetchPublicApi<{ id: string; name: string; icon?: string }>(`/api/amenities/${aid}`))),
         fetchPublicApi<ListResponse<Parcel>>(`/api/parcels?zoneId=${id}`),
       ])
 
@@ -109,8 +179,8 @@ export default function ZonePage() {
         constructionType: z.constructionType ?? null,
         region: region ? { name: region.name } : null,
         zoneType: zoneType ? { name: zoneType.name } : null,
-        activities: Array.isArray(activities) ? activities.map(a => ({ activity: { name: a?.name || '' } })) : [],
-        amenities: Array.isArray(amenities) ? amenities.map(a => a?.name || '') : [],
+        activities: Array.isArray(activities) ? activities.map(a => ({ activity: { name: a?.name || '', icon: a?.icon } })) : [],
+        amenities: Array.isArray(amenities) ? amenities.map(a => ({ name: a?.name || '', icon: a?.icon })) : [],
         parcels,
         vertices: z.vertices,
         latitude: z.latitude ?? null,
@@ -199,11 +269,17 @@ export default function ZonePage() {
                   <div className="mt-4">
                     <div className="font-semibold text-white/80 mb-2">Activités</div>
                     <div className="flex flex-wrap gap-2">
-                      {zone.activities.map((a, i) => (
-                        <span key={i} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium">
-                          {a.activity.name}
-                        </span>
-                      ))}
+                      {zone.activities.map((a, i) => {
+                        const IconComponent = getLucideIcon(a.activity.icon)
+                        return (
+                          <span key={i} className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                            {a.activity.icon && (
+                              <IconComponent className="w-4 h-4" />
+                            )}
+                            {a.activity.name}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -243,12 +319,19 @@ export default function ZonePage() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {zone.amenities.map((name, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-industria-gray-light rounded-lg">
-                    <div className="w-2 h-2 bg-industria-olive-light rounded-full"></div>
-                    <span className="text-sm font-medium text-gray-700">{name}</span>
-                  </div>
-                ))}
+                {zone.amenities.map((amenity, i) => {
+                  const IconComponent = getLucideIcon(amenity.icon)
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-industria-gray-light rounded-lg">
+                      {amenity.icon ? (
+                        <IconComponent className="w-5 h-5 flex-shrink-0 text-industria-olive-light" />
+                      ) : (
+                        <div className="w-2 h-2 bg-industria-olive-light rounded-full flex-shrink-0"></div>
+                      )}
+                      <span className="text-sm font-medium text-gray-700">{amenity.name}</span>
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

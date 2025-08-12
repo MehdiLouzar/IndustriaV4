@@ -1,3 +1,23 @@
+/**
+ * Composant Header - En-tête principal du site Industria
+ * 
+ * Fournit la navigation principale du site avec :
+ * - Barre de contact supérieure avec téléphone et localisation
+ * - Navigation desktop avec menus déroulants (Média, Le Groupe)
+ * - Interface mobile responsive avec menu hamburger
+ * - Authentification utilisateur et liens admin
+ * - Sélecteur de langue et badges informatifs
+ * 
+ * Le composant s'adapte automatiquement aux différentes tailles d'écran
+ * et affiche conditionnellement les liens d'administration selon les permissions.
+ * 
+ * @param showAdminLink Indique s'il faut afficher le lien Dashboard admin
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import { useState } from 'react';

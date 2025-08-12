@@ -12,58 +12,40 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
   MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight, Grid3X3,
-  Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, 
-  Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, 
-  HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill
+  Zap, Wifi, Car, Wrench, Building
 } from 'lucide-react'
 
 /**
  * Interface représentant une image de zone industrielle
  */
 interface ZoneImage {
-  /** Identifiant unique de l'image */
   id: string
-  /** Nom du fichier stocké */
   filename: string
-  /** Nom original du fichier uploadé */
   originalFilename: string
-  /** Description optionnelle de l'image */
   description?: string
-  /** Indique si c'est l'image principale */
   isPrimary: boolean
-  /** Ordre d'affichage dans le carrousel */
   displayOrder: number
 }
 
 /**
- * Interface représentant une activité industrielle
+ * Représentation d'une activité avec icône
  */
 interface Activity {
-  /** Identifiant unique de l'activité */
   id: string
-  /** Nom de l'activité */
   name: string
-  /** Description de l'activité */
-  description: string
-  /** Icône de l'activité */
   icon?: string
-  /** Catégorie de l'activité */
+  description?: string
   category?: string
 }
 
 /**
- * Interface représentant un équipement/service
+ * Représentation d'un équipement avec icône
  */
 interface Amenity {
-  /** Identifiant unique de l'équipement */
   id: string
-  /** Nom de l'équipement */
   name: string
-  /** Description de l'équipement */
-  description: string
-  /** Icône de l'équipement */
   icon?: string
-  /** Catégorie de l'équipement */
+  description?: string
   category?: string
 }
 
@@ -71,35 +53,20 @@ interface Amenity {
  * Interface représentant une zone industrielle
  */
 interface IndustrialZone {
-  /** Identifiant unique de la zone */
   id: string
-  /** Nom de la zone */
   name: string
-  /** Description détaillée */
   description: string
-  /** Localisation géographique */
   location: string
-  /** Superficie formatée avec unité */
   area: string
-  /** Prix formaté avec devise */
   price: string
-  /** Type de zone (parc industriel, zone franche, etc.) */
   type: string
-  /** Statut actuel (LIBRE, OCCUPE, RESERVE, etc.) */
   status: string
-  /** Date de livraison prévue */
   deliveryDate?: string
-  /** URL de l'image principale (legacy) */
   image?: string
-  /** Collection d'images pour carrousel */
   images?: ZoneImage[]
-  /** Nombre total de parcelles */
   totalParcels?: number
-  /** Nombre de parcelles disponibles */
   availableParcels?: number
-  /** Activités autorisées dans la zone */
   activities?: Activity[]
-  /** Équipements disponibles dans la zone */
   amenities?: Amenity[]
 }
 
@@ -107,14 +74,11 @@ interface IndustrialZone {
  * Props du composant ZoneCard
  */
 interface ZoneCardProps {
-  /** Données de la zone industrielle à afficher */
   zone: IndustrialZone
 }
 
 /**
  * Détermine les classes CSS de couleur pour un badge de statut
- * @param status - Statut de la zone (LIBRE, OCCUPE, RESERVE, etc.)
- * @returns Classes Tailwind CSS pour le badge
  */
 function getStatusColor(status: string) {
   switch (status) {
@@ -141,67 +105,12 @@ function getLucideIcon(iconName?: string) {
   if (!iconName) return Factory
   
   const iconMap: { [key: string]: any } = {
-    // Électricité et énergie
     'Zap': Zap,
-    'Power': Power,
-    'Battery': Battery,
-    'Lightbulb': Zap,
-    'Sun': Power,
-    'Flame': Zap,
-    
-    // Internet et communication
     'Wifi': Wifi,
-    'Globe': Globe,
-    'Mail': Globe,
-    'Server': Server,
-    'Database': Database,
-    'HardDrive': HardDrive,
-    'Monitor': Monitor,
-    
-    // Transport et parking
     'Car': Car,
-    'Truck': Truck,
-    'Plane': Plane,
-    'ParkingCircle': Car,
-    
-    // Bâtiments et infrastructure
-    'Building': Building2,
-    'Building2': Building2,
-    'Factory': Factory,
-    'Home': Home,
-    'Briefcase': Briefcase,
-    'Hospital': Building2,
-    'CreditCard': Package,
-    
-    // Technologie et outils
-    'Cpu': Cpu,
     'Wrench': Wrench,
-    'Settings': Settings,
-    'Cog': Settings,
-    'Tool': Tool,
-    'Gauge': Gauge,
-    'Settings2': Settings2,
-    
-    // Sécurité et services
-    'Shield': Shield,
-    'shield': Shield,
-    'Droplets': Droplets,
-    'droplet': Droplet,
-    'droplets': Droplets,
-    'Coffee': Coffee,
-    'Users': Users,
-    'Package': Package,
-    'package': Package,
-    'UtensilsCrossed': Coffee,
-    
-    // Icônes spécifiques de la base
-    'car': Car,
-    'zap': Zap,
-    'wifi': Wifi,
-    'shirt': Shirt,
-    'pill': Pill,
-    
-    // Icônes génériques
+    'Building': Building,
+    'Factory': Factory,
     'MapPin': MapPin,
     'Ruler': Ruler,
     'Phone': Phone,
@@ -216,15 +125,6 @@ function getLucideIcon(iconName?: string) {
 
 /**
  * Composant carte de zone industrielle avec carrousel d'images
- * 
- * Affiche une zone industrielle sous forme de carte avec :
- * - Carrousel d'images interactif
- * - Informations clés (superficie, prix, parcelles)
- * - Badge de statut coloré
- * - Actions (voir détails, demander rendez-vous)
- * 
- * @param props - Props du composant
- * @returns Élément React de la carte zone
  */
 const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -357,11 +257,11 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
             </div>
           )}
         </div>
-        
+
         {/* Section Activités et Équipements */}
         {((zone.activities && zone.activities.length > 0) || (zone.amenities && zone.amenities.length > 0)) && (
-          <div className="space-y-3">
-            {/* Activités autorisées */}
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            {/* Activités */}
             {zone.activities && zone.activities.length > 0 && (
               <div>
                 <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
@@ -382,15 +282,15 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
                     )
                   })}
                   {zone.activities.length > 4 && (
-                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
                       +{zone.activities.length - 4}
-                    </div>
+                    </span>
                   )}
                 </div>
               </div>
             )}
             
-            {/* Équipements disponibles */}
+            {/* Équipements */}
             {zone.amenities && zone.amenities.length > 0 && (
               <div>
                 <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
@@ -411,9 +311,9 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
                     )
                   })}
                   {zone.amenities.length > 4 && (
-                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
                       +{zone.amenities.length - 4}
-                    </div>
+                    </span>
                   )}
                 </div>
               </div>

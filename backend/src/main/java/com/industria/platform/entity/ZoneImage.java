@@ -6,6 +6,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entité représentant une image de zone industrielle.
+ * 
+ * Gère les images associées aux zones industrielles avec métadonnées
+ * complètes (nom de fichier, taille, type, ordre d'affichage, image principale).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Table(name = "zone_images")
 public class ZoneImage {

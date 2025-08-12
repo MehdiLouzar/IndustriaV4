@@ -1,35 +1,40 @@
 package com.industria.platform.controller;
 
+import com.industria.platform.dto.ListResponse;
+import com.industria.platform.dto.ParcelDto;
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.dto.ZoneDto;
-import com.industria.platform.dto.ParcelDto;
 import com.industria.platform.entity.*;
 import com.industria.platform.exception.EntityNotFoundException;
 import com.industria.platform.exception.ForbiddenException;
 import com.industria.platform.repository.*;
-import com.industria.platform.service.StatusService;
-import com.industria.platform.service.GeometryUpdateService;
-import com.industria.platform.service.PermissionService;
-import com.industria.platform.service.UserService;
-import com.industria.platform.service.PostGISGeometryService;
-import com.industria.platform.service.AuditService;
-import com.industria.platform.service.GeometryParsingService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.industria.platform.service.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.PageRequest;
-import com.industria.platform.dto.ListResponse;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des zones industrielles.
+ * 
+ * Gère les opérations CRUD sur les zones avec gestion des permissions,
+ * audit des modifications et calculs géospatiaux automatiques.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/zones")
+@RequiredArgsConstructor
+@Slf4j
 public class ZoneController {
-    private static final Logger log = LoggerFactory.getLogger(ZoneController.class);
 
     private final StatusService statusService;
     private final ZoneRepository zoneRepository;
@@ -47,37 +52,6 @@ public class ZoneController {
     private final AuditService auditService;
     private final GeometryParsingService geometryParsingService;
 
-    public ZoneController(StatusService statusService,
-                         ZoneRepository zoneRepository,
-                         ParcelRepository parcelRepository,
-                         ActivityRepository activityRepository,
-                         AmenityRepository amenityRepository,
-                         ZoneActivityRepository zoneActivityRepository,
-                         ZoneAmenityRepository zoneAmenityRepository,
-                         ZoneTypeRepository zoneTypeRepository,
-                         RegionRepository regionRepository,
-                         GeometryUpdateService geometryUpdateService,
-                         PermissionService permissionService,
-                         UserService userService,
-                         PostGISGeometryService postGISGeometryService,
-                         AuditService auditService,
-                         GeometryParsingService geometryParsingService) {
-        this.statusService = statusService;
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.activityRepository = activityRepository;
-        this.amenityRepository = amenityRepository;
-        this.zoneActivityRepository = zoneActivityRepository;
-        this.zoneAmenityRepository = zoneAmenityRepository;
-        this.zoneTypeRepository = zoneTypeRepository;
-        this.regionRepository = regionRepository;
-        this.geometryUpdateService = geometryUpdateService;
-        this.permissionService = permissionService;
-        this.userService = userService;
-        this.postGISGeometryService = postGISGeometryService;
-        this.auditService = auditService;
-        this.geometryParsingService = geometryParsingService;
-    }
 
 
 

@@ -150,6 +150,8 @@ export default function ParcelsAdmin() {
     setback: '',
   })
   const [images, setImages] = useState<{ file: File; url: string }[]>([])
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Fonction pour récupérer les coordonnées pré-calculées d'une parcelle
   const getParcelCoordinates = useCallback((parcel: Parcel) => {
@@ -227,8 +229,14 @@ export default function ParcelsAdmin() {
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }, [])
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }, [errors])
 
   const handleToggle = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.checked }))
@@ -259,7 +267,13 @@ export default function ParcelsAdmin() {
       verts[index] = { ...verts[index], [field]: value }
       return { ...f, vertices: verts }
     })
-  }, [])
+    
+    // Effacer l'erreur pour ce vertex lors de la saisie
+    const errorKey = `vertex_${index}_${field === 'lambertX' ? 'x' : 'y'}`
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: '' }))
+    }
+  }, [errors])
 
   const removeVertex = useCallback((index: number) => {
     setForm((f) => {
@@ -288,51 +302,139 @@ export default function ParcelsAdmin() {
     })
   }, [])
 
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation de la référence (obligatoire)
+    if (!form.reference.trim()) {
+      newErrors.reference = 'La référence de la parcelle est obligatoire'
+    } else if (form.reference.length < 2) {
+      newErrors.reference = 'La référence doit contenir au moins 2 caractères'
+    }
+    
+    // Validation de la zone (obligatoire)
+    if (!form.zoneId) {
+      newErrors.zoneId = 'La sélection d\'une zone est obligatoire'
+    }
+    
+    // Validation de la superficie (doit être positive si renseignée)
+    if (form.area && (isNaN(parseFloat(form.area)) || parseFloat(form.area) <= 0)) {
+      newErrors.area = 'La superficie doit être un nombre positif'
+    }
+    
+    // Validation des coefficients (entre 0 et 10 si renseignés)
+    if (form.cos && (isNaN(parseFloat(form.cos)) || parseFloat(form.cos) < 0 || parseFloat(form.cos) > 10)) {
+      newErrors.cos = 'Le COS doit être un nombre entre 0 et 10'
+    }
+    
+    if (form.cus && (isNaN(parseFloat(form.cus)) || parseFloat(form.cus) < 0 || parseFloat(form.cus) > 10)) {
+      newErrors.cus = 'Le CUS doit être un nombre entre 0 et 10'
+    }
+    
+    // Validation de la limite de hauteur (doit être positive si renseignée)
+    if (form.heightLimit && (isNaN(parseFloat(form.heightLimit)) || parseFloat(form.heightLimit) <= 0)) {
+      newErrors.heightLimit = 'La limite de hauteur doit être un nombre positif'
+    }
+    
+    // Validation du recul (doit être positif si renseigné)
+    if (form.setback && (isNaN(parseFloat(form.setback)) || parseFloat(form.setback) < 0)) {
+      newErrors.setback = 'Le recul doit être un nombre positif ou zéro'
+    }
+    
+    // Validation des coordonnées Lambert (si renseignées)
+    form.vertices.forEach((vertex, index) => {
+      if (vertex.lambertX && isNaN(parseFloat(vertex.lambertX))) {
+        newErrors[`vertex_${index}_x`] = `Coordonnée X du point ${index + 1} invalide`
+      }
+      if (vertex.lambertY && isNaN(parseFloat(vertex.lambertY))) {
+        newErrors[`vertex_${index}_y`] = `Coordonnée Y du point ${index + 1} invalide`
+      }
+    })
+    
+    // Vérification d'unicité de la référence (si nouvelle parcelle)
+    if (!form.id && form.reference.trim()) {
+      try {
+        const response = await fetchApi(`/api/parcels/check-reference?reference=${encodeURIComponent(form.reference.trim())}`)
+        if (response && response.exists) {
+          newErrors.reference = 'Une parcelle avec cette référence existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité de la référence:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const body = {
-      reference: form.reference,
-      area: form.area ? parseFloat(form.area) : undefined,
-      status: form.status,
-      isShowroom: form.isShowroom,
-      zoneId: form.zoneId,
-      cos: form.cos ? parseFloat(form.cos) : undefined,
-      cus: form.cus ? parseFloat(form.cus) : undefined,
-      heightLimit: form.heightLimit ? parseFloat(form.heightLimit) : undefined,
-      setback: form.setback ? parseFloat(form.setback) : undefined,
-      vertices: form.vertices.map((v, i) => ({
-        seq: i,
-        lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
-        lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
-      })),
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        reference: form.reference.trim(),
+        area: form.area ? parseFloat(form.area) : undefined,
+        status: form.status,
+        isShowroom: form.isShowroom,
+        zoneId: form.zoneId,
+        cos: form.cos ? parseFloat(form.cos) : undefined,
+        cus: form.cus ? parseFloat(form.cus) : undefined,
+        heightLimit: form.heightLimit ? parseFloat(form.heightLimit) : undefined,
+        setback: form.setback ? parseFloat(form.setback) : undefined,
+        vertices: form.vertices.map((v, i) => ({
+          seq: i,
+          lambertX: v.lambertX ? parseFloat(v.lambertX) : 0,
+          lambertY: v.lambertY ? parseFloat(v.lambertY) : 0,
+        })),
     }
 
-    if (form.id) {
-      await fetchApi(`/api/parcels/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } else {
-      await fetchApi('/api/parcels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    }
+      if (form.id) {
+        await fetchApi(`/api/parcels/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        await fetchApi('/api/parcels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
 
-    setForm({
-      id: '',
-      reference: '',
-      area: '',
-      status: 'LIBRE',
-      isShowroom: false,
-      zoneId: '',
-      vertices: [],
-    })
-    setImages([])
-    setOpen(false)
-    load(currentPage)
+      setForm({
+        id: '',
+        reference: '',
+        area: '',
+        status: 'LIBRE',
+        isShowroom: false,
+        zoneId: '',
+        vertices: [],
+        cos: '',
+        cus: '',
+        heightLimit: '',
+        setback: '',
+      })
+      setImages([])
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleEdit = useCallback((it: Parcel) => {
@@ -376,6 +478,7 @@ export default function ParcelsAdmin() {
       setback: '',
     })
     setImages([])
+    setErrors({})
     setOpen(true)
   }
 
@@ -435,15 +538,39 @@ export default function ParcelsAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouvelle parcelle'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
-            <div>
-              <Label htmlFor="reference">Référence</Label>
-              <Input id="reference" name="reference" value={form.reference} onChange={handleChange} required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="area">Surface m²</Label>
-                <Input id="area" name="area" value={form.area} onChange={handleChange} />
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
               </div>
+            )}
+            
+            <div>
+              <Label htmlFor="reference">Référence de la parcelle *</Label>
+              <Input 
+                id="reference" 
+                name="reference" 
+                value={form.reference} 
+                onChange={handleChange} 
+                required 
+                className={errors.reference ? 'border-red-500' : ''}
+                placeholder="Ex: P-001, LOT-A12"
+              />
+              {errors.reference && <span className="text-red-500 text-sm mt-1">{errors.reference}</span>}
+            </div>
+            <div>
+              <Label htmlFor="area">Superficie (m²)</Label>
+              <Input 
+                id="area" 
+                name="area" 
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.area} 
+                onChange={handleChange}
+                className={errors.area ? 'border-red-500' : ''}
+                placeholder="Ex: 2500"
+              />
+              {errors.area && <span className="text-red-500 text-sm mt-1">{errors.area}</span>}
             </div>
             
             {/* Contraintes techniques */}
@@ -452,19 +579,65 @@ export default function ParcelsAdmin() {
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <div>
                   <Label htmlFor="cos">COS (Coefficient d'occupation du sol)</Label>
-                  <Input id="cos" name="cos" value={form.cos} onChange={handleChange} placeholder="Ex: 0.7" />
+                  <Input 
+                    id="cos" 
+                    name="cos" 
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.01"
+                    value={form.cos} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 0.7"
+                    className={errors.cos ? 'border-red-500' : ''}
+                  />
+                  {errors.cos && <span className="text-red-500 text-sm mt-1">{errors.cos}</span>}
                 </div>
                 <div>
                   <Label htmlFor="cus">CUS (Coefficient d'utilisation du sol)</Label>
-                  <Input id="cus" name="cus" value={form.cus} onChange={handleChange} placeholder="Ex: 2.5" />
+                  <Input 
+                    id="cus" 
+                    name="cus" 
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.01"
+                    value={form.cus} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 2.5"
+                    className={errors.cus ? 'border-red-500' : ''}
+                  />
+                  {errors.cus && <span className="text-red-500 text-sm mt-1">{errors.cus}</span>}
                 </div>
                 <div>
                   <Label htmlFor="heightLimit">Limite de hauteur (m)</Label>
-                  <Input id="heightLimit" name="heightLimit" value={form.heightLimit} onChange={handleChange} placeholder="Ex: 12" />
+                  <Input 
+                    id="heightLimit" 
+                    name="heightLimit" 
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.heightLimit} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 12"
+                    className={errors.heightLimit ? 'border-red-500' : ''}
+                  />
+                  {errors.heightLimit && <span className="text-red-500 text-sm mt-1">{errors.heightLimit}</span>}
                 </div>
                 <div>
                   <Label htmlFor="setback">Recul (m)</Label>
-                  <Input id="setback" name="setback" value={form.setback} onChange={handleChange} placeholder="Ex: 5" />
+                  <Input 
+                    id="setback" 
+                    name="setback" 
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.setback} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 5"
+                    className={errors.setback ? 'border-red-500' : ''}
+                  />
+                  {errors.setback && <span className="text-red-500 text-sm mt-1">{errors.setback}</span>}
                 </div>
               </div>
             </div>
@@ -479,18 +652,30 @@ export default function ParcelsAdmin() {
                 Les coordonnées GPS seront calculées automatiquement après sauvegarde
               </div>
               {(form.vertices ?? []).map((v, idx) => (
-                <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
-                  <Input
-                    placeholder="X (Lambert)"
-                    value={v.lambertX}
-                    onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
-                  />
-                  <div className="flex gap-2">
+                <div key={idx} className="grid grid-cols-2 gap-2 items-start mb-2">
+                  <div>
                     <Input
-                      placeholder="Y (Lambert)"
-                      value={v.lambertY}
-                      onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                      type="number"
+                      step="0.01"
+                      placeholder="X (Lambert)"
+                      value={v.lambertX}
+                      onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
+                      className={errors[`vertex_${idx}_x`] ? 'border-red-500' : ''}
                     />
+                    {errors[`vertex_${idx}_x`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_x`]}</span>}
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Y (Lambert)"
+                        value={v.lambertY}
+                        onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                        className={errors[`vertex_${idx}_y`] ? 'border-red-500' : ''}
+                      />
+                      {errors[`vertex_${idx}_y`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_y`]}</span>}
+                    </div>
                     <Button type="button" size="sm" variant="destructive" onClick={() => removeVertex(idx)}>
                       ×
                     </Button>
@@ -500,9 +685,9 @@ export default function ParcelsAdmin() {
               <Button type="button" size="sm" onClick={addVertex}>Ajouter un point</Button>
             </div>
             <div>
-              <Label htmlFor="zoneId">Zone</Label>
+              <Label htmlFor="zoneId">Zone industrielle *</Label>
               <Select value={form.zoneId || undefined} onValueChange={handleZone}>
-                <SelectTrigger>
+                <SelectTrigger className={errors.zoneId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="-- Sélectionnez une zone --" />
                 </SelectTrigger>
                 <SelectContent>
@@ -521,6 +706,7 @@ export default function ParcelsAdmin() {
                   )}
                 </SelectContent>
               </Select>
+              {errors.zoneId && <span className="text-red-500 text-sm mt-1">{errors.zoneId}</span>}
               {zones.length === 0 && (
                 <p className="text-xs text-gray-500 mt-1">
                   {zones.length === 0 ? 'Chargement des zones...' : `${zones.length} zones disponibles`}
@@ -564,7 +750,26 @@ export default function ParcelsAdmin() {
                 ))}
               </div>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

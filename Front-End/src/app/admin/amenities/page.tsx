@@ -37,6 +37,8 @@ export default function AmenitiesAdmin() {
     icon: '',
     category: '',
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
@@ -91,33 +93,107 @@ export default function AmenitiesAdmin() {
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom de l\'équipement est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    } else if (form.name.length > 100) {
+      newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
+    }
+    
+    // Validation de la description (longueur si renseignée)
+    if (form.description && form.description.length < 5) {
+      newErrors.description = 'La description doit contenir au moins 5 caractères'
+    } else if (form.description && form.description.length > 500) {
+      newErrors.description = 'La description ne peut pas dépasser 500 caractères'
+    }
+    
+    // Validation de l'icône (format si renseignée)
+    if (form.icon && form.icon.length > 50) {
+      newErrors.icon = 'L\'icône ne peut pas dépasser 50 caractères'
+    }
+    
+    // Validation de la catégorie (longueur si renseignée)
+    if (form.category && form.category.length < 2) {
+      newErrors.category = 'La catégorie doit contenir au moins 2 caractères'
+    } else if (form.category && form.category.length > 50) {
+      newErrors.category = 'La catégorie ne peut pas dépasser 50 caractères'
+    }
+    
+    // Vérification d'unicité du nom (si nouvel équipement)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/amenities/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Un équipement avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const body = {
-      name: form.name,
-      description: form.description || undefined,
-      icon: form.icon || undefined,
-      category: form.category || undefined,
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        icon: form.icon?.trim() || undefined,
+        category: form.category?.trim() || undefined,
+      }
+      
+      if (form.id) {
+        await fetchApi(`/api/amenities/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        await fetchApi('/api/amenities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+      
+      setForm({ id: '', name: '', description: '', icon: '', category: '' })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    if (form.id) {
-      await fetchApi(`/api/amenities/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } else {
-      await fetchApi('/api/amenities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    }
-    setForm({ id: '', name: '', description: '', icon: '', category: '' })
-    setOpen(false)
-    load(currentPage)
   }
 
   function edit(it: Amenity) {
@@ -137,6 +213,7 @@ export default function AmenitiesAdmin() {
 
   function addNew() {
     setForm({ id: '', name: '', description: '', icon: '', category: '' })
+    setErrors({})
     setOpen(true)
   }
 
@@ -216,23 +293,101 @@ export default function AmenitiesAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouvel équipement'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom de l'équipement *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Parking, Station électrique, Wi-Fi, Restaurant"
+                maxLength={100}
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {form.name.length}/100 caractères
+              </p>
             </div>
+            
             <div>
               <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" value={form.description} onChange={handleChange} />
+              <Input 
+                id="description" 
+                name="description" 
+                value={form.description || ''} 
+                onChange={handleChange}
+                className={errors.description ? 'border-red-500' : ''}
+                placeholder="Description détaillée de l'équipement (optionnel)"
+                maxLength={500}
+              />
+              {errors.description && <span className="text-red-500 text-sm mt-1">{errors.description}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {(form.description || '').length}/500 caractères
+              </p>
             </div>
-            <div>
-              <Label htmlFor="icon">Icône</Label>
-              <Input id="icon" name="icon" value={form.icon} onChange={handleChange} />
-            </div>
+            
             <div>
               <Label htmlFor="category">Catégorie</Label>
-              <Input id="category" name="category" value={form.category} onChange={handleChange} />
+              <Input 
+                id="category" 
+                name="category" 
+                value={form.category || ''} 
+                onChange={handleChange}
+                className={errors.category ? 'border-red-500' : ''}
+                placeholder="Ex: Transport, Énergie, Communication, Restauration"
+                maxLength={50}
+              />
+              {errors.category && <span className="text-red-500 text-sm mt-1">{errors.category}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Catégorie pour regrouper les équipements similaires
+              </p>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div>
+              <Label htmlFor="icon">Icône</Label>
+              <Input 
+                id="icon" 
+                name="icon" 
+                value={form.icon || ''} 
+                onChange={handleChange}
+                className={errors.icon ? 'border-red-500' : ''}
+                placeholder="Ex: 🚗, ⚡, 📶, 🍽️ ou nom d'icône CSS"
+                maxLength={50}
+              />
+              {errors.icon && <span className="text-red-500 text-sm mt-1">{errors.icon}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Emoji ou nom d'icône pour représenter l'équipement
+              </p>
+            </div>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

@@ -7,20 +7,31 @@ import java.time.LocalDateTime;
 /**
  * Repository pour la gestion des rendez-vous.
  * 
- * @author Industria Platform
+ * Fournit les opérations CRUD ainsi que des méthodes de recherche
+ * et statistiques pour les rendez-vous des investisseurs.
+ * 
+ * @author Industria Platform Team
  * @version 1.0
+ * @since 1.0
  */
 public interface AppointmentRepository extends JpaRepository<Appointment, String> {
     
     /**
-     * Compte le nombre de rendez-vous en attente de traitement.
+     * Compte les rendez-vous par statut.
+     * Utilisé pour les statistiques administratives.
      * 
-     * @return Nombre de rendez-vous avec statut PENDING
+     * @param status statut des rendez-vous à compter
+     * @return nombre de rendez-vous avec le statut donné
      */
     Long countByStatus(AppointmentStatus status);
     
     /**
-     * Méthodes pour les rapports
+     * Compte les rendez-vous créés dans une période donnée.
+     * Utilisé pour les rapports temporels.
+     * 
+     * @param start date de début de la période
+     * @param end date de fin de la période
+     * @return nombre de rendez-vous créés dans la période
      */
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }

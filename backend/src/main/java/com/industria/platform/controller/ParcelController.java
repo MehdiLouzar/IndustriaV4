@@ -1,5 +1,6 @@
 package com.industria.platform.controller;
 
+import com.industria.platform.dto.ListResponse;
 import com.industria.platform.dto.ParcelDto;
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.entity.AuditAction;
@@ -9,26 +10,28 @@ import com.industria.platform.entity.User;
 import com.industria.platform.entity.Zone;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
-import com.industria.platform.service.StatusService;
-import com.industria.platform.service.GeometryUpdateService;
-import com.industria.platform.service.PermissionService;
-import com.industria.platform.service.UserService;
-import com.industria.platform.service.AuditService;
-import com.industria.platform.service.GeometryParsingService;
-import com.industria.platform.service.PostGISGeometryService;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.industria.platform.service.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Optional;
-import org.springframework.data.domain.PageRequest;
-import com.industria.platform.dto.ListResponse;
+import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des parcelles.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/parcels")
+@RequiredArgsConstructor
+@Slf4j
 public class ParcelController {
 
     private final StatusService statusService;
@@ -41,26 +44,15 @@ public class ParcelController {
     private final GeometryParsingService geometryParsingService;
     private final PostGISGeometryService postGISGeometryService;
 
-    public ParcelController(StatusService statusService,
-                             ParcelRepository parcelRepository,
-                             ZoneRepository zoneRepository,
-                             GeometryUpdateService geometryUpdateService,
-                             PermissionService permissionService,
-                             UserService userService,
-                             AuditService auditService,
-                             GeometryParsingService geometryParsingService,
-                             PostGISGeometryService postGISGeometryService) {
-        this.statusService = statusService;
-        this.parcelRepository = parcelRepository;
-        this.zoneRepository = zoneRepository;
-        this.geometryUpdateService = geometryUpdateService;
-        this.permissionService = permissionService;
-        this.userService = userService;
-        this.auditService = auditService;
-        this.geometryParsingService = geometryParsingService;
-        this.postGISGeometryService = postGISGeometryService;
-    }
-
+    /**
+     * Récupère toutes les parcelles avec pagination et filtrage.
+     *
+     * @param zoneId identifiant de la zone pour filtrer (optionnel)
+     * @param page numéro de la page (défaut: 1)
+     * @param limit nombre d'éléments par page (défaut: 10, max: 100)
+     * @param search terme de recherche pour filtrer par référence (optionnel)
+     * @return réponse paginée des parcelles
+     */
     @GetMapping
     public ListResponse<ParcelDto> all(@RequestParam(required = false) String zoneId,
                                        @RequestParam(defaultValue = "1") int page,
@@ -84,7 +76,7 @@ public class ParcelController {
             allParcels = parcelRepository.findAll();
         }
         
-        System.out.println("DEBUG - Found " + allParcels.size() + " parcels before filtering");
+        log.debug("Found {} parcels before filtering", allParcels.size());
         
         // Filtrer selon les permissions seulement pour les ZONE_MANAGER connectés
         List<Parcel> permissionFilteredParcels;
@@ -105,7 +97,7 @@ public class ParcelController {
             permissionFilteredParcels = allParcels;
         }
         
-        System.out.println("DEBUG - After permission filtering: " + permissionFilteredParcels.size() + " parcels");
+        log.debug("After permission filtering: {} parcels", permissionFilteredParcels.size());
         
         // MAINTENANT appliquer la pagination sur les résultats filtrés
         long totalFiltered = permissionFilteredParcels.size();
@@ -121,6 +113,11 @@ public class ParcelController {
         return new ListResponse<>(items, totalFiltered, totalPagesFiltered, p, l);
     }
 
+    /**
+     * Récupère toutes les parcelles sans pagination.
+     *
+     * @return liste complète des parcelles
+     */
     @GetMapping("/all")
     public List<ParcelDto> allParcels() {
         List<Parcel> parcels = parcelRepository.findAll();
@@ -146,11 +143,24 @@ public class ParcelController {
                 .toList();
     }
 
+    /**
+     * Récupère une parcelle par son identifiant.
+     *
+     * @param id identifiant de la parcelle
+     * @return données de la parcelle
+     */
     @GetMapping("/{id}")
     public ParcelDto get(@PathVariable String id) {
         return parcelRepository.findById(id).map(this::toDto).orElse(null);
     }
 
+    /**
+     * Crée une nouvelle parcelle.
+     * Accessible aux gestionnaires de zones et administrateurs.
+     *
+     * @param dto données de la parcelle à créer
+     * @return la parcelle créée
+     */
     @PostMapping
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ParcelDto create(@RequestBody ParcelDto dto) {
@@ -179,6 +189,14 @@ public class ParcelController {
         return toDto(p);
     }
 
+    /**
+     * Met à jour une parcelle existante.
+     * Accessible aux gestionnaires de zones et administrateurs.
+     *
+     * @param id identifiant de la parcelle à modifier
+     * @param dto nouvelles données de la parcelle
+     * @return la parcelle mise à jour
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<ParcelDto> update(@PathVariable String id, @RequestBody ParcelDto dto) {
@@ -202,6 +220,13 @@ public class ParcelController {
         return ResponseEntity.ok(toDto(oldParcel));
     }
 
+    /**
+     * Supprime une parcelle.
+     * Accessible aux gestionnaires de zones et administrateurs.
+     *
+     * @param id identifiant de la parcelle à supprimer
+     * @return réponse vide
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
@@ -219,6 +244,14 @@ public class ParcelController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Met à jour le statut d'une parcelle.
+     * Accessible aux gestionnaires de zones et administrateurs.
+     *
+     * @param id identifiant de la parcelle
+     * @param request requête contenant le nouveau statut
+     * @return la parcelle avec le statut mis à jour
+     */
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<Parcel> updateStatus(@PathVariable String id, @RequestBody StatusRequest request) {
@@ -243,26 +276,25 @@ public class ParcelController {
         // Récupérer la géométrie - d'abord essayer depuis l'entity, puis via PostGIS service
         try {
             String geometry = p.getGeometry();
-            System.out.println("DEBUG - Parcel " + p.getId() + " geometry: " + (geometry != null ? geometry.substring(0, Math.min(100, geometry.length())) + "..." : "null"));
+            log.debug("Parcel {} geometry: {}", p.getId(), geometry != null ? geometry.substring(0, Math.min(100, geometry.length())) + "..." : "null");
             
             if (geometry != null && !geometry.trim().isEmpty()) {
                 vertices = geometryParsingService.parseWKTGeometry(geometry);
-                System.out.println("DEBUG - Parcel " + p.getId() + " parsed " + vertices.size() + " vertices via entity");
+                log.debug("Parcel {} parsed {} vertices via entity", p.getId(), vertices.size());
                 if (!vertices.isEmpty()) {
-                    System.out.println("DEBUG - First vertex: (" + vertices.get(0).lambertX() + ", " + vertices.get(0).lambertY() + ")");
+                    log.debug("First vertex: ({}, {})", vertices.get(0).lambertX(), vertices.get(0).lambertY());
                 }
             } else {
                 // Fallback: essayer via PostGIS service
-                System.out.println("DEBUG - Parcel " + p.getId() + " trying PostGIS service fallback");
+                log.debug("Parcel {} trying PostGIS service fallback", p.getId());
                 vertices = postGISGeometryService.extractParcelVertices(p.getId());
-                System.out.println("DEBUG - Parcel " + p.getId() + " parsed " + vertices.size() + " vertices via PostGIS");
+                log.debug("Parcel {} parsed {} vertices via PostGIS", p.getId(), vertices.size());
                 if (!vertices.isEmpty()) {
-                    System.out.println("DEBUG - First vertex from PostGIS: (" + vertices.get(0).lambertX() + ", " + vertices.get(0).lambertY() + ")");
+                    log.debug("First vertex from PostGIS: ({}, {})", vertices.get(0).lambertX(), vertices.get(0).lambertY());
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error parsing parcel geometry for " + p.getId() + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error parsing parcel geometry for {}: {}", p.getId(), e.getMessage(), e);
         }
         
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
@@ -300,15 +332,15 @@ public class ParcelController {
                 p.setGeometry(newGeometry);
                 p.setSrid(4326);
                 
-                System.out.println("DEBUG: Vertices reçus pour parcelle: " + dto.vertices());
-                System.out.println("DEBUG: Nouvelle géométrie générée: " + newGeometry);
+                log.debug("Vertices reçus pour parcelle: {}", dto.vertices());
+                log.debug("Nouvelle géométrie générée: {}", newGeometry);
                 // Calculer automatiquement les coordonnées WGS84
                 geometryUpdateService.updateParcelCoordinates(p, dto.vertices());
             } else {
-                System.out.println("DEBUG: Géométrie générée nulle, conservation de l'existante");
+                log.debug("Géométrie générée nulle, conservation de l'existante");
             }
         } else {
-            System.out.println("DEBUG: Aucun vertex fourni, conservation de la géométrie existante");
+            log.debug("Aucun vertex fourni, conservation de la géométrie existante");
             // Ne pas appeler geometryUpdateService pour éviter de réinitialiser les coordonnées
         }
     }
@@ -316,7 +348,7 @@ public class ParcelController {
     private List<VertexDto> parseGeometry(String wkt) {
         if (wkt == null || wkt.trim().isEmpty()) return List.of();
         
-        System.out.println("DEBUG: Parsing WKT: " + wkt);
+        log.debug("Parsing WKT: {}", wkt);
         
         // Extraire les coordonnées du POLYGON((x1 y1, x2 y2, ...))
         String coords = wkt;
@@ -327,7 +359,7 @@ public class ParcelController {
             coords = coords.substring(0, coords.length() - 2); // Remove "))"
         }
         
-        System.out.println("DEBUG: Extracted coords: " + coords);
+        log.debug("Extracted coords: {}", coords);
         
         List<VertexDto> verts = new ArrayList<>();
         String[] coordPairs = coords.split(",");

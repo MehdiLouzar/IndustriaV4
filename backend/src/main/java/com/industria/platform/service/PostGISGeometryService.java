@@ -5,28 +5,40 @@ import com.industria.platform.entity.Parcel;
 import com.industria.platform.entity.Zone;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Service d'extraction et manipulation de géométries PostGIS.
+ * 
+ * Gère la conversion des formats géométriques (WKB/WKT) et l'extraction
+ * des vertices pour les zones et parcelles stockées en base PostGIS.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class PostGISGeometryService {
 
     private final ParcelRepository parcelRepository;
     private final ZoneRepository zoneRepository;
     private final GeometryParsingService geometryParsingService;
 
-    public PostGISGeometryService(ParcelRepository parcelRepository,
-                                 ZoneRepository zoneRepository,
-                                 GeometryParsingService geometryParsingService) {
-        this.parcelRepository = parcelRepository;
-        this.zoneRepository = zoneRepository;
-        this.geometryParsingService = geometryParsingService;
-    }
-
     /**
-     * Extrait les vertices d'une zone en convertissant WKB vers WKT avec JTS
+     * Extrait les vertices géométriques d'une zone.
+     * 
+     * Convertit automatiquement les formats WKB vers WKT si nécessaire
+     * et extrait les points de contour de la zone.
+     * 
+     * @param zoneId identifiant de la zone
+     * @return liste des vertices en coordonnées Lambert Maroc
      */
     public List<VertexDto> extractZoneVertices(String zoneId) {
         Optional<Zone> zoneOpt = zoneRepository.findById(zoneId);
@@ -53,7 +65,13 @@ public class PostGISGeometryService {
     }
 
     /**
-     * Extrait les vertices d'une parcelle en convertissant WKB vers WKT avec JTS
+     * Extrait les vertices géométriques d'une parcelle.
+     * 
+     * Convertit automatiquement les formats WKB vers WKT si nécessaire
+     * et extrait les points de contour de la parcelle.
+     * 
+     * @param parcelId identifiant de la parcelle
+     * @return liste des vertices en coordonnées Lambert Maroc
      */
     public List<VertexDto> extractParcelVertices(String parcelId) {
         Optional<Parcel> parcelOpt = parcelRepository.findById(parcelId);
@@ -80,7 +98,13 @@ public class PostGISGeometryService {
     }
 
     /**
-     * Calcule le centroïde d'une zone
+     * Calcule le centroïde d'une zone dans plusieurs systèmes de coordonnées.
+     * 
+     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées)
+     * et en Lambert Maroc (calculées dynamiquement).
+     * 
+     * @param zoneId identifiant de la zone
+     * @return tableau [longitude_WGS84, latitude_WGS84, X_Lambert, Y_Lambert]
      */
     public double[] getZoneCentroid(String zoneId) {
         Optional<Zone> zoneOpt = zoneRepository.findById(zoneId);
@@ -111,7 +135,13 @@ public class PostGISGeometryService {
     }
 
     /**
-     * Calcule le centroïde d'une parcelle 
+     * Calcule le centroïde d'une parcelle dans plusieurs systèmes de coordonnées.
+     * 
+     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées)
+     * et en Lambert Maroc (calculées dynamiquement).
+     * 
+     * @param parcelId identifiant de la parcelle
+     * @return tableau [longitude_WGS84, latitude_WGS84, X_Lambert, Y_Lambert]
      */
     public double[] getParcelCentroid(String parcelId) {
         Optional<Parcel> parcelOpt = parcelRepository.findById(parcelId);
@@ -142,7 +172,13 @@ public class PostGISGeometryService {
     }
     
     /**
-     * Convertit WKB (format binaire) en WKT si nécessaire
+     * Convertit une géométrie WKB vers WKT si nécessaire.
+     * 
+     * Détecte automatiquement le format de la géométrie et effectue
+     * la conversion appropriee pour le parsing.
+     * 
+     * @param geometry géométrie en format WKB ou WKT
+     * @return géométrie convertie en WKT ou null si conversion impossible
      */
     private String convertToWKTIfNeeded(String geometry) {
         if (geometry == null || geometry.trim().isEmpty()) {
@@ -156,7 +192,7 @@ public class PostGISGeometryService {
         
         // Si c'est du WKB (format hexadécimal commençant par 0103...), indiquer qu'on ne peut pas le convertir sans SQL
         if (geometry.matches("^[0-9A-Fa-f]+$")) {
-            System.err.println("ERREUR: Géométrie en format WKB détectée, impossible de convertir sans requête SQL PostGIS");
+            log.error("Géométrie en format WKB détectée, impossible de convertir sans requête SQL PostGIS");
             return null;
         }
         

@@ -1,6 +1,8 @@
 package com.industria.platform.controller;
 
 import com.industria.platform.repository.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,9 +19,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Contrôleur REST pour la génération de rapports administratifs.
+ * 
+ * Fournit des statistiques et exports CSV pour l'analyse des données
+ * de la plateforme (zones, parcelles, rendez-vous, contacts).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/admin/reports")
 @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
+@RequiredArgsConstructor
+@Slf4j
 public class ReportsController {
 
     private final ZoneRepository zoneRepository;
@@ -27,19 +41,6 @@ public class ReportsController {
     private final AppointmentRepository appointmentRepository;
     private final ContactRequestRepository contactRequestRepository;
     private final UserRepository userRepository;
-
-    public ReportsController(
-            ZoneRepository zoneRepository,
-            ParcelRepository parcelRepository,
-            AppointmentRepository appointmentRepository,
-            ContactRequestRepository contactRequestRepository,
-            UserRepository userRepository) {
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.appointmentRepository = appointmentRepository;
-        this.contactRequestRepository = contactRequestRepository;
-        this.userRepository = userRepository;
-    }
 
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getReportStats(

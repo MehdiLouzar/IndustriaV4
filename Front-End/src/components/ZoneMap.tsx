@@ -1,3 +1,27 @@
+/**
+ * Composant ZoneMap - Carte détaillée d'une zone industrielle
+ * 
+ * Affiche une carte précise d'une zone industrielle spécifique avec :
+ * - Polygones de la zone et de ses parcelles
+ * - Projection Lambert Maroc vers WGS84 pour géolocalisation précise
+ * - Sélection interactive des parcelles disponibles
+ * - Popups avec détails (superficie, prix, règlements COS/CUS)
+ * - Intégration du formulaire de prise de rendez-vous
+ * - Couleurs conditionnelles selon disponibilité
+ * 
+ * Utilise :
+ * - Proj4js pour les transformations de coordonnées
+ * - Leaflet pour le rendu cartographique
+ * - Polygones vectoriels pour la précision
+ * - Géométries stockées en base PostGIS
+ * 
+ * @param zone Zone industrielle à afficher avec ses parcelles
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 "use client";
 
 import { MapContainer, TileLayer, Polygon, Popup, Marker } from "react-leaflet";
@@ -5,42 +29,98 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import L from "leaflet";
 import proj4 from "proj4";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapPin, Square, Building2 } from "lucide-react";
+import { MapPin, Square, Building2, Zap, Wifi, Car, Wrench, Factory, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
+/**
+ * Représentation d'une parcelle avec géométrie et règlements
+ */
 interface Parcel {
+  /** Identifiant unique */
   id: string;
+  /** Référence cadastrale */
   reference: string;
+  /** Statut de disponibilité */
   status: string;
+  /** Indique si la parcelle est libre */
   isFree?: boolean;
+  /** Coordonnée X en Lambert Maroc */
   lambertX?: number | null;
+  /** Coordonnée Y en Lambert Maroc */
   lambertY?: number | null;
+  /** Latitude en WGS84 */
   latitude?: number;
+  /** Longitude en WGS84 */
   longitude?: number;
+  /** Superficie en m² */
   area?: number | null;
+  /** Prix au m² */
   price?: number | null;
+  /** Sommets du polygone de la parcelle */
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  /** Coefficient d'occupation du sol */
   cos?: number | null;
+  /** Coefficient d'utilisation du sol */
   cus?: number | null;
+  /** Limite de hauteur en mètres */
   heightLimit?: number | null;
+  /** Recul obligatoire en mètres */
   setback?: number | null;
+  /** Nom de la zone parente */
   zoneName?: string | null;
+  /** Adresse de la zone */
   zoneAddress?: string | null;
+  /** Prix de la zone */
   zonePrice?: number | null;
+  /** Type de prix de la zone */
   zonePriceType?: string | null;
 }
 
-interface Zone {
-  id: string;
+/**
+ * Représentation d'une activité avec icône
+ */
+interface Activity {
+  activity: {
+    name: string;
+    icon?: string;
+  };
+}
+
+/**
+ * Représentation d'un équipement avec icône
+ */
+interface Amenity {
   name: string;
+  icon?: string;
+}
+
+/**
+ * Représentation d'une zone industrielle avec ses parcelles
+ */
+interface Zone {
+  /** Identifiant unique */
+  id: string;
+  /** Nom de la zone */
+  name: string;
+  /** Statut global */
   status: string;
+  /** Coordonnée X du centroide en Lambert */
   lambertX?: number | null;
+  /** Coordonnée Y du centroide en Lambert */
   lambertY?: number | null;
+  /** Latitude du centroide en WGS84 */
   latitude?: number;
+  /** Longitude du centroide en WGS84 */
   longitude?: number;
+  /** Liste des parcelles de la zone */
   parcels?: Parcel[];
+  /** Sommets du polygone de la zone */
   vertices?: { seq: number; lambertX: number; lambertY: number; lat?: number; lon?: number }[];
+  /** Activités autorisées dans cette zone */
+  activities?: Activity[];
+  /** Équipements disponibles dans cette zone */
+  amenities?: Amenity[];
 }
 
 export default function ZoneMap({ zone }: { zone: Zone }) {
@@ -48,6 +128,79 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
   const [_zone_parcels, setZoneParcels] = useState<Parcel[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
+
+  // Fonction pour obtenir l'icône Lucide React appropriée
+  const getLucideIcon = (iconName?: string) => {
+    if (!iconName) return Factory
+    
+    const iconMap: { [key: string]: any } = {
+      // Électricité et énergie
+      'Zap': Zap,
+      'Power': Power,
+      'Battery': Battery,
+      'Lightbulb': Zap,
+      'Sun': Power,
+      'Flame': Zap,
+      
+      // Internet et communication
+      'Wifi': Wifi,
+      'Globe': Globe,
+      'Mail': Globe,
+      'Server': Server,
+      'Database': Database,
+      'HardDrive': HardDrive,
+      'Monitor': Monitor,
+      
+      // Transport et parking
+      'Car': Car,
+      'Truck': Truck,
+      'Plane': Plane,
+      'ParkingCircle': Car,
+      
+      // Bâtiments et infrastructure
+      'Building': Building2,
+      'Building2': Building2,
+      'Factory': Factory,
+      'Home': Home,
+      'Briefcase': Briefcase,
+      'Hospital': Building2,
+      'CreditCard': Package,
+      
+      // Technologie et outils
+      'Cpu': Cpu,
+      'Wrench': Wrench,
+      'Settings': Settings,
+      'Cog': Settings,
+      'Tool': Tool,
+      'Gauge': Gauge,
+      'Settings2': Settings2,
+      
+      // Sécurité et services
+      'Shield': Shield,
+      'shield': Shield,
+      'Droplets': Droplets,
+      'droplet': Droplet,
+      'droplets': Droplets,
+      'Coffee': Coffee,
+      'Users': Users,
+      'Package': Package,
+      'package': Package,
+      'UtensilsCrossed': Coffee,
+      
+      // Icônes spécifiques de la base
+      'car': Car,
+      'zap': Zap,
+      'wifi': Wifi,
+      'shirt': Shirt,
+      'pill': Pill,
+      
+      // Icônes spécifiques à la carte
+      'MapPin': MapPin,
+      'Square': Square
+    }
+    
+    return iconMap[iconName] || Factory
+  }
 
   const isParcelWrapper = (data: unknown): data is { items: Parcel[] } =>
     typeof data === 'object' && data !== null && Array.isArray((data as { items?: unknown }).items);
@@ -185,17 +338,17 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     switch (s) {
       case "LIBRE":
       case "AVAILABLE":
-        return "#A79059";
+        return "#4CAF50"; // Vert vif pour les disponibles
       case "RESERVEE":
       case "RESERVED":
-        return "#C9A956";
+        return "#FF9800"; // Orange vif pour les réservées
       case "VENDU":
       case "OCCUPIED":
-        return "#8C6B2F";
+        return "#F44336"; // Rouge vif pour les vendues/occupées
       case "SHOWROOM":
-        return "#1C1C1C";
+        return "#9C27B0"; // Violet vif pour les showrooms
       default:
-        return "#CCCCCC";
+        return "#757575"; // Gris foncé pour les autres statuts
     }
   };
 
@@ -223,14 +376,14 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
     };
 
     return {
-      LIBRE: createParcelIcon('#A79059', 'LIBRE'),
-      AVAILABLE: createParcelIcon('#A79059', 'AVAILABLE'),
-      RESERVEE: createParcelIcon('#C9A956', 'RESERVEE'),
-      RESERVED: createParcelIcon('#C9A956', 'RESERVED'),
-      VENDU: createParcelIcon('#8C6B2F', 'VENDU'),
-      OCCUPIED: createParcelIcon('#8C6B2F', 'OCCUPIED'),
-      SHOWROOM: createParcelIcon('#1C1C1C', 'SHOWROOM'),
-      DEFAULT: createParcelIcon('#CCCCCC', 'DEFAULT'),
+      LIBRE: createParcelIcon('#4CAF50', 'LIBRE'), // Vert vif pour les disponibles
+      AVAILABLE: createParcelIcon('#4CAF50', 'AVAILABLE'), // Vert vif pour les disponibles
+      RESERVEE: createParcelIcon('#FF9800', 'RESERVEE'), // Orange vif pour les réservées
+      RESERVED: createParcelIcon('#FF9800', 'RESERVED'), // Orange vif pour les réservées
+      VENDU: createParcelIcon('#F44336', 'VENDU'), // Rouge vif pour les vendues
+      OCCUPIED: createParcelIcon('#F44336', 'OCCUPIED'), // Rouge vif pour les occupées
+      SHOWROOM: createParcelIcon('#9C27B0', 'SHOWROOM'), // Violet vif pour les showrooms
+      DEFAULT: createParcelIcon('#757575', 'DEFAULT'), // Gris foncé pour les autres
     };
   }, []);
 
@@ -340,19 +493,70 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
           positions={zonePolygon}
           pathOptions={{
             color: zoneColor[zone.status] || "#8C6B2F",
-            opacity: 0.8,
+            opacity: 1.0, // Opacité maximale pour une meilleure visibilité
             fillColor: zoneColor[zone.status] || "#8C6B2F",
-            fillOpacity: 0.2,
-            weight: 3,
+            fillOpacity: 0.1, // Réduit pour ne pas masquer les parcelles
+            weight: 4, // Augmenté pour des bordures plus visibles
           }}
         >
-          <Popup>
-            <div className="space-y-1 text-sm">
-              <strong>{zone.name}</strong>
-              <div>Statut: {zone.status}</div>
+          <Popup maxWidth={400}>
+            <div className="space-y-3 text-sm max-w-sm">
+              {/* Titre de la zone */}
+              <div className="bg-gradient-to-r from-industria-brown-gold/10 to-industria-olive-light/10 -m-3 p-3 mb-3 rounded-t-lg">
+                <strong className="text-lg text-industria-brown-gold">{zone.name}</strong>
+                <div className="text-gray-600 mt-1">Statut: {zone.status}</div>
+              </div>
+              
+              {/* Coordonnées si disponibles */}
               {zone.latitude != null && zone.longitude != null && (
+                <div className="text-xs text-gray-500">
+                  Coordonnées: {zone.latitude.toFixed(5)}, {zone.longitude.toFixed(5)}
+                </div>
+              )}
+              
+              {/* Activités autorisées */}
+              {zone.activities && zone.activities.length > 0 && (
                 <div>
-                  Lat: {zone.latitude.toFixed(5)}, Lon: {zone.longitude.toFixed(5)}
+                  <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-2">Activités autorisées</h5>
+                  <div className="flex flex-wrap gap-1">
+                    {zone.activities.slice(0, 4).map((activity, i) => {
+                      const IconComponent = getLucideIcon(activity.activity.icon)
+                      return (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs border border-blue-200">
+                          <IconComponent className="w-3 h-3" />
+                          <span>{activity.activity.name}</span>
+                        </span>
+                      )
+                    })}
+                    {zone.activities.length > 4 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                        +{zone.activities.length - 4}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Équipements disponibles */}
+              {zone.amenities && zone.amenities.length > 0 && (
+                <div>
+                  <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-2">Équipements</h5>
+                  <div className="flex flex-wrap gap-1">
+                    {zone.amenities.slice(0, 4).map((amenity, i) => {
+                      const IconComponent = getLucideIcon(amenity.icon)
+                      return (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs border border-green-200">
+                          <IconComponent className="w-3 h-3" />
+                          <span>{amenity.name}</span>
+                        </span>
+                      )
+                    })}
+                    {zone.amenities.length > 4 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                        +{zone.amenities.length - 4}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -372,10 +576,10 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                   positions={parcelPoly(p)}
                   pathOptions={{
                     color: parcelColor(p.status),
-                    opacity: 0.6,
+                    opacity: 0.9, // Augmenté pour des bordures plus visibles
                     fillColor: parcelColor(p.status),
-                    fillOpacity: 0.1,
-                    weight: 1,
+                    fillOpacity: 0.15, // Légèrement augmenté pour une meilleure distinction
+                    weight: 2, // Augmenté pour des bordures plus épaisses
                   }}
                 />
                 {/* Marqueur au centre de la parcelle */}
@@ -472,26 +676,6 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                         </div>
                       )}
 
-                      {/* Informations financières zone */}
-                      {(p.zonePrice || p.zonePriceType) && (
-                        <div className="space-y-2">
-                          <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-green-600" />
-                            Tarification zone
-                          </h4>
-                          <div className="ml-6">
-                            {p.zonePrice && (
-                              <div className="p-2 bg-emerald-50 rounded">
-                                <span className="text-gray-600">Prix zone: </span>
-                                <span className="font-bold text-emerald-600">{p.zonePrice.toLocaleString()} DH</span>
-                                {p.zonePriceType && (
-                                  <span className="text-xs text-gray-500 ml-1">({p.zonePriceType})</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
 
                       {/* Adresse si disponible */}
                       {p.zoneAddress && (

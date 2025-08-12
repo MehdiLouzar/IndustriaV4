@@ -4,6 +4,8 @@ import com.industria.platform.entity.ContactRequest;
 import com.industria.platform.entity.ContactRequestStatus;
 import com.industria.platform.entity.ContactType;
 import com.industria.platform.repository.ContactRequestRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -12,17 +14,34 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Service de filtrage des demandes de contact.
+ * 
+ * Fournit des capacités de recherche et filtrage avancées
+ * pour les demandes de contact des investisseurs et aménageurs.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class ContactRequestFilterService {
 
     private final ContactRequestRepository contactRequestRepository;
 
-    public ContactRequestFilterService(ContactRequestRepository contactRequestRepository) {
-        this.contactRequestRepository = contactRequestRepository;
-    }
-
     /**
-     * Filtre les demandes de contact selon les critères fournis
+     * Filtre les demandes de contact selon les critères fournis.
+     * 
+     * Applique les filtres de statut, type et recherche textuelle
+     * avec pagination des résultats triés par date de création.
+     * 
+     * @param status filtre par statut (optionnel)
+     * @param contactType filtre par type de contact (optionnel)
+     * @param search terme de recherche textuelle (optionnel)
+     * @param pageable paramètres de pagination
+     * @return page de demandes filtrées
      */
     public Page<ContactRequest> findWithFilters(ContactRequestStatus status,
                                                ContactType contactType,

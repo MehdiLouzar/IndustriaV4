@@ -171,6 +171,9 @@ export default function ZonesAdmin() {
     vertices: [],
     verticesModified: false,
   })
+  
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [images, setImages] = useState<{ file: File; url: string; description?: string; isPrimary?: boolean }[]>([])
   const [existingImages, setExistingImages] = useState<Array<{
     id: string;
@@ -307,8 +310,14 @@ export default function ZonesAdmin() {
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }, [])
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }, [errors])
 
   const handleStatus = useCallback((value: string) => {
     setForm(prev => ({ ...prev, status: value }))
@@ -366,7 +375,13 @@ export default function ZonesAdmin() {
       verts[index] = { ...verts[index], [field]: value }
       return { ...f, vertices: verts, verticesModified: true }
     })
-  }, [])
+    
+    // Effacer l'erreur pour ce vertex lors de la saisie
+    const errorKey = `vertex_${index}_${field === 'lambertX' ? 'x' : 'y'}`
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: '' }))
+    }
+  }, [errors])
 
   const removeVertex = useCallback((index: number) => {
     setForm((f) => {
@@ -453,14 +468,69 @@ export default function ZonesAdmin() {
     })
   }, [])
 
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom de la zone est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation de la superficie (doit être positive si renseignée)
+    if (form.totalArea && (isNaN(parseFloat(form.totalArea)) || parseFloat(form.totalArea) <= 0)) {
+      newErrors.totalArea = 'La superficie doit être un nombre positif'
+    }
+    
+    // Validation du prix (doit être positif si renseigné)
+    if (form.price && (isNaN(parseFloat(form.price)) || parseFloat(form.price) <= 0)) {
+      newErrors.price = 'Le prix doit être un nombre positif'
+    }
+    
+    // Validation des coordonnées Lambert (si renseignées)
+    form.vertices.forEach((vertex, index) => {
+      if (vertex.lambertX && isNaN(parseFloat(vertex.lambertX))) {
+        newErrors[`vertex_${index}_x`] = `Coordonnée X du point ${index + 1} invalide`
+      }
+      if (vertex.lambertY && isNaN(parseFloat(vertex.lambertY))) {
+        newErrors[`vertex_${index}_y`] = `Coordonnée Y du point ${index + 1} invalide`
+      }
+    })
+    
+    // Vérification d'unicité du nom (si nouvelle zone)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/zones/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Une zone avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     
+    setIsSubmitting(true)
+    
     try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
       const body = {
-        name: form.name,
-        description: form.description || undefined,
-        address: form.address || undefined,
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        address: form.address?.trim() || undefined,
         totalArea: form.totalArea ? parseFloat(form.totalArea) : undefined,
         price: form.price ? parseFloat(form.price) : undefined,
         priceType: form.priceType || undefined,
@@ -519,11 +589,14 @@ export default function ZonesAdmin() {
       })
       setImages([])
       setExistingImages([])
+      setErrors({})
       setOpen(false)
       loadZones(currentPage)
     } catch (error) {
       console.error('Erreur lors de la soumission:', error)
-      alert('Erreur lors de la sauvegarde: ' + (error instanceof Error ? error.message : 'Erreur inconnue'))
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -577,6 +650,7 @@ export default function ZonesAdmin() {
       verticesModified: false,
     })
     setImages([])
+    setErrors({})
     setOpen(true)
   }
 
@@ -636,26 +710,75 @@ export default function ZonesAdmin() {
             <DialogTitle>{form.id ? 'Modifier une zone' : 'Nouvelle zone'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom de la zone *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Nom de la zone industrielle"
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
             </div>
             <div>
               <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" value={form.description} onChange={handleChange} />
+              <Input 
+                id="description" 
+                name="description" 
+                value={form.description} 
+                onChange={handleChange}
+                placeholder="Description de la zone (optionnel)"
+              />
             </div>
             <div>
               <Label htmlFor="address">Adresse</Label>
-              <Input id="address" name="address" value={form.address} onChange={handleChange} />
+              <Input 
+                id="address" 
+                name="address" 
+                value={form.address} 
+                onChange={handleChange}
+                placeholder="Adresse complète de la zone"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="totalArea">Superficie m²</Label>
-                <Input id="totalArea" name="totalArea" value={form.totalArea} onChange={handleChange} />
+                <Label htmlFor="totalArea">Superficie (m²)</Label>
+                <Input 
+                  id="totalArea" 
+                  name="totalArea" 
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.totalArea} 
+                  onChange={handleChange}
+                  className={errors.totalArea ? 'border-red-500' : ''}
+                  placeholder="Ex: 50000"
+                />
+                {errors.totalArea && <span className="text-red-500 text-sm mt-1">{errors.totalArea}</span>}
               </div>
               <div>
-                <Label htmlFor="price">Prix</Label>
-                <Input id="price" name="price" value={form.price} onChange={handleChange} />
+                <Label htmlFor="price">Prix (DH)</Label>
+                <Input 
+                  id="price" 
+                  name="price" 
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.price} 
+                  onChange={handleChange}
+                  className={errors.price ? 'border-red-500' : ''}
+                  placeholder="Ex: 1500000"
+                />
+                {errors.price && <span className="text-red-500 text-sm mt-1">{errors.price}</span>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -696,18 +819,30 @@ export default function ZonesAdmin() {
                 Les coordonnées GPS seront calculées automatiquement après sauvegarde
               </div>
               {(form.vertices ?? []).map((v, idx) => (
-                <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
-                  <Input
-                    placeholder="X (Lambert)"
-                    value={v.lambertX}
-                    onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
-                  />
-                  <div className="flex gap-2">
+                <div key={idx} className="grid grid-cols-2 gap-2 items-start mb-2">
+                  <div>
                     <Input
-                      placeholder="Y (Lambert)"
-                      value={v.lambertY}
-                      onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                      type="number"
+                      step="0.01"
+                      placeholder="X (Lambert)"
+                      value={v.lambertX}
+                      onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
+                      className={errors[`vertex_${idx}_x`] ? 'border-red-500' : ''}
                     />
+                    {errors[`vertex_${idx}_x`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_x`]}</span>}
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Y (Lambert)"
+                        value={v.lambertY}
+                        onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                        className={errors[`vertex_${idx}_y`] ? 'border-red-500' : ''}
+                      />
+                      {errors[`vertex_${idx}_y`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_y`]}</span>}
+                    </div>
                     <Button type="button" size="sm" variant="destructive" onClick={() => removeVertex(idx)}>
                       ×
                     </Button>
@@ -861,7 +996,26 @@ export default function ZonesAdmin() {
                 <p className="text-gray-500 text-xs mt-1">Aucune image. Vous pouvez ajouter des images pour illustrer cette zone.</p>
               )}
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,24 @@
+/**
+ * Composant AppointmentForm - Formulaire de prise de rendez-vous
+ * 
+ * Modal de demande de rendez-vous pour visites de zones industrielles :
+ * - Formulaire complet avec informations de contact
+ * - Détails du projet et budget d'investissement
+ * - Sélection de date/heure et niveau d'urgence
+ * - Soumission via API publique
+ * - Gestion d'états de chargement et d'erreur
+ * 
+ * Intègre avec le CRM pour le suivi commercial et génère
+ * automatiquement les leads pour l'équipe commerciale.
+ * 
+ * @param parcel Parcelle associée au rendez-vous (optionnel)
+ * @param onClose Callback appelé à la fermeture
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client'
 
 import { useState } from 'react'
@@ -9,14 +30,25 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fetchApi } from '@/lib/utils'
 
+/**
+ * Représentation d'une parcelle
+ */
 interface Parcel {
+  /** Identifiant unique */
   id: string
+  /** Référence de la parcelle */
   reference: string
+  /** Superficie en m² */
   area?: number
 }
 
+/**
+ * Props du composant AppointmentForm
+ */
 interface Props {
+  /** Parcelle concernée par le rendez-vous */
   parcel?: Parcel
+  /** Callback de fermeture */
   onClose: () => void
 }
 

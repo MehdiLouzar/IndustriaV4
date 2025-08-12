@@ -4,6 +4,18 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Entité représentant une notification envoyée.
+ * 
+ * Stocke l'historique des notifications emails envoyées aux utilisateurs
+ * avec le suivi de leur statut (envoyé, échec, lu, etc.).
+ * 
+ * Utilisé pour l'audit des communications et les statistiques d'envoi.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

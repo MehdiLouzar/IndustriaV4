@@ -1,22 +1,22 @@
-'use client'
+'use client';
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
-import Pagination from '@/components/Pagination'
-import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
-import type { ListResponse } from '@/types'
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { fetchApi } from '@/lib/utils';
+import Pagination from '@/components/Pagination';
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
+import type { ListResponse } from '@/types';
 
 interface Activity {
-  id: string
-  name: string
-  description?: string
-  icon?: string
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
 }
 
 export default function ActivitiesAdmin() {
@@ -35,6 +35,8 @@ export default function ActivitiesAdmin() {
     description: '',
     icon: '',
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
@@ -89,32 +91,99 @@ export default function ActivitiesAdmin() {
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom de l\'activité est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    } else if (form.name.length > 100) {
+      newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
+    }
+    
+    // Validation de la description (longueur si renseignée)
+    if (form.description && form.description.length < 5) {
+      newErrors.description = 'La description doit contenir au moins 5 caractères'
+    } else if (form.description && form.description.length > 500) {
+      newErrors.description = 'La description ne peut pas dépasser 500 caractères'
+    }
+    
+    // Validation de l'icône (format si renseignée)
+    if (form.icon && form.icon.length > 50) {
+      newErrors.icon = 'L\'icône ne peut pas dépasser 50 caractères'
+    }
+    
+    // Vérification d'unicité du nom (si nouvelle activité)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/activities/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Une activité avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const body = {
-      name: form.name,
-      description: form.description || undefined,
-      icon: form.icon || undefined,
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        icon: form.icon?.trim() || undefined,
+      }
+      
+      if (form.id) {
+        await fetchApi(`/api/activities/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        await fetchApi('/api/activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+      
+      setForm({ id: '', name: '', description: '', icon: '' })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    if (form.id) {
-      await fetchApi(`/api/activities/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } else {
-      await fetchApi('/api/activities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    }
-    setForm({ id: '', name: '', description: '', icon: '' })
-    setOpen(false)
-    load(currentPage)
   }
 
   function edit(it: Activity) {
@@ -133,6 +202,7 @@ export default function ActivitiesAdmin() {
 
   function addNew() {
     setForm({ id: '', name: '', description: '', icon: '' })
+    setErrors({})
     setOpen(true)
   }
 
@@ -214,19 +284,84 @@ export default function ActivitiesAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouvelle activité'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom de l'activité *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Industrie automobile, Textile, Agroalimentaire"
+                maxLength={100}
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {form.name.length}/100 caractères
+              </p>
             </div>
+            
             <div>
               <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" value={form.description} onChange={handleChange} />
+              <Input 
+                id="description" 
+                name="description" 
+                value={form.description || ''} 
+                onChange={handleChange}
+                className={errors.description ? 'border-red-500' : ''}
+                placeholder="Description détaillée de l'activité (optionnel)"
+                maxLength={500}
+              />
+              {errors.description && <span className="text-red-500 text-sm mt-1">{errors.description}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {(form.description || '').length}/500 caractères
+              </p>
             </div>
+            
             <div>
               <Label htmlFor="icon">Icône</Label>
-              <Input id="icon" name="icon" value={form.icon} onChange={handleChange} />
+              <Input 
+                id="icon" 
+                name="icon" 
+                value={form.icon || ''} 
+                onChange={handleChange}
+                className={errors.icon ? 'border-red-500' : ''}
+                placeholder="Ex: 🏭, 🚗, 👕, 🍎 ou nom d'icône CSS"
+                maxLength={50}
+              />
+              {errors.icon && <span className="text-red-500 text-sm mt-1">{errors.icon}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Emoji ou nom d'icône pour représenter l'activité
+              </p>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

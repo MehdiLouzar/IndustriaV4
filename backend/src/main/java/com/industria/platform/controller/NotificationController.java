@@ -14,6 +14,18 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des notifications.
+ * 
+ * Permet la consultation et gestion des notifications envoyées
+ * par la plateforme avec filtrage et pagination.
+ * 
+ * Accès réservé aux administrateurs.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/admin/notifications")
 @PreAuthorize("hasRole('ADMIN')")

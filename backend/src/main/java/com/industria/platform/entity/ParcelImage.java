@@ -6,6 +6,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entité représentant une image de parcelle.
+ * 
+ * Gère les images associées aux parcelles industrielles avec métadonnées
+ * complètes (nom de fichier, taille, type, ordre d'affichage, image principale).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Table(name = "parcel_images")
 public class ParcelImage {

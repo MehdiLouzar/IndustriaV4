@@ -50,6 +50,9 @@ export default function UsersAdmin() {
     isActive: true,
     password: '',
   })
+  
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
@@ -102,9 +105,66 @@ export default function UsersAdmin() {
     return () => clearTimeout(timeoutId)
   }, [searchTerm, load])
 
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation de l'email
+    if (!form.email.trim()) {
+      newErrors.email = 'L\'adresse email est obligatoire'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = 'Format d\'email invalide'
+    }
+    
+    // Validation du nom
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation du téléphone (optionnel mais format si renseigné)
+    if (form.phone && !/^(\+212|0)[567]\d{8}$/.test(form.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Format de téléphone marocain invalide (ex: +212 6 XX XX XX XX)'
+    }
+    
+    // Validation du mot de passe (obligatoire pour création, optionnel pour modification)
+    if (!form.id && (!form.password || form.password.length < 8)) {
+      newErrors.password = 'Le mot de passe est obligatoire et doit contenir au moins 8 caractères'
+    } else if (form.password && form.password.length > 0 && form.password.length < 8) {
+      newErrors.password = 'Le mot de passe doit contenir au moins 8 caractères'
+    }
+    
+    // Validation de la société (optionnel mais longueur si renseigné)
+    if (form.company && form.company.length < 2) {
+      newErrors.company = 'Le nom de société doit contenir au moins 2 caractères'
+    }
+    
+    // Vérification d'unicité de l'email
+    if (form.email && !newErrors.email && !form.id) {
+      try {
+        const response = await fetchApi(`/api/users/check-email?email=${encodeURIComponent(form.email)}`)
+        if (response && response.exists) {
+          newErrors.email = 'Un utilisateur avec cette adresse email existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité de l\'email:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
-  }, [])
+    const { name, value } = e.target
+    setForm((f) => ({ ...f, [name]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }, [errors])
 
   const handleRole = useCallback((value: string) => {
     setForm((f) => ({ ...f, role: value }))
@@ -112,37 +172,57 @@ export default function UsersAdmin() {
 
   const submit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    const body = {
-      email: form.email,
-      name: form.name,
-      role: form.role,
-      company: form.company || undefined,
-      phone: form.phone || undefined,
-      isActive: form.isActive,
-      password: form.password,
-    }
-    if (form.id) {
-      await fetchApi(`/api/users/${form.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+
+      const body = {
+        email: form.email.trim().toLowerCase(),
+        name: form.name.trim(),
+        role: form.role,
+        company: form.company?.trim() || undefined,
+        phone: form.phone?.trim() || undefined,
+        isActive: form.isActive,
+        password: form.password || undefined,
+      }
+      
+      if (form.id) {
+        await fetchApi(`/api/users/${form.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        })
+      } else {
+        await fetchApi('/api/users', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        })
+      }
+      
+      setForm({
+        id: '',
+        email: '',
+        name: '',
+        role: 'USER',
+        company: '',
+        phone: '',
+        isActive: true,
+        password: '',
       })
-    } else {
-      await fetchApi('/api/users', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setForm({
-      id: '',
-      email: '',
-      name: '',
-      role: 'USER',
-      company: '',
-      phone: '',
-      isActive: true,
-      password: '',
-    })
-    setOpen(false)
-    load(currentPage)
-  }, [form, load])
+  }, [form, load, validateForm])
 
   const edit = useCallback((it: User) => {
     setForm({
@@ -155,12 +235,14 @@ export default function UsersAdmin() {
       isActive: it.isActive ?? true,
       password: '',
     })
+    setErrors({})
     setOpen(true)
   }, [])
+  
   const del = useCallback(async (id: string) => {
     await fetchApi(`/api/users/${id}`, { method: 'DELETE' })
     load(currentPage)
-  }, [load])
+  }, [load, currentPage])
 
   const addNew = useCallback(() => {
     setForm({
@@ -173,6 +255,7 @@ export default function UsersAdmin() {
       isActive: true,
       password: '',
     })
+    setErrors({})
     setOpen(true)
   }, [])
 
@@ -240,46 +323,137 @@ export default function UsersAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouvel utilisateur'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" value={form.email} onChange={handleChange} required />
+              <Label htmlFor="email">Email *</Label>
+              <Input 
+                id="email" 
+                name="email" 
+                type="email"
+                value={form.email} 
+                onChange={handleChange} 
+                required 
+                className={errors.email ? 'border-red-500' : ''}
+                placeholder="utilisateur@entreprise.com"
+              />
+              {errors.email && <span className="text-red-500 text-sm mt-1">{errors.email}</span>}
             </div>
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} />
+              <Label htmlFor="name">Nom *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Nom complet de l'utilisateur"
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
             </div>
+            
             <div>
               <Label htmlFor="company">Société</Label>
-              <Input id="company" name="company" value={form.company} onChange={handleChange} />
+              <Input 
+                id="company" 
+                name="company" 
+                value={form.company} 
+                onChange={handleChange}
+                className={errors.company ? 'border-red-500' : ''}
+                placeholder="Nom de l'entreprise (optionnel)"
+              />
+              {errors.company && <span className="text-red-500 text-sm mt-1">{errors.company}</span>}
             </div>
+            
             <div>
               <Label htmlFor="phone">Téléphone</Label>
-              <Input id="phone" name="phone" value={form.phone} onChange={handleChange} />
+              <Input 
+                id="phone" 
+                name="phone" 
+                type="tel"
+                value={form.phone} 
+                onChange={handleChange}
+                className={errors.phone ? 'border-red-500' : ''}
+                placeholder="+212 6 XX XX XX XX (optionnel)"
+              />
+              {errors.phone && <span className="text-red-500 text-sm mt-1">{errors.phone}</span>}
             </div>
+            
             <div>
-              <Label htmlFor="role">Rôle</Label>
+              <Label htmlFor="role">Rôle *</Label>
               <Select value={form.role} onValueChange={handleRole}>
                 <SelectTrigger>
-                  <SelectValue placeholder="-- Sélectionnez un rôle --" />
+                  <SelectValue placeholder="Sélectionnez un rôle" />
                 </SelectTrigger>
                 <SelectContent>
                   {roles
                     .filter((r) => r && r.trim() !== "")
                     .map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                      <SelectItem key={r} value={r}>
+                        {r === 'ADMIN' ? 'Administrateur' : 
+                         r === 'MANAGER' ? 'Gestionnaire' : 
+                         'Utilisateur'}
+                      </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
             </div>
+            
             <div className="flex items-center space-x-2">
-              <input id="isActive" name="isActive" type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
-              <Label htmlFor="isActive">Actif</Label>
+              <input 
+                id="isActive" 
+                name="isActive" 
+                type="checkbox" 
+                checked={form.isActive} 
+                onChange={(e) => setForm({ ...form, isActive: e.target.checked })} 
+                className="rounded"
+              />
+              <Label htmlFor="isActive">Compte actif</Label>
             </div>
+            
             <div>
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input id="password" name="password" type="password" value={form.password || ''} onChange={handleChange} />
+              <Label htmlFor="password">
+                Mot de passe {!form.id ? '*' : '(laisser vide pour ne pas modifier)'}
+              </Label>
+              <Input 
+                id="password" 
+                name="password" 
+                type="password" 
+                value={form.password || ''} 
+                onChange={handleChange}
+                className={errors.password ? 'border-red-500' : ''}
+                placeholder={form.id ? "Nouveau mot de passe (optionnel)" : "Au moins 8 caractères"}
+                minLength={8}
+              />
+              {errors.password && <span className="text-red-500 text-sm mt-1">{errors.password}</span>}
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

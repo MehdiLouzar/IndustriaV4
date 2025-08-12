@@ -2,58 +2,90 @@ package com.industria.platform.converter;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
+import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKTWriter;
 import org.locationtech.jts.io.ParseException;
 
+/**
+ * Convertisseur JPA pour les géométries PostGIS.
+ * 
+ * Convertit automatiquement les géométries entre les formats
+ * WKB (stockage base de données) et WKT (utilisation application).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Converter
+@Slf4j
 public class GeometryConverter implements AttributeConverter<String, String> {
 
     private static final WKBReader WKB_READER = new WKBReader();
     private static final WKTWriter WKT_WRITER = new WKTWriter();
 
+    /**
+     * Convertit une géométrie WKT pour le stockage en base.
+     * 
+     * @param wktGeometry géométrie au format WKT
+     * @return géométrie prête pour le stockage
+     */
     @Override
     public String convertToDatabaseColumn(String wktGeometry) {
-        // Lors de la sauvegarde, garder tel quel
         return wktGeometry;
     }
 
+    /**
+     * Convertit une géométrie depuis la base vers l'entité.
+     * 
+     * Détecte automatiquement le format (WKT ou WKB) et effectue
+     * la conversion nécessaire vers WKT.
+     * 
+     * @param dbData géométrie depuis la base de données
+     * @return géométrie convertie en WKT
+     */
     @Override
     public String convertToEntityAttribute(String dbData) {
-        System.out.println("DEBUG: GeometryConverter.convertToEntityAttribute appelé avec: " + 
-                          (dbData != null ? dbData.substring(0, Math.min(50, dbData.length())) + "..." : "null"));
+        log.debug("GeometryConverter.convertToEntityAttribute appelé avec: {}", 
+                 dbData != null ? dbData.substring(0, Math.min(50, dbData.length())) + "..." : "null");
         
         // Lors de la lecture, vérifier si c'est du WKB et le convertir
         if (dbData == null || dbData.trim().isEmpty()) {
-            System.out.println("DEBUG: Géométrie null ou vide, retour tel quel");
+            log.debug("Géométrie null ou vide, retour tel quel");
             return dbData;
         }
         
         // Si c'est déjà du WKT, retourner tel quel
         if (dbData.startsWith("POLYGON") || dbData.startsWith("POINT") || dbData.startsWith("LINESTRING")) {
-            System.out.println("DEBUG: Déjà en format WKT, retour tel quel");
+            log.debug("Déjà en format WKT, retour tel quel");
             return dbData;
         }
         
         // Si c'est du WKB (format hexadécimal), essayer de le convertir
         if (dbData.matches("^[0-9A-Fa-f]+$")) {
-            System.out.println("DEBUG: Format WKB détecté, tentative de conversion...");
+            log.debug("Format WKB détecté, tentative de conversion...");
             try {
                 String result = convertWKBToWKT(dbData);
-                System.out.println("DEBUG: Conversion WKB->WKT réussie!");
+                log.debug("Conversion WKB->WKT réussie!");
                 return result;
             } catch (Exception e) {
-                System.err.println("DEBUG: Impossible de convertir WKB en WKT: " + e.getMessage());
-                e.printStackTrace();
+                log.error("Impossible de convertir WKB en WKT: {}", e.getMessage());
                 return null;
             }
         }
         
-        System.out.println("DEBUG: Format inconnu, retour tel quel");
+        log.debug("Format inconnu, retour tel quel");
         return dbData;
     }
     
+    /**
+     * Convertit une géométrie WKB hexadécimale vers WKT.
+     * 
+     * @param wkbHex géométrie en format WKB hexadécimal
+     * @return géométrie convertie en WKT
+     * @throws ParseException si la conversion échoue
+     */
     private String convertWKBToWKT(String wkbHex) throws ParseException {
         try {
             // Convertir la chaîne hexadécimale en bytes
@@ -65,14 +97,20 @@ public class GeometryConverter implements AttributeConverter<String, String> {
             // Convertir en WKT
             String wkt = WKT_WRITER.write(geometry);
             
-            System.out.println("DEBUG: Conversion WKB -> WKT réussie: " + wkt.substring(0, Math.min(100, wkt.length())) + "...");
+            log.debug("Conversion WKB -> WKT réussie: {}...", wkt.substring(0, Math.min(100, wkt.length())));
             return wkt;
         } catch (Exception e) {
-            System.err.println("DEBUG: Erreur conversion WKB -> WKT: " + e.getMessage());
+            log.error("Erreur conversion WKB -> WKT: {}", e.getMessage());
             throw new ParseException("Erreur lors de la conversion WKB vers WKT: " + e.getMessage(), e);
         }
     }
     
+    /**
+     * Convertit une chaîne hexadécimale en tableau d'octets.
+     * 
+     * @param hexString chaîne hexadécimale
+     * @return tableau d'octets correspondant
+     */
     private byte[] hexStringToByteArray(String hexString) {
         int len = hexString.length();
         byte[] data = new byte[len / 2];

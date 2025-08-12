@@ -7,8 +7,10 @@ import com.industria.platform.repository.AppointmentRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.service.AppointmentService;
 import com.industria.platform.service.PermissionService;
-import org.springframework.security.access.prepost.PreAuthorize;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,8 +18,20 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des rendez-vous.
+ * 
+ * Gère les demandes de visite et rendez-vous des investisseurs,
+ * avec notifications automatiques par email et gestion des statuts.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
+@Slf4j
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
@@ -25,16 +39,13 @@ public class AppointmentController {
     private final ParcelRepository parcelRepository;
     private final PermissionService permissionService;
 
-    public AppointmentController(AppointmentService appointmentService,
-                                 AppointmentRepository appointmentRepository,
-                                 ParcelRepository parcelRepository,
-                                 PermissionService permissionService) {
-        this.appointmentService = appointmentService;
-        this.appointmentRepository = appointmentRepository;
-        this.parcelRepository = parcelRepository;
-        this.permissionService = permissionService;
-    }
-
+    /**
+     * Crée un nouveau rendez-vous depuis l'interface publique.
+     * Accessible à tous sans authentification.
+     *
+     * @param request requête de création de rendez-vous
+     * @return le rendez-vous créé
+     */
     @PostMapping("/public/appointments")
     public Appointment create(@RequestBody AppointmentRequest request) {
         Appointment appointment = new Appointment();
@@ -48,16 +59,22 @@ public class AppointmentController {
         appointment.setPreferredDate(request.preferredDate());
         appointment.setPreferredTime(request.preferredTime());
         appointment.setUrgency(request.urgency());
-        appointment.setStatus(AppointmentStatus.PENDING); // Statut par défaut
+        appointment.setStatus(AppointmentStatus.PENDING);
         return appointmentService.createAppointment(appointment, request.parcelId());
     }
 
+    /**
+     * Récupère tous les rendez-vous.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param authentication contexte d'authentification
+     * @return liste des rendez-vous filtrée selon les permissions
+     */
     @GetMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public List<AppointmentDto> all(Authentication authentication) {
         List<Appointment> appointments = appointmentRepository.findAll();
         
-        // Filtrer pour les ZONE_MANAGER : seulement leurs rendez-vous
         if (!permissionService.hasRole("ADMIN")) {
             appointments = appointments.stream()
                 .filter(a -> a.getParcel() != null && permissionService.canModifyParcel(a.getParcel().getId()))
@@ -67,6 +84,13 @@ public class AppointmentController {
         return appointments.stream().map(this::toDto).toList();
     }
 
+    /**
+     * Récupère un rendez-vous par son identifiant.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous
+     * @return données du rendez-vous
+     */
     @GetMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> get(@PathVariable String id) {
@@ -78,6 +102,13 @@ public class AppointmentController {
         return ResponseEntity.ok(toDto(a));
     }
 
+    /**
+     * Crée un nouveau rendez-vous depuis l'interface admin.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param dto données du rendez-vous à créer
+     * @return le rendez-vous créé
+     */
     @PostMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> createAdmin(@RequestBody AppointmentDto dto) {
@@ -94,6 +125,14 @@ public class AppointmentController {
         return ResponseEntity.ok(toDto(a));
     }
 
+    /**
+     * Met à jour un rendez-vous existant.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous
+     * @param dto nouvelles données du rendez-vous
+     * @return le rendez-vous mis à jour
+     */
     @PutMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> update(@PathVariable String id, @RequestBody AppointmentDto dto) {
@@ -117,6 +156,14 @@ public class AppointmentController {
         }
     }
 
+    /**
+     * Met à jour le statut d'un rendez-vous.
+     * Déclenche automatiquement les notifications email appropriées.
+     *
+     * @param id identifiant du rendez-vous
+     * @param request requête contenant le nouveau statut et notes
+     * @return le rendez-vous avec le statut mis à jour
+     */
     @PutMapping("/appointments/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest request) {
@@ -128,6 +175,13 @@ public class AppointmentController {
         return ResponseEntity.ok(toDto(updatedAppointment));
     }
 
+    /**
+     * Supprime un rendez-vous.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous à supprimer
+     * @return réponse vide
+     */
     @DeleteMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
@@ -178,7 +232,7 @@ public class AppointmentController {
             try {
                 a.setStatus(AppointmentStatus.valueOf(dto.status()));
             } catch (IllegalArgumentException e) {
-                System.err.println("Statut invalide: " + dto.status());
+                log.error("Statut invalide: {}", dto.status());
             }
         }
         
@@ -192,7 +246,7 @@ public class AppointmentController {
                 }
                 a.setRequestedDate(LocalDateTime.parse(dateStr));
             } catch (Exception e) {
-                System.err.println("Erreur lors du parsing de la date: " + dto.requestedDate() + " - " + e.getMessage());
+                log.error("Erreur lors du parsing de la date: {} - {}", dto.requestedDate(), e.getMessage());
                 a.setRequestedDate(null);
             }
         } else {

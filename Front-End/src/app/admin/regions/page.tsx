@@ -30,6 +30,8 @@ export default function RegionsAdmin() {
   const [open, setOpen] = useState(false)
   const [allCountries, setAllCountries] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<Region>({ id: '', name: '', code: '', countryId: '' })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
@@ -91,31 +93,124 @@ export default function RegionsAdmin() {
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
   }
 
   const handleCountry = (value: string) => {
     setForm({ ...form, countryId: value })
+    
+    // Effacer l'erreur pour le pays lors de la sélection
+    if (errors.countryId) {
+      setErrors(prev => ({ ...prev, countryId: '' }))
+    }
+  }
+
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom de la région est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    } else if (form.name.length > 100) {
+      newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
+    }
+    
+    // Validation du code (obligatoire)
+    if (!form.code.trim()) {
+      newErrors.code = 'Le code de la région est obligatoire'
+    } else if (form.code.length < 2) {
+      newErrors.code = 'Le code doit contenir au moins 2 caractères'
+    } else if (form.code.length > 10) {
+      newErrors.code = 'Le code ne peut pas dépasser 10 caractères'
+    } else if (!/^[A-Z0-9-_]+$/i.test(form.code)) {
+      newErrors.code = 'Le code ne peut contenir que des lettres, chiffres, tirets et underscores'
+    }
+    
+    // Validation du pays (obligatoire)
+    if (!form.countryId) {
+      newErrors.countryId = 'La sélection d\'un pays est obligatoire'
+    }
+    
+    // Vérification d'unicité du nom (si nouvelle région)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/regions/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Une région avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    // Vérification d'unicité du code (si nouvelle région)
+    if (!form.id && form.code.trim()) {
+      try {
+        const response = await fetchApi(`/api/regions/check-code?code=${encodeURIComponent(form.code.trim())}`)
+        if (response && response.exists) {
+          newErrors.code = 'Une région avec ce code existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du code:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (form.id) {
-      await fetchApi(`/api/regions/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, code: form.code, countryId: form.countryId })
-      })
-    } else {
-      await fetchApi('/api/regions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, code: form.code, countryId: form.countryId })
-      })
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        name: form.name.trim(),
+        code: form.code.trim().toUpperCase(),
+        countryId: form.countryId
+      }
+      
+      if (form.id) {
+        await fetchApi(`/api/regions/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      } else {
+        await fetchApi('/api/regions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      }
+      
+      setForm({ id: '', name: '', code: '', countryId: '' })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setForm({ id: '', name: '', code: '', countryId: '' })
-    setOpen(false)
-    load(currentPage)
   }
 
   function edit(it: Region) {
@@ -130,6 +225,7 @@ export default function RegionsAdmin() {
 
   function addNew() {
     setForm({ id: '', name: '', code: '', countryId: '' })
+    setErrors({})
     setOpen(true)
   }
 
@@ -194,30 +290,97 @@ export default function RegionsAdmin() {
             <DialogTitle>{form.id ? 'Modifier une région' : 'Nouvelle région'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom de la région *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Casablanca-Settat, Rabat-Salé-Kénitra"
+                maxLength={100}
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {form.name.length}/100 caractères
+              </p>
             </div>
+            
             <div>
-              <Label htmlFor="code">Code</Label>
-              <Input id="code" name="code" value={form.code} onChange={handleChange} required />
+              <Label htmlFor="code">Code de la région *</Label>
+              <Input 
+                id="code" 
+                name="code" 
+                value={form.code} 
+                onChange={handleChange} 
+                required 
+                className={errors.code ? 'border-red-500' : ''}
+                placeholder="Ex: CS, RSK, FES (lettres, chiffres, - et _ uniquement)"
+                maxLength={10}
+                style={{ textTransform: 'uppercase' }}
+              />
+              {errors.code && <span className="text-red-500 text-sm mt-1">{errors.code}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Code court unique pour identifier la région
+              </p>
             </div>
+            
             <div>
-              <Label htmlFor="countryId">Pays</Label>
+              <Label htmlFor="countryId">Pays *</Label>
               <Select value={form.countryId || undefined} onValueChange={handleCountry}>
-                <SelectTrigger>
+                <SelectTrigger className={errors.countryId ? 'border-red-500' : ''}>
                   <SelectValue placeholder="-- Sélectionnez un pays --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allCountries.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+                  {allCountries.length === 0 ? (
+                    <SelectItem value="NO_COUNTRIES" disabled>
+                      Aucun pays disponible
                     </SelectItem>
-                  ))}
+                  ) : (
+                    allCountries.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {errors.countryId && <span className="text-red-500 text-sm mt-1">{errors.countryId}</span>}
+              {allCountries.length === 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Chargement des pays...
+                </p>
+              )}
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting || allCountries.length === 0}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

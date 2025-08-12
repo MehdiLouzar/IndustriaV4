@@ -2,18 +2,28 @@ package com.industria.platform.service;
 
 import com.industria.platform.entity.User;
 import com.industria.platform.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service de gestion des utilisateurs.
+ * 
+ * Ce service gère la synchronisation entre Keycloak et la base de données locale,
+ * ainsi que l'obtention des informations de l'utilisateur courant.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
-
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     /**
      * Obtient l'utilisateur actuel depuis le contexte de sécurité
@@ -82,7 +92,7 @@ public class UserService {
             }
         } catch (Exception e) {
             // Log l'erreur mais continue avec null
-            System.err.println("Erreur lors de la création d'utilisateur depuis Keycloak: " + e.getMessage());
+            log.error("Erreur lors de la création d'utilisateur depuis Keycloak: {}", e.getMessage(), e);
         }
         return null;
     }

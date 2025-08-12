@@ -26,6 +26,8 @@ export default function ZoneTypesAdmin() {
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<ZoneType>({ id: '', name: '' })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
     const params = new URLSearchParams({
@@ -79,27 +81,83 @@ export default function ZoneTypesAdmin() {
   }, [searchTerm, load])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom du type de zone est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    } else if (form.name.length > 100) {
+      newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
+    }
+    
+    // Vérification d'unicité du nom (si nouveau type)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/zone-types/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Un type de zone avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (form.id) {
-      await fetchApi(`/api/zone-types/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name })
-      })
-    } else {
-      await fetchApi('/api/zone-types', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name })
-      })
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = { name: form.name.trim() }
+      
+      if (form.id) {
+        await fetchApi(`/api/zone-types/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      } else {
+        await fetchApi('/api/zone-types', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      }
+      
+      setForm({ id: '', name: '' })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setForm({ id: '', name: '' })
-    setOpen(false)
-    load(currentPage)
   }
 
   function edit(it: ZoneType) {
@@ -114,6 +172,7 @@ export default function ZoneTypesAdmin() {
 
   function addNew() {
     setForm({ id: '', name: '' })
+    setErrors({})
     setOpen(true)
   }
 
@@ -174,11 +233,50 @@ export default function ZoneTypesAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouveau type'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom du type de zone *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Zone industrielle, Zone logistique, Zone mixte"
+                maxLength={100}
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {form.name.length}/100 caractères - Nom descriptif du type de zone
+              </p>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

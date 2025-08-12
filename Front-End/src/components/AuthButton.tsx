@@ -1,3 +1,23 @@
+/**
+ * Composant AuthButton - Bouton d'authentification intelligent
+ * 
+ * Gère l'affichage conditionnel de l'interface d'authentification :
+ * - Boutons de connexion/inscription si utilisateur non connecté
+ * - Profil utilisateur avec nom, rôle et actions si connecté
+ * - Décodage automatique du token JWT pour extraire les informations
+ * - Gestion des rôles Keycloak (ADMIN, ZONE_MANAGER, CONTENT_MANAGER)
+ * - Déconnexion avec nettoyage du localStorage
+ * 
+ * Intègre parfaitement avec l'authentification Keycloak/OAuth2
+ * utilisée par la plateforme Industria.
+ * 
+ * @returns Composant React adapté à l'état d'authentification
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import Link from 'next/link'
@@ -6,8 +26,30 @@ import { Badge } from '@/components/ui/badge'
 import { User, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-interface Payload { name?: string; preferred_username?: string; realm_access?: { roles?: string[] }; sub?: string }
+/**
+ * Structure du payload JWT décodé de Keycloak
+ */
+interface Payload { 
+  /** Nom complet de l'utilisateur */
+  name?: string; 
+  /** Nom d'utilisateur préféré */
+  preferred_username?: string; 
+  /** Accès aux rôles du realm Keycloak */
+  realm_access?: { roles?: string[] }; 
+  /** Identifiant unique de l'utilisateur */
+  sub?: string 
+}
 
+/**
+ * Décode un token JWT sans vérification de signature
+ * 
+ * Extrait le payload d'un token JWT en décodant la partie base64.
+ * Utilisé uniquement côté client pour l'affichage, la vérification
+ * de sécurité étant assurée côté serveur.
+ * 
+ * @param token Token JWT à décoder
+ * @returns Payload décodé ou null si erreur
+ */
 function parseJwt(token: string): Payload | null {
   try {
     const base = token.split('.')[1]

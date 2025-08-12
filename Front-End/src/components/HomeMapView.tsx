@@ -1,3 +1,26 @@
+/**
+ * Composant HomeMapView - Carte interactive avancée pour la page d'accueil
+ * 
+ * Carte interactive sophistiquée affichant les zones industrielles avec :
+ * - Polygones de zones avec remplissage selon le statut
+ * - Marqueurs clusterés avec popups détaillées
+ * - Couches de transport (aéroports, ports, gares)
+ * - Icônes dynamiques pour activités et équipements
+ * - Actions rapides (appel, visite, détail)
+ * - Optimisations de performance avec mémorisation
+ * 
+ * Intègre :
+ * - Leaflet pour la cartographie
+ * - Clustering intelligent des marqueurs
+ * - Géométries vectorielles (polygones)
+ * - API publique pour les données
+ * - Styles CSS personnalisés
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client'
 
 import React, {
@@ -24,7 +47,7 @@ import '@/styles/map.css'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye } from 'lucide-react'
+import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye, Zap, Wifi, Car, Wrench, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Cog, Tool, Gauge, Settings2, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Shirt, Pill } from 'lucide-react'
 import type { FeatureCollection } from 'geojson'
 
 import DynamicIcon from '@/components/DynamicIcon'
@@ -34,9 +57,12 @@ import { fetchPublicApi } from '@/lib/publicApi'
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 
 /*************************
- *  Types & Constants    *
+ *  Types & Constantes   *
  *************************/
 
+/**
+ * Représentation d'une zone avec géométrie
+ */
 type ZoneFeature = {
   polygon: [number, number][]
   centroid: [number, number]
@@ -354,7 +380,58 @@ export default function HomeMapView() {
                 )}
               </div>
 
-              {/* 8. Prix (s'il est fourni) */}
+              {/* 8. Activités et équipements avec icônes */}
+              {(zone.properties.activityIcons.length > 0 || zone.properties.amenityIcons.length > 0) && (
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  {/* Activités */}
+                  {zone.properties.activityIcons.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-1">Activités</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {zone.properties.activityIcons.slice(0, 3).map((iconName, i) => {
+                          const IconComponent = getLucideIcon(iconName)
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs border border-blue-200">
+                              <IconComponent className="w-3 h-3" />
+                              <span>Activité {i + 1}</span>
+                            </span>
+                          )
+                        })}
+                        {zone.properties.activityIcons.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                            +{zone.properties.activityIcons.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Équipements */}
+                  {zone.properties.amenityIcons.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-1">Équipements</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {zone.properties.amenityIcons.slice(0, 3).map((iconName, i) => {
+                          const IconComponent = getLucideIcon(iconName)
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs border border-green-200">
+                              <IconComponent className="w-3 h-3" />
+                              <span>Équipement {i + 1}</span>
+                            </span>
+                          )
+                        })}
+                        {zone.properties.amenityIcons.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                            +{zone.properties.amenityIcons.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 9. Prix (s'il est fourni) */}
               {zone.properties.price && (
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2">
@@ -364,7 +441,7 @@ export default function HomeMapView() {
                 </div>
               )}
 
-              {/* 9. Boutons d'action */}
+              {/* 10. Boutons d'action */}
               <div className="flex gap-2 pt-2">
                 {zone.properties.id.startsWith('demo-') ||
                 zone.properties.id.startsWith('fallback-') ? (
@@ -515,6 +592,81 @@ const loadZones = useCallback(async (precision: number, force = false) => {
       }
     }
   }, [])
+
+  // Fonction pour obtenir l'icône Lucide React appropriée
+  const getLucideIcon = (iconName?: string) => {
+    if (!iconName) return Factory
+    
+    const iconMap: { [key: string]: any } = {
+      // Électricité et énergie
+      'Zap': Zap,
+      'Power': Power,
+      'Battery': Battery,
+      'Lightbulb': Zap,
+      'Sun': Power,
+      'Flame': Zap,
+      
+      // Internet et communication
+      'Wifi': Wifi,
+      'Globe': Globe,
+      'Mail': Globe,
+      'Server': Server,
+      'Database': Database,
+      'HardDrive': HardDrive,
+      'Monitor': Monitor,
+      
+      // Transport et parking
+      'Car': Car,
+      'Truck': Truck,
+      'Plane': Plane,
+      'ParkingCircle': Car,
+      
+      // Bâtiments et infrastructure
+      'Building': Building2,
+      'Factory': Factory,
+      'Home': Home,
+      'Briefcase': Briefcase,
+      'Hospital': Building2,
+      'CreditCard': Package,
+      
+      // Technologie et outils
+      'Cpu': Cpu,
+      'Wrench': Wrench,
+      'Settings': Settings,
+      'Cog': Settings,
+      'Tool': Tool,
+      'Gauge': Gauge,
+      'Settings2': Settings2,
+      
+      // Sécurité et services
+      'Shield': Shield,
+      'shield': Shield,
+      'Droplets': Droplets,
+      'droplet': Droplet,
+      'droplets': Droplets,
+      'Coffee': Coffee,
+      'Users': Users,
+      'Package': Package,
+      'package': Package,
+      'UtensilsCrossed': Coffee,
+      
+      // Icônes spécifiques de la base
+      'car': Car,
+      'zap': Zap,
+      'wifi': Wifi,
+      'shirt': Shirt,
+      'pill': Pill,
+      
+      // Icônes génériques
+      'MapPin': MapPin,
+      'Ruler': Ruler,
+      'Phone': Phone,
+      'Eye': Eye,
+      'Grid3X3': Grid3X3
+    }
+    
+    return iconMap[iconName] || Factory
+  }
 
   return (
     <div className="w-full h-full relative">

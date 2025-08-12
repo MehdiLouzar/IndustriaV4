@@ -1,3 +1,24 @@
+/**
+ * Composant SearchBar - Barre de recherche avancée pour zones industrielles
+ * 
+ * Fournit une interface de recherche multi-critères permettant aux utilisateurs
+ * de filtrer les zones industrielles selon :
+ * - Région géographique (Casablanca, Rabat, etc.)
+ * - Type de zone industrielle
+ * - Statut de disponibilité (AVAILABLE, RESERVED, OCCUPIED, SHOWROOM)
+ * - Plages de prix (DH/m²)
+ * - Plages de superficie (m²)
+ * 
+ * Intègre la navigation automatique avec mise à jour des paramètres URL
+ * et callback pour la communication avec les composants parents.
+ * 
+ * @param onSearch Callback optionnel appelé lors de l'exécution d'une recherche
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react'
@@ -15,11 +36,19 @@ import { Search, MapPin, Factory } from 'lucide-react'
 import { fetchApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 
+/**
+ * Interface des filtres de recherche
+ */
 interface Filters {
+  /** ID de la région sélectionnée */
   regionId: string
+  /** ID du type de zone sélectionné */
   zoneTypeId: string
+  /** Statut de disponibilité */
   status: string
+  /** Index de la plage de superficie sélectionnée */
   area: string
+  /** Index de la plage de prix sélectionnée */
   price: string
 }
 export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => void }) {

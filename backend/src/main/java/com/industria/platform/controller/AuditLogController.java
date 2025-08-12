@@ -22,6 +22,14 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des journaux d'audit.
+ * Accessible uniquement aux administrateurs.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/audit-logs")
 @RequiredArgsConstructor

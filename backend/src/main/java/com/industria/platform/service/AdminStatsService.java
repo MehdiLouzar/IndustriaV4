@@ -4,7 +4,8 @@ import com.industria.platform.dto.AdminStatsDto;
 import com.industria.platform.entity.ParcelStatus;
 import com.industria.platform.entity.AppointmentStatus;
 import com.industria.platform.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -15,10 +16,16 @@ import java.util.List;
 /**
  * Service pour la génération des statistiques administrateur.
  * 
- * @author Industria Platform
+ * Calcule et agrège les données statistiques pour le tableau de bord
+ * d'administration avec gestion des permissions par rôle.
+ * 
+ * @author Industria Platform Team
  * @version 1.0
+ * @since 1.0
  */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AdminStatsService {
 
     private final UserRepository userRepository;
@@ -27,21 +34,6 @@ public class AdminStatsService {
     private final AppointmentRepository appointmentRepository;
     private final PermissionService permissionService;
     private final UserService userService;
-    
-    @Autowired
-    public AdminStatsService(UserRepository userRepository, 
-                           ZoneRepository zoneRepository, 
-                           ParcelRepository parcelRepository,
-                           AppointmentRepository appointmentRepository,
-                           PermissionService permissionService,
-                           UserService userService) {
-        this.userRepository = userRepository;
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.appointmentRepository = appointmentRepository;
-        this.permissionService = permissionService;
-        this.userService = userService;
-    }
 
     /**
      * Génère les statistiques complètes pour le tableau de bord admin.

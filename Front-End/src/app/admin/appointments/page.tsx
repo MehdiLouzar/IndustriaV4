@@ -68,6 +68,9 @@ export default function AppointmentsAdmin() {
     parcelId: '',
     status: 'PENDING',
   })
+  
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
     const params = new URLSearchParams({
@@ -129,8 +132,64 @@ export default function AppointmentsAdmin() {
       .catch(() => setParcels([]))
   }, [])
 
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom de contact
+    if (!form.contactName.trim()) {
+      newErrors.contactName = 'Le nom de contact est obligatoire'
+    } else if (form.contactName.length < 2) {
+      newErrors.contactName = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation de l'email
+    if (form.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail)) {
+      newErrors.contactEmail = 'Format d\'email invalide'
+    }
+    
+    // Validation du téléphone
+    if (form.contactPhone && !/^(\+212|0)[567]\d{8}$/.test(form.contactPhone.replace(/\s/g, ''))) {
+      newErrors.contactPhone = 'Format de téléphone marocain invalide (ex: +212 6 XX XX XX XX)'
+    }
+    
+    // Validation des dates
+    if (form.preferredDate && new Date(form.preferredDate) > new Date('2030-12-31')) {
+      newErrors.preferredDate = 'Date trop éloignée dans le futur'
+    }
+    
+    if (form.requestedDate) {
+      const today = new Date()
+      const requestedDate = new Date(form.requestedDate)
+      if (requestedDate < today) {
+        newErrors.requestedDate = 'La date programmée ne peut pas être dans le passé'
+      }
+    }
+    
+    // Vérification d'unicité de l'email (si modification)
+    if (form.contactEmail && !form.id) {
+      try {
+        const existingAppointments = await fetchApi<ListResponse<Appointment>>(`/api/appointments?search=${form.contactEmail}`)
+        if (existingAppointments?.items?.some(apt => apt.contactEmail === form.contactEmail && apt.status === 'PENDING')) {
+          newErrors.contactEmail = 'Un rendez-vous en attente existe déjà pour cet email'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' })
+    }
   }
 
   const handleStatus = (value: string) => {
@@ -143,53 +202,73 @@ export default function AppointmentsAdmin() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const body = {
-      contactName: form.contactName,
-      contactEmail: form.contactEmail || undefined,
-      contactPhone: form.contactPhone || undefined,
-      companyName: form.companyName || undefined,
-      activityType: form.activityType || undefined,
-      projectDescription: form.projectDescription || undefined,
-      investmentBudget: form.investmentBudget || undefined,
-      preferredDate: form.preferredDate || undefined,
-      preferredTime: form.preferredTime || undefined,
-      urgency: form.urgency || undefined,
-      requestedDate: form.requestedDate || undefined,
-      parcelId: form.parcelId || undefined,
-      status: form.status,
-    }
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
 
-    if (form.id) {
-      await fetchApi(`/api/appointments/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const body = {
+        contactName: form.contactName.trim(),
+        contactEmail: form.contactEmail.trim() || undefined,
+        contactPhone: form.contactPhone.trim() || undefined,
+        companyName: form.companyName.trim() || undefined,
+        activityType: form.activityType || undefined,
+        projectDescription: form.projectDescription.trim() || undefined,
+        investmentBudget: form.investmentBudget || undefined,
+        preferredDate: form.preferredDate || undefined,
+        preferredTime: form.preferredTime || undefined,
+        urgency: form.urgency || undefined,
+        requestedDate: form.requestedDate || undefined,
+        parcelId: form.parcelId || undefined,
+        status: form.status,
+      }
+
+      if (form.id) {
+        await fetchApi(`/api/appointments/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        await fetchApi('/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
+      
+      // Réinitialiser le formulaire
+      setForm({
+        id: '',
+        contactName: '',
+        contactEmail: '',
+        contactPhone: '',
+        companyName: '',
+        activityType: '',
+        projectDescription: '',
+        investmentBudget: '',
+        preferredDate: '',
+        preferredTime: '',
+        urgency: '',
+        requestedDate: '',
+        parcelId: '',
+        status: 'PENDING',
       })
-    } else {
-      await fetchApi('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      setErrors({})
+      setOpen(false)
+      load(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setForm({
-      id: '',
-      contactName: '',
-      contactEmail: '',
-      contactPhone: '',
-      companyName: '',
-      activityType: '',
-      projectDescription: '',
-      investmentBudget: '',
-      preferredDate: '',
-      preferredTime: '',
-      urgency: '',
-      requestedDate: '',
-      parcelId: '',
-      status: 'PENDING',
-    })
-    setOpen(false)
-    load(currentPage)
   }
 
   function edit(it: Appointment) {
@@ -332,49 +411,158 @@ export default function AppointmentsAdmin() {
             <DialogTitle>{form.id ? 'Modifier' : 'Nouveau RDV'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
             <div>
-              <Label htmlFor="contactName">Contact</Label>
-              <Input id="contactName" name="contactName" value={form.contactName} onChange={handleChange} required />
+              <Label htmlFor="contactName">Contact *</Label>
+              <Input 
+                id="contactName" 
+                name="contactName" 
+                value={form.contactName} 
+                onChange={handleChange} 
+                required 
+                className={errors.contactName ? 'border-red-500' : ''}
+                placeholder="Nom complet du contact"
+              />
+              {errors.contactName && <span className="text-red-500 text-sm">{errors.contactName}</span>}
             </div>
             <div>
               <Label htmlFor="contactEmail">Email</Label>
-              <Input id="contactEmail" name="contactEmail" value={form.contactEmail} onChange={handleChange} />
+              <Input 
+                id="contactEmail" 
+                name="contactEmail" 
+                type="email"
+                value={form.contactEmail} 
+                onChange={handleChange}
+                className={errors.contactEmail ? 'border-red-500' : ''}
+                placeholder="email@entreprise.com"
+              />
+              {errors.contactEmail && <span className="text-red-500 text-sm">{errors.contactEmail}</span>}
             </div>
             <div>
               <Label htmlFor="contactPhone">Téléphone</Label>
-              <Input id="contactPhone" name="contactPhone" value={form.contactPhone} onChange={handleChange} />
+              <Input 
+                id="contactPhone" 
+                name="contactPhone" 
+                type="tel"
+                value={form.contactPhone} 
+                onChange={handleChange}
+                className={errors.contactPhone ? 'border-red-500' : ''}
+                placeholder="+212 6 XX XX XX XX"
+              />
+              {errors.contactPhone && <span className="text-red-500 text-sm">{errors.contactPhone}</span>}
             </div>
             <div>
               <Label htmlFor="companyName">Société</Label>
-              <Input id="companyName" name="companyName" value={form.companyName} onChange={handleChange} />
+              <Input 
+                id="companyName" 
+                name="companyName" 
+                value={form.companyName} 
+                onChange={handleChange}
+                placeholder="Nom de l'entreprise"
+              />
             </div>
             <div>
               <Label htmlFor="activityType">Type d'activité</Label>
-              <Input id="activityType" name="activityType" value={form.activityType} onChange={handleChange} />
+              <Select value={form.activityType || undefined} onValueChange={(value) => setForm({...form, activityType: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez le secteur d'activité" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="industrie-automobile">Industrie automobile</SelectItem>
+                  <SelectItem value="textile">Textile</SelectItem>
+                  <SelectItem value="agroalimentaire">Agroalimentaire</SelectItem>
+                  <SelectItem value="pharmaceutique">Pharmaceutique</SelectItem>
+                  <SelectItem value="logistique">Logistique et distribution</SelectItem>
+                  <SelectItem value="metallurgie">Métallurgie</SelectItem>
+                  <SelectItem value="chimie">Chimie</SelectItem>
+                  <SelectItem value="electronique">Électronique</SelectItem>
+                  <SelectItem value="autre">Autre</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="projectDescription">Description du projet</Label>
-              <Input id="projectDescription" name="projectDescription" value={form.projectDescription} onChange={handleChange} />
+              <Input 
+                id="projectDescription" 
+                name="projectDescription" 
+                value={form.projectDescription} 
+                onChange={handleChange}
+                placeholder="Description succincte du projet industriel"
+              />
             </div>
             <div>
               <Label htmlFor="investmentBudget">Budget d'investissement</Label>
-              <Input id="investmentBudget" name="investmentBudget" value={form.investmentBudget} onChange={handleChange} />
+              <Select value={form.investmentBudget || undefined} onValueChange={(value) => setForm({...form, investmentBudget: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Fourchette de budget (optionnel)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="moins-1m">Moins de 1M DH</SelectItem>
+                  <SelectItem value="1m-5m">1M - 5M DH</SelectItem>
+                  <SelectItem value="5m-10m">5M - 10M DH</SelectItem>
+                  <SelectItem value="10m-50m">10M - 50M DH</SelectItem>
+                  <SelectItem value="plus-50m">Plus de 50M DH</SelectItem>
+                  <SelectItem value="confidentiel">Confidentiel</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="preferredDate">Date préférée</Label>
-              <Input id="preferredDate" name="preferredDate" type="date" value={form.preferredDate} onChange={handleChange} />
+              <Label htmlFor="preferredDate">Date demandée par le client</Label>
+              <Input 
+                id="preferredDate" 
+                name="preferredDate" 
+                type="date" 
+                value={form.preferredDate} 
+                onChange={handleChange}
+                max="2030-12-31"
+                className={errors.preferredDate ? 'border-red-500' : ''}
+              />
+              {errors.preferredDate && <span className="text-red-500 text-sm">{errors.preferredDate}</span>}
             </div>
             <div>
               <Label htmlFor="preferredTime">Créneau préféré</Label>
-              <Input id="preferredTime" name="preferredTime" value={form.preferredTime} onChange={handleChange} />
+              <Select value={form.preferredTime || undefined} onValueChange={(value) => setForm({...form, preferredTime: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez un créneau" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="matin-9h-12h">Matin (9h-12h)</SelectItem>
+                  <SelectItem value="apres-midi-14h-17h">Après-midi (14h-17h)</SelectItem>
+                  <SelectItem value="flexible">Flexible</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="urgency">Urgence</Label>
-              <Input id="urgency" name="urgency" value={form.urgency} onChange={handleChange} />
+              <Select value={form.urgency || undefined} onValueChange={(value) => setForm({...form, urgency: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez le niveau d'urgence" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="urgent">Urgent (décision sous 1 mois)</SelectItem>
+                  <SelectItem value="moyen-terme">Moyen terme (3-6 mois)</SelectItem>
+                  <SelectItem value="long-terme">Long terme (6 mois+)</SelectItem>
+                  <SelectItem value="etude">Phase d'étude</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="requestedDate">Date souhaitée</Label>
-              <Input id="requestedDate" name="requestedDate" type="date" value={form.requestedDate} onChange={handleChange} />
+              <Label htmlFor="requestedDate">Date programmée/confirmée</Label>
+              <Input 
+                id="requestedDate" 
+                name="requestedDate" 
+                type="date" 
+                value={form.requestedDate} 
+                onChange={handleChange}
+                min={new Date().toISOString().split('T')[0]}
+                max="2030-12-31"
+                className={errors.requestedDate ? 'border-red-500' : ''}
+              />
+              {errors.requestedDate && <span className="text-red-500 text-sm">{errors.requestedDate}</span>}
             </div>
             <div>
               <Label htmlFor="parcelId">Parcelle</Label>
@@ -406,7 +594,25 @@ export default function AppointmentsAdmin() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

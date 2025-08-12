@@ -27,6 +27,8 @@ export default function CountriesAdmin() {
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Country>({ id: '', name: '', code: '' })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
     const params = new URLSearchParams({
@@ -64,27 +66,109 @@ export default function CountriesAdmin() {
   }, [searchTerm, load])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm({ ...form, [name]: value })
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom du pays est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    } else if (form.name.length > 100) {
+      newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
+    }
+    
+    // Validation du code (obligatoire)
+    if (!form.code.trim()) {
+      newErrors.code = 'Le code du pays est obligatoire'
+    } else if (form.code.length < 2) {
+      newErrors.code = 'Le code doit contenir au moins 2 caractères'
+    } else if (form.code.length > 5) {
+      newErrors.code = 'Le code ne peut pas dépasser 5 caractères'
+    } else if (!/^[A-Z]{2,3}$/.test(form.code.toUpperCase())) {
+      newErrors.code = 'Le code doit contenir uniquement 2 ou 3 lettres (ex: MA, FR, USA)'
+    }
+    
+    // Vérification d'unicité du nom (si nouveau pays)
+    if (!form.id && form.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/countries/check-name?name=${encodeURIComponent(form.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Un pays avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    // Vérification d'unicité du code (si nouveau pays)
+    if (!form.id && form.code.trim()) {
+      try {
+        const response = await fetchApi(`/api/countries/check-code?code=${encodeURIComponent(form.code.trim().toUpperCase())}`)
+        if (response && response.exists) {
+          newErrors.code = 'Un pays avec ce code existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du code:', error)
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (form.id) {
-      await fetchApi(`/api/countries/${form.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, code: form.code })
-      })
-    } else {
-      await fetchApi('/api/countries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, code: form.code })
-      })
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        name: form.name.trim(),
+        code: form.code.trim().toUpperCase()
+      }
+      
+      if (form.id) {
+        await fetchApi(`/api/countries/${form.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      } else {
+        await fetchApi('/api/countries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      }
+      
+      setForm({ id: '', name: '', code: '' })
+      setErrors({})
+      setOpen(false)
+      load()
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
-    setForm({ id: '', name: '', code: '' })
-    setOpen(false)
-    load()
   }
 
   function edit(it: Country) {
@@ -99,6 +183,7 @@ export default function CountriesAdmin() {
 
   function addNew() {
     setForm({ id: '', name: '', code: '' })
+    setErrors({})
     setOpen(true)
   }
 
@@ -161,15 +246,69 @@ export default function CountriesAdmin() {
             <DialogTitle>{form.id ? 'Modifier un pays' : 'Nouveau pays'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom du pays *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Maroc, France, États-Unis"
+                maxLength={100}
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                {form.name.length}/100 caractères
+              </p>
             </div>
+            
             <div>
-              <Label htmlFor="code">Code</Label>
-              <Input id="code" name="code" value={form.code} onChange={handleChange} required />
+              <Label htmlFor="code">Code pays (ISO) *</Label>
+              <Input 
+                id="code" 
+                name="code" 
+                value={form.code} 
+                onChange={handleChange} 
+                required 
+                className={errors.code ? 'border-red-500' : ''}
+                placeholder="Ex: MA, FR, USA (2-3 lettres)"
+                maxLength={3}
+                style={{ textTransform: 'uppercase' }}
+              />
+              {errors.code && <span className="text-red-500 text-sm mt-1">{errors.code}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Code ISO standard à 2 ou 3 lettres (sera converti en majuscules)
+              </p>
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,24 @@
+/**
+ * Composant Footer - Pied de page complet du site Industria
+ * 
+ * Fournit un pied de page riche avec :
+ * - Boutons d'action rapide (appel, contact, rendez-vous)
+ * - Liens de navigation structurés (Média, Groupe)
+ * - Informations de contact avec icônes
+ * - Réseaux sociaux et liens institutionnels
+ * - Modal de prise de rendez-vous intégrée
+ * - Copyright automatique avec année courante
+ * 
+ * Design responsive qui s'adapte aux différentes tailles d'écran
+ * avec reorganisation automatique des éléments.
+ * 
+ * @returns Composant React du pied de page
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import { useState } from 'react';

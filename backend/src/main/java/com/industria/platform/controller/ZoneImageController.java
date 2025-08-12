@@ -5,7 +5,8 @@ import com.industria.platform.entity.ZoneImage;
 import com.industria.platform.repository.ZoneImageRepository;
 import com.industria.platform.repository.ZoneRepository;
 import com.industria.platform.service.FileStorageService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -21,25 +22,46 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Contrôleur REST pour la gestion des images de zones.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/zones/{zoneId}/images")
+@RequiredArgsConstructor
+@Slf4j
 public class ZoneImageController {
 
-    @Autowired
-    private ZoneImageRepository zoneImageRepository;
-    
-    @Autowired
-    private ZoneRepository zoneRepository;
-    
-    @Autowired
-    private FileStorageService fileStorageService;
+    private final ZoneImageRepository zoneImageRepository;
+    private final ZoneRepository zoneRepository;
+    private final FileStorageService fileStorageService;
 
+    /**
+     * Récupère toutes les images d'une zone.
+     *
+     * @param zoneId identifiant de la zone
+     * @return liste des images triées par priorité (principale en premier)
+     */
     @GetMapping
     public ResponseEntity<List<ZoneImage>> getZoneImages(@PathVariable String zoneId) {
         List<ZoneImage> images = zoneImageRepository.findByZoneIdOrderByIsPrimaryDescDisplayOrderAsc(zoneId);
         return ResponseEntity.ok(images);
     }
 
+    /**
+     * Télécharge une nouvelle image pour une zone.
+     * Nécessite les droits d'administration.
+     *
+     * @param zoneId identifiant de la zone
+     * @param file fichier image à télécharger
+     * @param description description optionnelle de l'image
+     * @param isPrimary indique si l'image est principale
+     * @param displayOrder ordre d'affichage
+     * @return l'image créée ou erreur
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ZoneImage> uploadZoneImage(
@@ -94,6 +116,13 @@ public class ZoneImageController {
         }
     }
 
+    /**
+     * Récupère le fichier d'une image de zone.
+     *
+     * @param zoneId identifiant de la zone
+     * @param imageId identifiant de l'image
+     * @return le fichier image ou erreur 404
+     */
     @GetMapping("/{imageId}/file")
     public ResponseEntity<Resource> getImageFile(@PathVariable String zoneId, @PathVariable String imageId) {
         try {
@@ -122,6 +151,17 @@ public class ZoneImageController {
         }
     }
 
+    /**
+     * Met à jour les métadonnées d'une image de zone.
+     * Nécessite les droits d'administration.
+     *
+     * @param zoneId identifiant de la zone
+     * @param imageId identifiant de l'image
+     * @param description nouvelle description
+     * @param isPrimary nouveau statut principal
+     * @param displayOrder nouvel ordre d'affichage
+     * @return l'image mise à jour ou erreur
+     */
     @PutMapping("/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ZoneImage> updateZoneImage(
@@ -155,6 +195,14 @@ public class ZoneImageController {
         return ResponseEntity.ok(savedImage);
     }
 
+    /**
+     * Supprime une image de zone et son fichier associé.
+     * Nécessite les droits d'administration.
+     *
+     * @param zoneId identifiant de la zone
+     * @param imageId identifiant de l'image à supprimer
+     * @return réponse vide ou erreur
+     */
     @DeleteMapping("/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteZoneImage(@PathVariable String zoneId, @PathVariable String imageId) {

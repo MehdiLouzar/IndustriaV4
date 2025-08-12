@@ -4,6 +4,19 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Entité représentant un log d'audit système.
+ * 
+ * Chaque enregistrement trace une action effectuée par un utilisateur
+ * avec les métadonnées contextuelles (IP, User-Agent, timestamp).
+ * 
+ * Permet la conformité réglementaire et le suivi des modifications
+ * pour des besoins de sécurité et de traçabilité.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

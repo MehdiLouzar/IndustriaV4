@@ -3,6 +3,16 @@ package com.industria.platform.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * Entité de relation entre Zone et Activity.
+ * 
+ * Représente l'association many-to-many entre les zones industrielles
+ * et les activités autorisées dans ces zones.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter
