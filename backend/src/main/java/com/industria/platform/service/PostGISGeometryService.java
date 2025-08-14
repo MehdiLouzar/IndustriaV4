@@ -30,6 +30,7 @@ public class PostGISGeometryService {
     private final ParcelRepository parcelRepository;
     private final ZoneRepository zoneRepository;
     private final GeometryParsingService geometryParsingService;
+    private final CoordinateCalculationService coordinateCalculationService;
 
     /**
      * Extrait les vertices géométriques d'une zone.
@@ -99,9 +100,10 @@ public class PostGISGeometryService {
 
     /**
      * Calcule le centroïde d'une zone dans plusieurs systèmes de coordonnées.
+     * Configure automatiquement les paramètres de projection selon le pays de la zone.
      * 
-     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées)
-     * et en Lambert Maroc (calculées dynamiquement).
+     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées
+     * ou calculées dynamiquement) et en Lambert (calculées dynamiquement).
      * 
      * @param zoneId identifiant de la zone
      * @return tableau [longitude_WGS84, latitude_WGS84, X_Lambert, Y_Lambert]
@@ -114,10 +116,6 @@ public class PostGISGeometryService {
         
         Zone zone = zoneOpt.get();
         
-        // Utiliser les coordonnées pré-calculées stockées dans l'entity
-        double longitude = zone.getLongitude() != null ? zone.getLongitude() : 0.0;
-        double latitude = zone.getLatitude() != null ? zone.getLatitude() : 0.0;
-        
         // Pour les coordonnées Lambert, calculer le centroïde depuis les vertices
         List<VertexDto> vertices = extractZoneVertices(zoneId);
         double lambertX = 0.0, lambertY = 0.0;
@@ -129,16 +127,25 @@ public class PostGISGeometryService {
             }
             lambertX /= vertices.size();
             lambertY /= vertices.size();
+            
+            // Utiliser le service de conversion avec configuration automatique du pays
+            double[] wgs84 = coordinateCalculationService.lambertToWGS84ForZone(lambertX, lambertY, zone);
+            return new double[]{wgs84[0], wgs84[1], lambertX, lambertY};
         }
+        
+        // Fallback: utiliser les coordonnées pré-calculées si disponibles
+        double longitude = zone.getLongitude() != null ? zone.getLongitude() : 0.0;
+        double latitude = zone.getLatitude() != null ? zone.getLatitude() : 0.0;
         
         return new double[]{longitude, latitude, lambertX, lambertY};
     }
 
     /**
      * Calcule le centroïde d'une parcelle dans plusieurs systèmes de coordonnées.
+     * Configure automatiquement les paramètres de projection selon le pays de la parcelle.
      * 
-     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées)
-     * et en Lambert Maroc (calculées dynamiquement).
+     * Retourne les coordonnées du centre géométrique en WGS84 (pré-calculées
+     * ou calculées dynamiquement) et en Lambert (calculées dynamiquement).
      * 
      * @param parcelId identifiant de la parcelle
      * @return tableau [longitude_WGS84, latitude_WGS84, X_Lambert, Y_Lambert]
@@ -151,10 +158,6 @@ public class PostGISGeometryService {
         
         Parcel parcel = parcelOpt.get();
         
-        // Utiliser les coordonnées pré-calculées stockées dans l'entity
-        double longitude = parcel.getLongitude() != null ? parcel.getLongitude() : 0.0;
-        double latitude = parcel.getLatitude() != null ? parcel.getLatitude() : 0.0;
-        
         // Pour les coordonnées Lambert, calculer le centroïde depuis les vertices
         List<VertexDto> vertices = extractParcelVertices(parcelId);
         double lambertX = 0.0, lambertY = 0.0;
@@ -166,7 +169,15 @@ public class PostGISGeometryService {
             }
             lambertX /= vertices.size();
             lambertY /= vertices.size();
+            
+            // Utiliser le service de conversion avec configuration automatique du pays
+            double[] wgs84 = coordinateCalculationService.lambertToWGS84ForParcel(lambertX, lambertY, parcel);
+            return new double[]{wgs84[0], wgs84[1], lambertX, lambertY};
         }
+        
+        // Fallback: utiliser les coordonnées pré-calculées si disponibles
+        double longitude = parcel.getLongitude() != null ? parcel.getLongitude() : 0.0;
+        double latitude = parcel.getLatitude() != null ? parcel.getLatitude() : 0.0;
         
         return new double[]{longitude, latitude, lambertX, lambertY};
     }

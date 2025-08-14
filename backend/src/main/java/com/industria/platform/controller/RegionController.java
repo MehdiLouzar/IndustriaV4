@@ -63,6 +63,20 @@ public class RegionController {
                         r.getCountry() != null ? r.getCountry().getId() : null))
                 .toList();
     }
+    
+    /**
+     * Récupère les régions d'un pays spécifique.
+     *
+     * @param countryId identifiant du pays
+     * @return liste des régions du pays
+     */
+    @GetMapping("/by-country/{countryId}")
+    public List<RegionDto> getByCountry(@PathVariable String countryId) {
+        return repo.findByCountryId(countryId).stream()
+                .map(r -> new RegionDto(r.getId(), r.getName(), r.getCode(),
+                        r.getCountry() != null ? r.getCountry().getId() : null))
+                .toList();
+    }
 
     /**
      * Récupère une région par son identifiant.
