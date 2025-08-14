@@ -36,26 +36,74 @@ SELECT * FROM (VALUES
 ) AS data(id, name, srid, proj4text, description, created_at, updated_at, deleted_at)
 WHERE NOT EXISTS (SELECT 1 FROM spatial_reference_system WHERE id = data.id);
 
+-- Spatial reference systems supplémentaires
+INSERT INTO spatial_reference_system (
+    id, name, srid, proj4text, description, created_at, updated_at, deleted_at
+)
+SELECT * FROM (VALUES 
+    ('srs-2154', 'RGF93 / Lambert-93', 2154, '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
+     'Lambert Conformal Conic projection for France', NOW(), NOW(), NULL::timestamp without time zone),
+    ('srs-31370', 'Belge 1972 / Belgian Lambert 72', 31370, '+proj=lcc +lat_1=51.16666723333333 +lat_2=49.8333339 +lat_0=90 +lon_0=4.367486666666666 +x_0=150000.013 +y_0=5400088.438 +ellps=intl +towgs84=-106.869,52.2978,-103.724,0.3366,-0.457,1.8422,-1.2747 +units=m +no_defs',
+     'Lambert Conformal Conic projection for Belgium', NOW(), NOW(), NULL::timestamp without time zone),
+    ('srs-31491', 'NORD SAHARA 1959 / UTM zone 31N', 31491, '+proj=utm +zone=31 +a=6378249.2 +b=6356515 +towgs84=-186,-93,310,0,0,0,0 +units=m +no_defs',
+     'UTM projection for Algeria zone 31', NOW(), NOW(), NULL::timestamp without time zone)
+) AS data(id, name, srid, proj4text, description, created_at, updated_at, deleted_at)
+WHERE NOT EXISTS (SELECT 1 FROM spatial_reference_system WHERE id = data.id);
+
 -- Countries
 INSERT INTO country (
     id, name, code, currency, default_srid, created_at, updated_at, deleted_at, srs_id
 )
-SELECT * FROM (VALUES (
-    'country-ma', 'Maroc', 'MA', 'MAD', 26191, NOW(), NOW(), NULL::timestamp without time zone, 'srs-26191'
-)) AS data(id, name, code, currency, default_srid, created_at, updated_at, deleted_at, srs_id)
-WHERE NOT EXISTS (SELECT 1 FROM country);
+SELECT * FROM (VALUES 
+    ('country-ma', 'Maroc', 'MA', 'MAD', 26191, NOW(), NOW(), NULL::timestamp without time zone, 'srs-26191'),
+    ('country-fr', 'France', 'FR', 'EUR', 2154, NOW(), NOW(), NULL::timestamp without time zone, 'srs-2154'),
+    ('country-dz', 'Algérie', 'DZ', 'DZD', 31491, NOW(), NOW(), NULL::timestamp without time zone, 'srs-31491')
+) AS data(id, name, code, currency, default_srid, created_at, updated_at, deleted_at, srs_id)
+WHERE NOT EXISTS (SELECT 1 FROM country WHERE id = data.id);
 
--- Regions
+-- Regions du Maroc
 INSERT INTO region (
     id, name, code, created_at, updated_at, deleted_at, country_id
 )
 SELECT * FROM (VALUES
+    -- Maroc
     ('region-cas', 'Casablanca-Settat', 'CAS', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
     ('region-rab', 'Rabat-Salé-Kénitra', 'RAB', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
     ('region-mar', 'Marrakech-Safi', 'MAR', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
-    ('region-tan', 'Tanger-Tétouan-Al Hoceima', 'TAN', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma')
+    ('region-tan', 'Tanger-Tétouan-Al Hoceima', 'TAN', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-fes', 'Fès-Meknès', 'FES', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-ori', 'L''Oriental', 'ORI', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-ben', 'Béni Mellal-Khénifra', 'BEN', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-dar', 'Dakhla-Oued Ed-Dahab', 'DAR', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-laa', 'Laâyoune-Sakia El Hamra', 'LAA', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-gue', 'Guelmim-Oued Noun', 'GUE', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-sou', 'Souss-Massa', 'SOU', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    ('region-dra', 'Drâa-Tafilalet', 'DRA', NOW(), NOW(), NULL::timestamp without time zone, 'country-ma'),
+    -- France
+    ('region-idf', 'Île-de-France', 'IDF', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-ara', 'Auvergne-Rhône-Alpes', 'ARA', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-hdf', 'Hauts-de-France', 'HDF', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-paca', 'Provence-Alpes-Côte d''Azur', 'PACA', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-occ', 'Occitanie', 'OCC', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-naq', 'Nouvelle-Aquitaine', 'NAQ', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-pdl', 'Pays de la Loire', 'PDL', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-bre', 'Bretagne', 'BRE', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-cvl', 'Centre-Val de Loire', 'CVL', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-nor', 'Normandie', 'NOR', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-bfc', 'Bourgogne-Franche-Comté', 'BFC', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-ges', 'Grand Est', 'GES', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    ('region-cor', 'Corse', 'COR', NOW(), NOW(), NULL::timestamp without time zone, 'country-fr'),
+    -- Algérie
+    ('region-alg', 'Alger', 'ALG', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-ora', 'Oran', 'ORA', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-con', 'Constantine', 'CON', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-ann', 'Annaba', 'ANN', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-set', 'Sétif', 'SET', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-bat', 'Batna', 'BAT', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-bej', 'Béjaïa', 'BEJ', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz'),
+    ('region-tiz', 'Tizi Ouzou', 'TIZ', NOW(), NOW(), NULL::timestamp without time zone, 'country-dz')
 ) AS data(id, name, code, created_at, updated_at, deleted_at, country_id)
-WHERE NOT EXISTS (SELECT 1 FROM region);
+WHERE NOT EXISTS (SELECT 1 FROM region WHERE id = data.id);
 
 -- Zone types
 INSERT INTO zone_type (
@@ -182,7 +230,39 @@ SELECT
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
     'zt-private', 'region-mar', 'admin@industria.ma'
-WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1');
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1')
+
+UNION ALL
+
+-- Zone en France - Parc Industriel Lyon Sud (zone agrandie - 2km x 2km)
+-- Utilisation du système Lambert 93 (EPSG:2154) pour la France
+-- Coordonnées Lambert 93 réelles pour la région de Lyon
+SELECT 
+    'zone-lyon-sud', 'Parc Industriel Lyon Sud', 'Zone industrielle moderne près de Lyon avec accès autoroutier', 'Lyon Sud, Rhône, France',
+    4000000, 150, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-public', 'region-ara', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-lyon-sud')
+
+UNION ALL
+
+-- Zone en Algérie - Zone Industrielle Oran (zone agrandie - 2km x 2km) 
+-- Utilisation du système UTM Zone 31N (EPSG:31491) pour l'Algérie
+-- Coordonnées UTM Zone 31N réelles pour Oran
+SELECT 
+    'zone-oran-ouest', 'Zone Industrielle Oran Ouest', 'Zone industrielle d''Oran avec infrastructures modernes', 'Oran Ouest, Algérie',
+    4000000, 8000, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
+    ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone,
+    'zt-free-zone', 'region-ora', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-oran-ouest');
 
 
 
@@ -224,7 +304,79 @@ SELECT
     ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
     ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((424050 373550, 424080 373550, 424080 373580, 424050 373580, 424050 373550))'), 26191)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-casa-nord', 'admin@industria.ma'
-WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-3');
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-3')
+
+UNION ALL
+
+-- Parcelles France - Lyon Sud (parcelles agrandies dans la zone en Lambert 93)
+SELECT 
+    'parcel-lyon-1', 'LYS-001', 500000, 'LIBRE', false, 0.8, 1.6, 25.0, 8.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-1')
+
+UNION ALL
+
+-- Parcelle Lyon 2
+SELECT 
+    'parcel-lyon-2', 'LYS-002', 600000, 'RESERVEE', true, 0.7, 1.5, 20.0, 6.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-2')
+
+UNION ALL
+
+-- Parcelle Lyon 3
+SELECT 
+    'parcel-lyon-3', 'LYS-003', 700000, 'LIBRE', false, 0.9, 1.8, 30.0, 8.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-3')
+
+UNION ALL
+
+-- Parcelles Algérie - Oran Ouest (parcelles agrandies dans la zone en UTM Zone 31N)
+SELECT 
+    'parcel-oran-1', 'ORW-001', 800000, 'LIBRE', false, 0.7, 1.4, 22.0, 7.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-1')
+
+UNION ALL
+
+-- Parcelle Oran 2
+SELECT 
+    'parcel-oran-2', 'ORW-002', 600000, 'LIBRE', true, 0.6, 1.2, 18.0, 5.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-2')
+
+UNION ALL
+
+-- Parcelle Oran 3
+SELECT 
+    'parcel-oran-3', 'ORW-003', 900000, 'VENDU', false, 0.8, 1.6, 25.0, 8.0,
+    ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491)), 4326)),
+    NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
+WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-3');
 
 
 
@@ -239,7 +391,11 @@ SELECT * FROM (VALUES
     ('za-5', 'zone-piaj', 'act-auto'),
     ('za-6', 'zone-zaina', 'act-log'),
     ('za-7', 'zone-ottawa', 'act-log'),
-    ('za-8', 'zone-marrakech-1', 'act-textile')
+    ('za-8', 'zone-marrakech-1', 'act-textile'),
+    ('za-9', 'zone-lyon-sud', 'act-auto'),
+    ('za-10', 'zone-lyon-sud', 'act-pharma'),
+    ('za-11', 'zone-oran-ouest', 'act-textile'),
+    ('za-12', 'zone-oran-ouest', 'act-log')
 ) AS d(id, zone_id, activity_id)
 WHERE NOT EXISTS (SELECT 1 FROM zone_activity WHERE id = d.id);
 
@@ -261,7 +417,16 @@ SELECT * FROM (VALUES
     ('zam-14', 'zone-ottawa', 'amn-water'),
     ('zam-15', 'zone-ottawa', 'amn-security'),
     ('zam-16', 'zone-marrakech-1', 'amn-electricity'),
-    ('zam-17', 'zone-marrakech-1', 'amn-water')
+    ('zam-17', 'zone-marrakech-1', 'amn-water'),
+    ('zam-18', 'zone-lyon-sud', 'amn-electricity'),
+    ('zam-19', 'zone-lyon-sud', 'amn-water'),
+    ('zam-20', 'zone-lyon-sud', 'amn-internet'),
+    ('zam-21', 'zone-lyon-sud', 'amn-security'),
+    ('zam-22', 'zone-lyon-sud', 'amn-parking'),
+    ('zam-23', 'zone-oran-ouest', 'amn-electricity'),
+    ('zam-24', 'zone-oran-ouest', 'amn-water'),
+    ('zam-25', 'zone-oran-ouest', 'amn-internet'),
+    ('zam-26', 'zone-oran-ouest', 'amn-security')
 ) AS d(id, zone_id, amenity_id)
 WHERE NOT EXISTS (SELECT 1 FROM zone_amenity WHERE id = d.id);
 

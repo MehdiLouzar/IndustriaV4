@@ -25,6 +25,7 @@ import java.util.List;
  * @param zoneAddress adresse de la zone parente
  * @param zonePrice prix de la zone parente
  * @param zonePriceType type de tarification de la zone parente
+ * @param countryCurrency devise du pays pour l'affichage des prix
  * 
  * @author Industria Platform Team
  * @version 1.0
@@ -34,4 +35,5 @@ public record ParcelDto(String id, String reference, Double area,
                         String status, Boolean isShowroom, String zoneId, 
                         List<VertexDto> vertices, Double longitude, Double latitude,
                         Double cos, Double cus, Double heightLimit, Double setback,
-                        String zoneName, String zoneAddress, Double zonePrice, String zonePriceType) {}
+                        String zoneName, String zoneAddress, Double zonePrice, String zonePriceType,
+                        String countryCurrency) {}

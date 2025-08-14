@@ -75,6 +75,8 @@ interface Parcel {
   zonePrice?: number | null;
   /** Type de prix de la zone */
   zonePriceType?: string | null;
+  /** Devise du pays pour l'affichage des prix */
+  countryCurrency?: string;
 }
 
 /**
@@ -121,6 +123,8 @@ interface Zone {
   activities?: Activity[];
   /** Équipements disponibles dans cette zone */
   amenities?: Amenity[];
+  /** Devise du pays pour l'affichage des prix */
+  countryCurrency?: string;
 }
 
 export default function ZoneMap({ zone }: { zone: Zone }) {
@@ -623,12 +627,6 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
                             <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                               <span className="text-gray-600">Surface</span>
                               <span className="font-bold text-industria-brown-gold">{p.area.toLocaleString()} m²</span>
-                            </div>
-                          )}
-                          {p.price && (
-                            <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
-                              <span className="text-gray-600">Prix parcelle</span>
-                              <span className="font-bold text-blue-600">{p.price.toLocaleString()} DH</span>
                             </div>
                           )}
                           {p.zoneName && (

@@ -39,11 +39,11 @@ public class GeometryUpdateService {
         if (zone == null) return;
             
         if (vertices != null && !vertices.isEmpty()) {
-            double[] wgs84Coords = coordinateCalculationService.calculateCentroidWGS84(vertices);
+            double[] wgs84Coords = coordinateCalculationService.calculateCentroidWGS84ForZone(vertices, zone);
             log.debug("Zone {} - Coordonnées calculées: lon={}, lat={}", zone.getId(), wgs84Coords[0], wgs84Coords[1]);
             
-            // Valider les coordonnées calculées
-            if (coordinateCalculationService.validateWGS84Coordinates(wgs84Coords[0], wgs84Coords[1])) {
+            // Valider les coordonnées calculées (coordonnées valides si dans une plage raisonnable)
+            if (isValidWGS84Coordinates(wgs84Coords[0], wgs84Coords[1])) {
                 zone.setLongitude(wgs84Coords[0]);
                 zone.setLatitude(wgs84Coords[1]);
                 log.debug("Coordonnées WGS84 validées et enregistrées pour zone {}", zone.getId());
@@ -74,10 +74,10 @@ public class GeometryUpdateService {
         if (parcel == null) return;
             
         if (vertices != null && !vertices.isEmpty()) {
-            double[] wgs84Coords = coordinateCalculationService.calculateCentroidWGS84(vertices);
+            double[] wgs84Coords = coordinateCalculationService.calculateCentroidWGS84ForParcel(vertices, parcel);
             
             // Valider les coordonnées calculées
-            if (coordinateCalculationService.validateWGS84Coordinates(wgs84Coords[0], wgs84Coords[1])) {
+            if (isValidWGS84Coordinates(wgs84Coords[0], wgs84Coords[1])) {
                 parcel.setLongitude(wgs84Coords[0]);
                 parcel.setLatitude(wgs84Coords[1]);
             } else {
@@ -92,5 +92,30 @@ public class GeometryUpdateService {
             parcel.setLongitude(null);
             parcel.setLatitude(null);
         }
+    }
+    
+    /**
+     * Valide que les coordonnées WGS84 sont dans une plage valide.
+     * 
+     * @param longitude longitude en degrés (-180 à +180)
+     * @param latitude latitude en degrés (-90 à +90)
+     * @return true si les coordonnées sont valides
+     */
+    private boolean isValidWGS84Coordinates(double longitude, double latitude) {
+        // Vérifier les limites WGS84
+        if (longitude < -180.0 || longitude > 180.0) {
+            return false;
+        }
+        if (latitude < -90.0 || latitude > 90.0) {
+            return false;
+        }
+        
+        // Vérifier que ce ne sont pas des valeurs par défaut/nulles
+        if (longitude == 0.0 && latitude == 0.0) {
+            return false;
+        }
+        
+        // Vérifier que les valeurs ne sont pas des NaN ou infinies
+        return Double.isFinite(longitude) && Double.isFinite(latitude);
     }
 }

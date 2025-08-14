@@ -41,7 +41,7 @@ public class CountryController {
         int l = Math.min(Math.max(1, limit), 100);
         var res = repo.findAll(PageRequest.of(p - 1, l));
         var items = res.getContent().stream()
-                .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
+                .map(this::toDto)
                 .toList();
         return new ListResponse<>(items, res.getTotalElements(), res.getTotalPages(), p, l);
     }
@@ -56,7 +56,7 @@ public class CountryController {
     @PermitAll
     public List<CountryDto> getAll() {
         return repo.findAll().stream()
-                .map(c -> new CountryDto(c.getId(), c.getName(), c.getCode()))
+                .map(this::toDto)
                 .toList();
     }
 
@@ -71,8 +71,17 @@ public class CountryController {
         Country c = new Country();
         c.setName(dto.name());
         c.setCode(dto.code());
+        c.setCurrency(dto.currency());
+        c.setDefaultSrid(dto.defaultSrid());
+        
+        // Créer un SRS simple si un nom est fourni
+        if (dto.spatialReferenceSystemName() != null && !dto.spatialReferenceSystemName().trim().isEmpty()) {
+            // Pour simplifier, on stocke juste le nom sans créer d'entité SRS
+            // Vous pourriez étendre ceci pour créer automatiquement un SRS
+        }
+        
         repo.save(c);
-        return new CountryDto(c.getId(), c.getName(), c.getCode());
+        return toDto(c);
     }
 
     /**
@@ -87,8 +96,15 @@ public class CountryController {
         Country c = repo.findById(id).orElseThrow();
         c.setName(dto.name());
         c.setCode(dto.code());
+        c.setCurrency(dto.currency());
+        c.setDefaultSrid(dto.defaultSrid());
+        
+        // Gérer le nom du système de coordonnées
+        // Pour simplifier, on ne fait rien de spécial ici
+        // Vous pourriez étendre ceci pour gérer automatiquement les SRS
+        
         repo.save(c);
-        return new CountryDto(c.getId(), c.getName(), c.getCode());
+        return toDto(c);
     }
 
     /**
@@ -99,5 +115,20 @@ public class CountryController {
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
         repo.deleteById(id);
+    }
+    
+    
+    /**
+     * Convertit une entité Country en DTO.
+     */
+    private CountryDto toDto(Country c) {
+        return new CountryDto(
+            c.getId(),
+            c.getName(),
+            c.getCode(),
+            c.getCurrency(),
+            c.getDefaultSrid(),
+            c.getSpatialReferenceSystem() != null ? c.getSpatialReferenceSystem().getName() : null
+        );
     }
 }

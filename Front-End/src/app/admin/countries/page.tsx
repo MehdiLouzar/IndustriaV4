@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
 import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
@@ -16,6 +23,9 @@ interface Country {
   id: string
   name: string
   code: string
+  currency?: string
+  defaultSrid?: number
+  spatialReferenceSystemName?: string
 }
 
 export default function CountriesAdmin() {
@@ -26,7 +36,14 @@ export default function CountriesAdmin() {
   const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState<Country>({ id: '', name: '', code: '' })
+  const [form, setForm] = useState<Country>({ 
+    id: '', 
+    name: '', 
+    code: '', 
+    currency: '', 
+    defaultSrid: undefined, 
+    spatialReferenceSystemName: '' 
+  })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -54,6 +71,7 @@ export default function CountriesAdmin() {
   }, [currentPage, itemsPerPage, searchTerm])
   
   useEffect(() => { load(currentPage) }, [currentPage, load])
+  
 
   // Effet pour la recherche
   useEffect(() => {
@@ -142,7 +160,10 @@ export default function CountriesAdmin() {
       
       const body = {
         name: form.name.trim(),
-        code: form.code.trim().toUpperCase()
+        code: form.code.trim().toUpperCase(),
+        currency: form.currency?.trim() || null,
+        defaultSrid: form.defaultSrid || null,
+        spatialReferenceSystemName: form.spatialReferenceSystemName?.trim() || null
       }
       
       if (form.id) {
@@ -159,7 +180,14 @@ export default function CountriesAdmin() {
         })
       }
       
-      setForm({ id: '', name: '', code: '' })
+      setForm({ 
+        id: '', 
+        name: '', 
+        code: '', 
+        currency: '', 
+        defaultSrid: undefined, 
+        spatialReferenceSystemName: '' 
+      })
       setErrors({})
       setOpen(false)
       load()
@@ -182,7 +210,14 @@ export default function CountriesAdmin() {
   }
 
   function addNew() {
-    setForm({ id: '', name: '', code: '' })
+    setForm({ 
+      id: '', 
+      name: '', 
+      code: '', 
+      currency: '', 
+      defaultSrid: undefined, 
+      spatialReferenceSystemName: '' 
+    })
     setErrors({})
     setOpen(true)
   }
@@ -208,6 +243,8 @@ export default function CountriesAdmin() {
               <tr className="border-b text-left">
                 <th className="p-2">Nom</th>
                 <th className="p-2">Code</th>
+                <th className="p-2">Monnaie</th>
+                <th className="p-2">Système Coord.</th>
                 <th className="p-2 w-32"></th>
               </tr>
             </thead>
@@ -218,6 +255,21 @@ export default function CountriesAdmin() {
                 <tr key={c.id} className="border-b last:border-0">
                   <td className="p-2 align-top">{c.name}</td>
                   <td className="p-2 align-top">{c.code}</td>
+                  <td className="p-2 align-top">{c.currency || '-'}</td>
+                  <td className="p-2 align-top">
+                    <div className="text-xs">
+                      {c.spatialReferenceSystemName || c.defaultSrid ? (
+                        <div>
+                          {c.spatialReferenceSystemName && (
+                            <div className="font-medium">{c.spatialReferenceSystemName}</div>
+                          )}
+                          {c.defaultSrid && (
+                            <div className="text-gray-500">SRID: {c.defaultSrid}</div>
+                          )}
+                        </div>
+                      ) : '-'}
+                    </div>
+                  </td>
                   <td className="p-2 space-x-2 whitespace-nowrap">
                     <Button size="sm" onClick={() => edit(c)}>Éditer</Button>
                     <DeleteConfirmDialog
@@ -289,6 +341,69 @@ export default function CountriesAdmin() {
               </p>
             </div>
             
+            <div>
+              <Label htmlFor="currency">Monnaie</Label>
+              <Input 
+                id="currency" 
+                name="currency" 
+                value={form.currency || ''} 
+                onChange={handleChange} 
+                className={errors.currency ? 'border-red-500' : ''}
+                placeholder="Ex: MAD, EUR, USD"
+                maxLength={3}
+                style={{ textTransform: 'uppercase' }}
+              />
+              {errors.currency && <span className="text-red-500 text-sm mt-1">{errors.currency}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Code ISO de la monnaie (optionnel)
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="spatialReferenceSystemName">Système de coordonnées</Label>
+                <Input 
+                  id="spatialReferenceSystemName" 
+                  name="spatialReferenceSystemName" 
+                  value={form.spatialReferenceSystemName || ''} 
+                  onChange={handleChange} 
+                  className={errors.spatialReferenceSystemName ? 'border-red-500' : ''}
+                  placeholder="Ex: Lambert 93, WGS84, UTM Zone 31N"
+                  maxLength={100}
+                />
+                {errors.spatialReferenceSystemName && (
+                  <span className="text-red-500 text-sm mt-1">{errors.spatialReferenceSystemName}</span>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Nom du système de projection utilisé (optionnel)
+                </p>
+              </div>
+              
+              <div>
+                <Label htmlFor="defaultSrid">SRID (Code EPSG)</Label>
+                <Input 
+                  id="defaultSrid" 
+                  name="defaultSrid" 
+                  type="number"
+                  value={form.defaultSrid || ''} 
+                  onChange={(e) => {
+                    const value = e.target.value ? parseInt(e.target.value) : undefined
+                    setForm(prev => ({ ...prev, defaultSrid: value }))
+                  }} 
+                  className={errors.defaultSrid ? 'border-red-500' : ''}
+                  placeholder="Ex: 4326, 2154, 26191"
+                  min="1"
+                  max="99999"
+                />
+                {errors.defaultSrid && (
+                  <span className="text-red-500 text-sm mt-1">{errors.defaultSrid}</span>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Code EPSG du système (optionnel)
+                </p>
+              </div>
+            </div>
+            
             <div className="flex gap-2 pt-4">
               <Button 
                 type="button" 
@@ -296,6 +411,14 @@ export default function CountriesAdmin() {
                 onClick={() => {
                   setOpen(false)
                   setErrors({})
+                  setForm({ 
+                    id: '', 
+                    name: '', 
+                    code: '', 
+                    currency: '', 
+                    defaultSrid: undefined, 
+                    spatialReferenceSystemName: '' 
+                  })
                 }}
                 disabled={isSubmitting}
               >

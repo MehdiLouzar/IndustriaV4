@@ -151,7 +151,9 @@ export default function ZonesAdmin() {
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
+  const [allCountries, setAllCountries] = useState<{ id: string; name: string; code: string }[]>([])
   const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
+  const [selectedCountryId, setSelectedCountryId] = useState<string>('')
   const [activities, setActivities] = useState<ActivityDto[]>([])
   const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
@@ -266,16 +268,41 @@ export default function ZonesAdmin() {
       })
   }, [])
 
+  // Charger les pays
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>('/api/regions/all')
+    fetchApi<{ id: string; name: string; code: string }[]>('/api/countries/all')
       .then((data) => {
-        setAllRegions(Array.isArray(data) ? data : [])
+        setAllCountries(Array.isArray(data) ? data : [])
       })
       .catch((error) => {
-        console.error('Erreur chargement regions:', error)
-        setAllRegions([])
+        console.error('Erreur chargement countries:', error)
+        setAllCountries([])
       })
   }, [])
+
+  // Charger les régions selon le pays sélectionné
+  useEffect(() => {
+    if (selectedCountryId) {
+      fetchApi<{ id: string; name: string }[]>(`/api/regions/by-country/${selectedCountryId}`)
+        .then((data) => {
+          setAllRegions(Array.isArray(data) ? data : [])
+        })
+        .catch((error) => {
+          console.error('Erreur chargement regions:', error)
+          setAllRegions([])
+        })
+    } else {
+      // Si aucun pays sélectionné, charger toutes les régions
+      fetchApi<{ id: string; name: string }[]>('/api/regions/all')
+        .then((data) => {
+          setAllRegions(Array.isArray(data) ? data : [])
+        })
+        .catch((error) => {
+          console.error('Erreur chargement regions:', error)
+          setAllRegions([])
+        })
+    }
+  }, [selectedCountryId])
 
   useEffect(() => {
     fetchApi<ListResponse<ActivityDto>>("/api/activities")
@@ -330,6 +357,15 @@ export default function ZonesAdmin() {
   const handleRegion = useCallback((value: string) => {
     setForm(prev => ({ ...prev, regionId: value }))
   }, [])
+  
+  const handleCountryFilter = useCallback((countryId: string) => {
+    const actualCountryId = countryId === 'all' ? '' : countryId
+    setSelectedCountryId(actualCountryId)
+    // Réinitialiser la région sélectionnée quand on change de pays
+    if (actualCountryId !== selectedCountryId) {
+      setForm(prev => ({ ...prev, regionId: '' }))
+    }
+  }, [selectedCountryId])
 
   const handlePriceType = useCallback((value: string) => {
     setForm(prev => ({ ...prev, priceType: value }))
@@ -882,6 +918,22 @@ export default function ZonesAdmin() {
               </Select>
             </div>
             <div>
+              <Label htmlFor="countryFilter">Pays (pour filtrer les régions)</Label>
+              <Select value={selectedCountryId || undefined} onValueChange={handleCountryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-- Tous les pays --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les pays</SelectItem>
+                  {(Array.isArray(allCountries) ? allCountries : []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="regionId">Région</Label>
               <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
@@ -895,6 +947,11 @@ export default function ZonesAdmin() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedCountryId && allRegions.length === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Aucune région trouvée pour ce pays
+                </p>
+              )}
             </div>
             <div>
               <Label>Activités</Label>

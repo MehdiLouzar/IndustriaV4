@@ -337,6 +337,17 @@ public class ZoneController {
             log.debug("Zone {} has no parcels or parcels is null", z.getId());
         }
 
+        // Récupérer les informations du pays via la région
+        String countryId = null;
+        String countryCode = null;
+        String countryCurrency = null;
+        
+        if (z.getRegion() != null && z.getRegion().getCountry() != null) {
+            countryId = z.getRegion().getCountry().getId();
+            countryCode = z.getRegion().getCountry().getCode();
+            countryCurrency = z.getRegion().getCountry().getCurrency();
+        }
+        
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -356,7 +367,10 @@ public class ZoneController {
                 z.getLongitude(), // Utiliser les coordonnées pré-calculées
                 totalParcels,
                 availableParcels,
-                parcelDtos
+                parcelDtos,
+                countryId,
+                countryCode,
+                countryCurrency
         );
     }
 
@@ -381,6 +395,12 @@ public class ZoneController {
             log.error("Error extracting parcel geometry for {}", p.getId(), e);
         }
         
+        // Récupérer la devise du pays via zone → région → pays
+        String countryCurrency = null;
+        if (p.getZone() != null && p.getZone().getRegion() != null && p.getZone().getRegion().getCountry() != null) {
+            countryCurrency = p.getZone().getRegion().getCountry().getCurrency();
+        }
+        
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -389,7 +409,8 @@ public class ZoneController {
                 p.getZone() == null ? null : p.getZone().getName(),
                 p.getZone() == null ? null : p.getZone().getAddress(),
                 p.getZone() == null ? null : p.getZone().getPrice(),
-                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()));
+                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()),
+                countryCurrency);
     }
 
     private List<VertexDto> parseParcelGeometry(String wkt) {
