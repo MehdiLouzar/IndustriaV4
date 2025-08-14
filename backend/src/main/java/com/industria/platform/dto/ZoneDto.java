@@ -27,6 +27,9 @@ import java.util.List;
  * @param totalParcels nombre total de parcelles
  * @param availableParcels nombre de parcelles disponibles
  * @param parcels liste des parcelles de la zone
+ * @param countryId identifiant du pays
+ * @param countryCode code du pays (ex: MA, FR, DZ)
+ * @param countryCurrency devise du pays (ex: MAD, EUR, DZD)
  * 
  * @author Industria Platform Team
  * @version 1.0
@@ -50,4 +53,7 @@ public record ZoneDto(String id,
                       Double longitude,
                       Integer totalParcels,
                       Integer availableParcels,
-                      List<ParcelDto> parcels) {}
+                      List<ParcelDto> parcels,
+                      String countryId,
+                      String countryCode,
+                      String countryCurrency) {}

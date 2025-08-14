@@ -13,8 +13,9 @@ export interface WGS84Coordinate {
 
 export interface CoordinateWithBoth extends LambertCoordinate, WGS84Coordinate {}
 
-// Paramètres de projection par pays
+// Interface pour les paramètres de projection récupérés depuis la DB
 export interface ProjectionParams {
+  srid: number
   centralMeridian: number
   centralParallel: number
   falseEasting: number
@@ -30,98 +31,103 @@ export interface ProjectionParams {
   maxY: number
 }
 
-// Paramètres par pays
-const COUNTRY_PARAMS: Record<string, ProjectionParams> = {
-  morocco: {
-    centralMeridian: -5.0,
-    centralParallel: 33.3,
-    falseEasting: 500000,
-    falseNorthing: 300000,
-    scaleFactor: 0.9996,
-    minLongitude: -13.0,
-    maxLongitude: -1.0,
-    minLatitude: 27.0,
-    maxLatitude: 36.0,
-    minX: 200000,
-    maxX: 800000,
-    minY: 100000,
-    maxY: 600000
-  },
-  france: {
-    centralMeridian: 3.0,
-    centralParallel: 46.5,
-    falseEasting: 700000,
-    falseNorthing: 6600000,
-    scaleFactor: 0.9996,
-    minLongitude: -5.0,
-    maxLongitude: 10.0,
-    minLatitude: 41.0,
-    maxLatitude: 51.5,
-    minX: 75000,
-    maxX: 1275000,
-    minY: 6000000,
-    maxY: 7200000
-  },
-  algeria: {
-    centralMeridian: 3.0,
-    centralParallel: 28.5,
-    falseEasting: 500000,
-    falseNorthing: 300000,
-    scaleFactor: 0.9996,
-    minLongitude: -8.7,
-    maxLongitude: 12.0,
-    minLatitude: 19.0,
-    maxLatitude: 37.0,
-    minX: 150000,
-    maxX: 850000,
-    minY: 50000,
-    maxY: 750000
-  }
-}
+// Cache des paramètres par SRID
+const paramsCache: Map<number, ProjectionParams> = new Map()
 
-// Paramètres actuels (par défaut: Maroc)
-let currentParams: ProjectionParams = COUNTRY_PARAMS.morocco
+// Paramètres actuels (chargés dynamiquement)
+let currentParams: ProjectionParams | null = null
 
 /**
- * Configure les paramètres de projection pour un pays spécifique
+ * Récupère les paramètres de projection depuis la base de données pour un SRID donné
  */
-export function setCountryParameters(country: string): void {
-  const countryKey = country.toLowerCase()
-  if (countryKey in COUNTRY_PARAMS) {
-    currentParams = COUNTRY_PARAMS[countryKey]
-    console.log(`Paramètres de projection configurés pour: ${country}`)
-  } else {
-    console.warn(`Paramètres non définis pour le pays: ${country}. Utilisation des paramètres du Maroc.`)
-    currentParams = COUNTRY_PARAMS.morocco
+export async function fetchProjectionParams(srid: number): Promise<ProjectionParams | null> {
+  try {
+    // Vérifier le cache
+    if (paramsCache.has(srid)) {
+      return paramsCache.get(srid)!
+    }
+    
+    const response = await fetch(`/api/spatial-reference-systems/${srid}`)
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const params: ProjectionParams = {
+      srid: data.srid,
+      centralMeridian: data.centralMeridian || 0,
+      centralParallel: data.centralParallel || 0,
+      falseEasting: data.falseEasting || 0,
+      falseNorthing: data.falseNorthing || 0,
+      scaleFactor: data.scaleFactor || 1.0,
+      minLongitude: data.minLongitude || -180,
+      maxLongitude: data.maxLongitude || 180,
+      minLatitude: data.minLatitude || -90,
+      maxLatitude: data.maxLatitude || 90,
+      minX: data.minX || 0,
+      maxX: data.maxX || 1000000,
+      minY: data.minY || 0,
+      maxY: data.maxY || 1000000
+    }
+    
+    // Mettre en cache
+    paramsCache.set(srid, params)
+    console.log(`Paramètres de projection chargés pour SRID ${srid}`)
+    return params
+    
+  } catch (error) {
+    console.error(`Erreur lors du chargement des paramètres pour SRID ${srid}:`, error)
+    return null
   }
 }
 
 /**
- * Configure automatiquement les paramètres selon le code pays
+ * Configure les paramètres de projection pour un pays spécifique par son code
  */
-export function setCountryByCode(countryCode: string): void {
-  const countryMapping: Record<string, string> = {
-    'MA': 'morocco',
-    'FR': 'france', 
-    'DZ': 'algeria'
+export async function setCountryByCode(countryCode: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/countries/${countryCode}/default-srid`)
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const srid = data.defaultSrid
+    
+    if (srid) {
+      const params = await fetchProjectionParams(srid)
+      if (params) {
+        currentParams = params
+        console.log(`Paramètres configurés pour le pays ${countryCode} (SRID: ${srid})`)
+        return true
+      }
+    }
+    
+    console.warn(`Impossible de configurer les paramètres pour le pays: ${countryCode}`)
+    return false
+    
+  } catch (error) {
+    console.error(`Erreur lors de la configuration du pays ${countryCode}:`, error)
+    return false
   }
-  
-  const country = countryMapping[countryCode.toUpperCase()] || 'morocco'
-  setCountryParameters(country)
 }
 
 /**
- * Configure des paramètres personnalisés
+ * Configure des paramètres spécifiques par SRID
  */
-export function setCustomParameters(params: ProjectionParams): void {
-  currentParams = params
-  console.log('Paramètres de projection personnalisés configurés')
+export async function setParametersBySRID(srid: number): Promise<boolean> {
+  const params = await fetchProjectionParams(srid)
+  if (params) {
+    currentParams = params
+    return true
+  }
+  return false
 }
 
 /**
  * Retourne les paramètres actuels
  */
-export function getCurrentParameters(): ProjectionParams {
+export function getCurrentParameters(): ProjectionParams | null {
   return currentParams
 }
 

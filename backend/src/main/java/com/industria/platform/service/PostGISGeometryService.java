@@ -62,7 +62,10 @@ public class PostGISGeometryService {
         }
         
         // Parser la géométrie WKT transformée
-        return geometryParsingService.parseWKTGeometry(wktGeometry);
+        List<VertexDto> vertices = geometryParsingService.parseWKTGeometry(wktGeometry);
+        
+        // Convertir les coordonnées Lambert vers WGS84 selon le pays de la zone
+        return convertVerticesToWGS84ForZone(vertices, zone);
     }
 
     /**
@@ -95,7 +98,10 @@ public class PostGISGeometryService {
         }
         
         // Parser la géométrie WKT transformée
-        return geometryParsingService.parseWKTGeometry(wktGeometry);
+        List<VertexDto> vertices = geometryParsingService.parseWKTGeometry(wktGeometry);
+        
+        // Convertir les coordonnées Lambert vers WGS84 selon le pays de la parcelle
+        return convertVerticesToWGS84ForParcel(vertices, parcel);
     }
 
     /**
@@ -180,6 +186,50 @@ public class PostGISGeometryService {
         double latitude = parcel.getLatitude() != null ? parcel.getLatitude() : 0.0;
         
         return new double[]{longitude, latitude, lambertX, lambertY};
+    }
+    
+    /**
+     * Convertit une liste de vertices Lambert vers WGS84 selon le pays de la zone.
+     */
+    private List<VertexDto> convertVerticesToWGS84ForZone(List<VertexDto> vertices, Zone zone) {
+        if (vertices == null || vertices.isEmpty()) {
+            return vertices;
+        }
+        
+        return vertices.stream().map(vertex -> {
+            try {
+                // Utiliser le service de conversion avec configuration automatique du pays
+                double[] wgs84 = coordinateCalculationService.lambertToWGS84ForZone(
+                    vertex.lambertX(), vertex.lambertY(), zone);
+                return new VertexDto(vertex.seq(), vertex.lambertX(), vertex.lambertY(), 
+                    wgs84[1], wgs84[0]); // longitude, latitude
+            } catch (Exception e) {
+                log.warn("Erreur conversion coordonnées pour vertex zone {}: {}", vertex.seq(), e.getMessage());
+                return vertex; // Retourner le vertex original en cas d'erreur
+            }
+        }).toList();
+    }
+    
+    /**
+     * Convertit une liste de vertices Lambert vers WGS84 selon le pays de la parcelle.
+     */
+    private List<VertexDto> convertVerticesToWGS84ForParcel(List<VertexDto> vertices, Parcel parcel) {
+        if (vertices == null || vertices.isEmpty()) {
+            return vertices;
+        }
+        
+        return vertices.stream().map(vertex -> {
+            try {
+                // Utiliser le service de conversion avec configuration automatique du pays
+                double[] wgs84 = coordinateCalculationService.lambertToWGS84ForParcel(
+                    vertex.lambertX(), vertex.lambertY(), parcel);
+                return new VertexDto(vertex.seq(), vertex.lambertX(), vertex.lambertY(), 
+                    wgs84[1], wgs84[0]); // longitude, latitude
+            } catch (Exception e) {
+                log.warn("Erreur conversion coordonnées pour vertex parcelle {}: {}", vertex.seq(), e.getMessage());
+                return vertex; // Retourner le vertex original en cas d'erreur
+            }
+        }).toList();
     }
     
     /**

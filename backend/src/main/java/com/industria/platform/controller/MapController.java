@@ -228,7 +228,7 @@ public class MapController {
                             Geometry geom = reader.read(z.getGeometry());
                             Geometry simplified = DouglasPeuckerSimplifier.simplify(geom, zoomToTolerance(zoom));
                             for (Coordinate c : simplified.getCoordinates()) {
-                                double[] wgs = coordinateService.lambertToWGS84(c.getX(), c.getY());
+                                double[] wgs = coordinateService.lambertToWGS84ForZone(c.getX(), c.getY(), z);
                                 coords.add(new double[]{wgs[1], wgs[0]}); // lat, lon
                             }
                             log.info("Using WKT geometry for zone {}", z.getId());

@@ -235,9 +235,9 @@ export default function ZonePage() {
                   
                   {zone.price && (
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                      <div className="font-semibold text-white/80">Prix</div>
+                      <div className="font-semibold text-white/80">A partir de</div>
                       <div className="text-lg font-bold">
-                        {zone.price.toLocaleString()} DH
+                        {zone.price.toLocaleString()} {zone.countryCurrency || 'DH'}
                         {zone.priceType === 'PER_SQUARE_METER' && '/m²'}
                         {zone.priceType === 'FIXED_PRICE' && ' (prix fixe)'}
                       </div>
@@ -480,17 +480,6 @@ export default function ZonePage() {
                                 <div className="font-bold text-yellow-800">{parcel.setback}m</div>
                               </div>
                             )}
-                          </div>
-                        )}
-
-                        {/* Prix de la parcelle si disponible */}
-                        {parcel.price && (
-                          <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-                            <div className="flex items-center gap-2">
-                              <DynamicIcon name="DollarSign" className="w-4 h-4 text-indigo-600" />
-                              <span className="text-sm font-medium text-gray-700">Prix parcelle</span>
-                            </div>
-                            <span className="font-bold text-indigo-700 text-lg">{parcel.price.toLocaleString()} DH</span>
                           </div>
                         )}
 

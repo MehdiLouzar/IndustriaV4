@@ -297,6 +297,12 @@ public class ParcelController {
             log.error("Error parsing parcel geometry for {}: {}", p.getId(), e.getMessage(), e);
         }
         
+        // Récupérer la devise du pays via zone → région → pays
+        String countryCurrency = null;
+        if (p.getZone() != null && p.getZone().getRegion() != null && p.getZone().getRegion().getCountry() != null) {
+            countryCurrency = p.getZone().getRegion().getCountry().getCurrency();
+        }
+        
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -305,7 +311,8 @@ public class ParcelController {
                 p.getZone() == null ? null : p.getZone().getName(),
                 p.getZone() == null ? null : p.getZone().getAddress(),
                 p.getZone() == null ? null : p.getZone().getPrice(),
-                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()));
+                p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()),
+                countryCurrency);
     }
 
     private void updateEntity(Parcel p, ParcelDto dto) {

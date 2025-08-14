@@ -235,25 +235,31 @@ WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1')
 UNION ALL
 
 -- Zone en France - Parc Industriel Lyon Sud (zone agrandie - 2km x 2km)
+-- Utilisation du système Lambert 93 (EPSG:2154) pour la France
+-- Coordonnées Lambert 93 réelles pour la région de Lyon
 SELECT 
     'zone-lyon-sud', 'Parc Industriel Lyon Sud', 'Zone industrielle moderne près de Lyon avec accès autoroutier', 'Lyon Sud, Rhône, France',
     4000000, 150, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
-    ST_SetSRID(ST_GeomFromText('POLYGON((4.8200 45.7500, 4.8400 45.7500, 4.8400 45.7700, 4.8200 45.7700, 4.8200 45.7500))'), 4326),
-    4326,
-    45.7600, 4.8300, -- Centre de la zone agrandie
+    ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
     'zt-public', 'region-ara', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-lyon-sud')
 
 UNION ALL
 
--- Zone en Algérie - Zone Industrielle Oran (zone agrandie - 2km x 2km)
+-- Zone en Algérie - Zone Industrielle Oran (zone agrandie - 2km x 2km) 
+-- Utilisation du système UTM Zone 31N (EPSG:31491) pour l'Algérie
+-- Coordonnées UTM Zone 31N réelles pour Oran
 SELECT 
     'zone-oran-ouest', 'Zone Industrielle Oran Ouest', 'Zone industrielle d''Oran avec infrastructures modernes', 'Oran Ouest, Algérie',
     4000000, 8000, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-    ST_SetSRID(ST_GeomFromText('POLYGON((-0.6500 35.6800, -0.6300 35.6800, -0.6300 35.7000, -0.6500 35.7000, -0.6500 35.6800))'), 4326),
-    4326,
-    35.6900, -0.6400, -- Centre de la zone agrandie
+    ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240000 3955000, 242000 3955000, 242000 3957000, 240000 3957000, 240000 3955000))'), 31491)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone,
     'zt-free-zone', 'region-ora', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-oran-ouest');
@@ -302,12 +308,13 @@ WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-3')
 
 UNION ALL
 
--- Parcelles France - Lyon Sud (parcelles agrandies dans la zone)
+-- Parcelles France - Lyon Sud (parcelles agrandies dans la zone en Lambert 93)
 SELECT 
     'parcel-lyon-1', 'LYS-001', 500000, 'LIBRE', false, 0.8, 1.6, 25.0, 8.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((4.8220 45.7520, 4.8280 45.7520, 4.8280 45.7580, 4.8220 45.7580, 4.8220 45.7520))'), 4326),
-    4326,
-    45.7550, 4.8250, -- Parcelle 1 - coin sud-ouest
+    ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6517200, 842800 6517200, 842800 6517800, 842200 6517800, 842200 6517200))'), 2154)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-1')
 
@@ -316,9 +323,10 @@ UNION ALL
 -- Parcelle Lyon 2
 SELECT 
     'parcel-lyon-2', 'LYS-002', 600000, 'RESERVEE', true, 0.7, 1.5, 20.0, 6.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((4.8300 45.7520, 4.8380 45.7520, 4.8380 45.7580, 4.8300 45.7580, 4.8300 45.7520))'), 4326),
-    4326,
-    45.7550, 4.8340, -- Parcelle 2 - coin sud-est
+    ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((843000 6517200, 843600 6517200, 843600 6517800, 843000 6517800, 843000 6517200))'), 2154)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-2')
 
@@ -327,20 +335,22 @@ UNION ALL
 -- Parcelle Lyon 3
 SELECT 
     'parcel-lyon-3', 'LYS-003', 700000, 'LIBRE', false, 0.9, 1.8, 30.0, 8.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((4.8220 45.7600, 4.8320 45.7600, 4.8320 45.7680, 4.8220 45.7680, 4.8220 45.7600))'), 4326),
-    4326,
-    45.7640, 4.8270, -- Parcelle 3 - coin nord-ouest
+    ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154),
+    2154,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842200 6518000, 843000 6518000, 843000 6518800, 842200 6518800, 842200 6518000))'), 2154)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-lyon-sud', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-lyon-3')
 
 UNION ALL
 
--- Parcelles Algérie - Oran Ouest (parcelles agrandies dans la zone)
+-- Parcelles Algérie - Oran Ouest (parcelles agrandies dans la zone en UTM Zone 31N)
 SELECT 
     'parcel-oran-1', 'ORW-001', 800000, 'LIBRE', false, 0.7, 1.4, 22.0, 7.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((-0.6480 35.6820, -0.6420 35.6820, -0.6420 35.6880, -0.6480 35.6880, -0.6480 35.6820))'), 4326),
-    4326,
-    35.6850, -0.6450, -- Parcelle 1 - coin sud-ouest
+    ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3955200, 240800 3955200, 240800 3955800, 240200 3955800, 240200 3955200))'), 31491)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-1')
 
@@ -349,9 +359,10 @@ UNION ALL
 -- Parcelle Oran 2
 SELECT 
     'parcel-oran-2', 'ORW-002', 600000, 'LIBRE', true, 0.6, 1.2, 18.0, 5.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((-0.6400 35.6820, -0.6340 35.6820, -0.6340 35.6880, -0.6400 35.6880, -0.6400 35.6820))'), 4326),
-    4326,
-    35.6850, -0.6370, -- Parcelle 2 - coin sud-est
+    ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((241000 3955200, 241600 3955200, 241600 3955800, 241000 3955800, 241000 3955200))'), 31491)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-2')
 
@@ -360,9 +371,10 @@ UNION ALL
 -- Parcelle Oran 3
 SELECT 
     'parcel-oran-3', 'ORW-003', 900000, 'VENDU', false, 0.8, 1.6, 25.0, 8.0,
-    ST_SetSRID(ST_GeomFromText('POLYGON((-0.6480 35.6900, -0.6380 35.6900, -0.6380 35.6980, -0.6480 35.6980, -0.6480 35.6900))'), 4326),
-    4326,
-    35.6940, -0.6430, -- Parcelle 3 - partie nord
+    ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491),
+    31491,
+    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491)), 4326)),
+    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((240200 3956000, 241200 3956000, 241200 3956800, 240200 3956800, 240200 3956000))'), 31491)), 4326)),
     NOW(), NOW(), NULL::timestamp without time zone, 'zone-oran-ouest', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM parcel WHERE id = 'parcel-oran-3');
 
