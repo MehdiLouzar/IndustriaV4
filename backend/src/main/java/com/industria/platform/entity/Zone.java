@@ -111,11 +111,11 @@ public class Zone {
     private User createdBy;
 
     /** Activités autorisées dans cette zone */
-    @OneToMany(mappedBy = "zone")
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ZoneActivity> activities;
 
     /** Équipements disponibles dans cette zone */
-    @OneToMany(mappedBy = "zone")
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ZoneAmenity> amenities;
 
     /** Images associées à cette zone */

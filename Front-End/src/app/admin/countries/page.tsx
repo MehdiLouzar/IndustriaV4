@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectTrigger,
@@ -28,6 +30,16 @@ interface Country {
   spatialReferenceSystemName?: string
 }
 
+interface SpatialReferenceSystem {
+  id: string
+  name: string
+  srid: number
+  proj4text: string
+  description?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 export default function CountriesAdmin() {
   const router = useRouter()
   const [items, setItems] = useState<Country[]>([])
@@ -46,6 +58,24 @@ export default function CountriesAdmin() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState('countries')
+
+  // États pour les systèmes de référence spatiale
+  const [srsItems, setSrsItems] = useState<SpatialReferenceSystem[]>([])
+  const [srsCurrentPage, setSrsCurrentPage] = useState(1)
+  const [srsTotalPages, setSrsTotalPages] = useState(1)
+  const [srsSearchTerm, setSrsSearchTerm] = useState('')
+  const [srsOpen, setSrsOpen] = useState(false)
+  const [srsForm, setSrsForm] = useState<SpatialReferenceSystem>({ 
+    id: '', 
+    name: '', 
+    srid: 0, 
+    proj4text: '',
+    description: ''
+  })
+  const [srsErrors, setSrsErrors] = useState<Record<string, string>>({})
+  const [srsIsSubmitting, setSrsIsSubmitting] = useState(false)
+  const [availableSrs, setAvailableSrs] = useState<SpatialReferenceSystem[]>([])
 
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
     const params = new URLSearchParams({
@@ -69,11 +99,54 @@ export default function CountriesAdmin() {
       setItems([])
     }
   }, [currentPage, itemsPerPage, searchTerm])
-  
-  useEffect(() => { load(currentPage) }, [currentPage, load])
-  
 
-  // Effet pour la recherche
+  // Fonction de chargement des systèmes de référence spatiale
+  const loadSrs = useCallback(async (page = srsCurrentPage, search = srsSearchTerm) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: itemsPerPage.toString()
+    })
+    
+    if (search.trim()) {
+      params.append('search', search.trim())
+    }
+    
+    const res = await fetchApi<ListResponse<SpatialReferenceSystem>>(
+      `/api/spatial-reference-systems?${params.toString()}`
+    ).catch(() => null)
+    if (res) {
+      const arr = Array.isArray(res.items) ? res.items : []
+      setSrsItems(arr)
+      setSrsTotalPages(res.totalPages || 1)
+      setSrsCurrentPage(res.page || 1)
+    } else {
+      setSrsItems([])
+    }
+  }, [srsCurrentPage, itemsPerPage, srsSearchTerm])
+
+  // Charger tous les SRS disponibles pour le dropdown
+  const loadAvailableSrs = useCallback(async () => {
+    try {
+      const res = await fetchApi<SpatialReferenceSystem[]>('/api/spatial-reference-systems/all')
+      setAvailableSrs(Array.isArray(res) ? res : [])
+    } catch (error) {
+      console.error('Erreur chargement SRS:', error)
+      setAvailableSrs([])
+    }
+  }, [])
+  
+  useEffect(() => { 
+    load(currentPage) 
+    loadAvailableSrs()
+  }, [currentPage, load, loadAvailableSrs])
+  
+  useEffect(() => { 
+    if (activeTab === 'srs') {
+      loadSrs(srsCurrentPage) 
+    }
+  }, [srsCurrentPage, loadSrs, activeTab])
+
+  // Effet pour la recherche des pays
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
@@ -82,6 +155,16 @@ export default function CountriesAdmin() {
 
     return () => clearTimeout(timeoutId)
   }, [searchTerm, load])
+
+  // Effet pour la recherche des SRS
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSrsCurrentPage(1)
+      loadSrs(1, srsSearchTerm)
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [srsSearchTerm, loadSrs])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -222,20 +305,169 @@ export default function CountriesAdmin() {
     setOpen(true)
   }
 
+  // Handlers pour les systèmes de référence spatiale
+  const handleSrsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    if (name === 'srid') {
+      setSrsForm({ ...srsForm, srid: value ? parseInt(value) : 0 })
+    } else {
+      setSrsForm({ ...srsForm, [name]: value })
+    }
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (srsErrors[name]) {
+      setSrsErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  // Validation pour les SRS
+  const validateSrsForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!srsForm.name.trim()) {
+      newErrors.name = 'Le nom du système est obligatoire'
+    } else if (srsForm.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation du SRID (obligatoire)
+    if (!srsForm.srid || srsForm.srid <= 0) {
+      newErrors.srid = 'Le SRID doit être un nombre positif'
+    }
+    
+    // Validation du proj4text (obligatoire)
+    if (!srsForm.proj4text.trim()) {
+      newErrors.proj4text = 'La chaîne Proj4 est obligatoire'
+    }
+    
+    // Vérification d'unicité du nom (si nouveau SRS)
+    if (!srsForm.id && srsForm.name.trim()) {
+      try {
+        const response = await fetchApi(`/api/spatial-reference-systems/check-name?name=${encodeURIComponent(srsForm.name.trim())}`)
+        if (response && response.exists) {
+          newErrors.name = 'Un système avec ce nom existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      }
+    }
+    
+    // Vérification d'unicité du SRID (si nouveau SRS)
+    if (!srsForm.id && srsForm.srid) {
+      try {
+        const response = await fetchApi(`/api/spatial-reference-systems/check-srid?srid=${srsForm.srid}`)
+        if (response && response.exists) {
+          newErrors.srid = 'Un système avec ce SRID existe déjà'
+        }
+      } catch (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du SRID:', error)
+      }
+    }
+    
+    setSrsErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  async function submitSrs(e: React.FormEvent) {
+    e.preventDefault()
+    
+    setSrsIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateSrsForm()
+      if (!isValid) {
+        setSrsIsSubmitting(false)
+        return
+      }
+      
+      const body = {
+        name: srsForm.name.trim(),
+        srid: srsForm.srid,
+        proj4text: srsForm.proj4text.trim(),
+        description: srsForm.description?.trim() || null
+      }
+      
+      if (srsForm.id) {
+        await fetchApi(`/api/spatial-reference-systems/${srsForm.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      } else {
+        await fetchApi('/api/spatial-reference-systems', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+      }
+      
+      setSrsForm({ 
+        id: '', 
+        name: '', 
+        srid: 0, 
+        proj4text: '',
+        description: ''
+      })
+      setSrsErrors({})
+      setSrsOpen(false)
+      loadSrs()
+      loadAvailableSrs() // Recharger pour les dropdowns
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error)
+      setSrsErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setSrsIsSubmitting(false)
+    }
+  }
+
+  function editSrs(it: SpatialReferenceSystem) {
+    setSrsForm(it)
+    setSrsOpen(true)
+  }
+
+  async function deleteSrs(id: string) {
+    await fetchApi(`/api/spatial-reference-systems/${id}`, { method: 'DELETE' })
+    loadSrs()
+    loadAvailableSrs() // Recharger pour les dropdowns
+  }
+
+  function addNewSrs() {
+    setSrsForm({ 
+      id: '', 
+      name: '', 
+      srid: 0, 
+      proj4text: '',
+      description: ''
+    })
+    setSrsErrors({})
+    setSrsOpen(true)
+  }
+
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center gap-4">
-        <h1 className="text-xl font-bold">Gestion des Pays</h1>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Rechercher par nom, code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
-          />
-          <Button onClick={addNew}>Ajouter</Button>
-        </div>
-      </div>
+      <h1 className="text-xl font-bold">Gestion des Pays et Systèmes de Coordonnées</h1>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="countries">Pays</TabsTrigger>
+          <TabsTrigger value="srs">Systèmes de Coordonnées</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="countries" className="space-y-4">
+          <div className="flex justify-between items-center gap-4">
+            <h2 className="text-lg font-semibold">Liste des Pays</h2>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Rechercher par nom, code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64"
+              />
+              <Button onClick={addNew}>Ajouter un pays</Button>
+            </div>
+          </div>
       <Card>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full text-sm">
@@ -285,12 +517,84 @@ export default function CountriesAdmin() {
         </CardContent>
       </Card>
 
-      <Pagination
-        totalItems={Array.isArray(items) ? items.length : 0}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+          <Pagination
+            totalItems={Array.isArray(items) ? items.length : 0}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+          />
+        </TabsContent>
+        
+        <TabsContent value="srs" className="space-y-4">
+          <div className="flex justify-between items-center gap-4">
+            <h2 className="text-lg font-semibold">Systèmes de Référence Spatiale</h2>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Rechercher par nom, SRID..."
+                value={srsSearchTerm}
+                onChange={(e) => setSrsSearchTerm(e.target.value)}
+                className="w-64"
+              />
+              <Button onClick={addNewSrs}>Ajouter un système</Button>
+            </div>
+          </div>
+          
+          <Card>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-2">Nom</th>
+                    <th className="p-2">SRID</th>
+                    <th className="p-2">Description</th>
+                    <th className="p-2">Proj4</th>
+                    <th className="p-2 w-32"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Array.isArray(srsItems) ? srsItems : [])
+                    .slice((srsCurrentPage - 1) * itemsPerPage, srsCurrentPage * itemsPerPage)
+                    .map((srs) => (
+                    <tr key={srs.id} className="border-b last:border-0">
+                      <td className="p-2 align-top font-medium">{srs.name}</td>
+                      <td className="p-2 align-top">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          EPSG:{srs.srid}
+                        </span>
+                      </td>
+                      <td className="p-2 align-top max-w-xs">
+                        <div className="truncate text-xs text-gray-600">
+                          {srs.description || '-'}
+                        </div>
+                      </td>
+                      <td className="p-2 align-top max-w-sm">
+                        <div className="truncate text-xs font-mono text-gray-500">
+                          {srs.proj4text}
+                        </div>
+                      </td>
+                      <td className="p-2 space-x-2 whitespace-nowrap">
+                        <Button size="sm" onClick={() => editSrs(srs)}>Éditer</Button>
+                        <DeleteConfirmDialog
+                          itemName={srs.name}
+                          onConfirm={() => deleteSrs(srs.id)}
+                          description={`Êtes-vous sûr de vouloir supprimer le système "${srs.name}" (EPSG:${srs.srid}) ? Cette action est irréversible et peut affecter les pays qui l'utilisent.`}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+
+          <Pagination
+            totalItems={Array.isArray(srsItems) ? srsItems.length : 0}
+            itemsPerPage={itemsPerPage}
+            currentPage={srsCurrentPage}
+            onPageChange={setSrsCurrentPage}
+          />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -359,49 +663,45 @@ export default function CountriesAdmin() {
               </p>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="spatialReferenceSystemName">Système de coordonnées</Label>
-                <Input 
-                  id="spatialReferenceSystemName" 
-                  name="spatialReferenceSystemName" 
-                  value={form.spatialReferenceSystemName || ''} 
-                  onChange={handleChange} 
-                  className={errors.spatialReferenceSystemName ? 'border-red-500' : ''}
-                  placeholder="Ex: Lambert 93, WGS84, UTM Zone 31N"
-                  maxLength={100}
-                />
-                {errors.spatialReferenceSystemName && (
-                  <span className="text-red-500 text-sm mt-1">{errors.spatialReferenceSystemName}</span>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Nom du système de projection utilisé (optionnel)
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="defaultSrid">SRID (Code EPSG)</Label>
-                <Input 
-                  id="defaultSrid" 
-                  name="defaultSrid" 
-                  type="number"
-                  value={form.defaultSrid || ''} 
-                  onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value) : undefined
-                    setForm(prev => ({ ...prev, defaultSrid: value }))
-                  }} 
-                  className={errors.defaultSrid ? 'border-red-500' : ''}
-                  placeholder="Ex: 4326, 2154, 26191"
-                  min="1"
-                  max="99999"
-                />
-                {errors.defaultSrid && (
-                  <span className="text-red-500 text-sm mt-1">{errors.defaultSrid}</span>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Code EPSG du système (optionnel)
-                </p>
-              </div>
+            <div>
+              <Label htmlFor="srs-select">Système de référence spatiale</Label>
+              <Select 
+                value={form.defaultSrid?.toString() || 'none'} 
+                onValueChange={(value) => {
+                  if (value === 'none') {
+                    setForm(prev => ({ 
+                      ...prev, 
+                      defaultSrid: undefined,
+                      spatialReferenceSystemName: ''
+                    }))
+                  } else {
+                    const selectedSrs = availableSrs.find(s => s.srid.toString() === value)
+                    setForm(prev => ({ 
+                      ...prev, 
+                      defaultSrid: parseInt(value),
+                      spatialReferenceSystemName: selectedSrs?.name || ''
+                    }))
+                  }
+                }}
+              >
+                <SelectTrigger className={errors.defaultSrid ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Sélectionner un système de coordonnées (optionnel)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun système sélectionné</SelectItem>
+                  {availableSrs.map((srs) => (
+                    <SelectItem key={srs.id} value={srs.srid.toString()}>
+                      {srs.name} (EPSG:{srs.srid})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.defaultSrid && (
+                <span className="text-red-500 text-sm mt-1">{errors.defaultSrid}</span>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Système de coordonnées par défaut pour ce pays
+              </p>
             </div>
             
             <div className="flex gap-2 pt-4">
@@ -430,6 +730,119 @@ export default function CountriesAdmin() {
                 className="flex-1"
               >
                 {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={srsOpen} onOpenChange={setSrsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{srsForm.id ? 'Modifier un système de référence spatiale' : 'Nouveau système de référence spatiale'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submitSrs} className="space-y-4">
+            {srsErrors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {srsErrors.submit}
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="srs-name">Nom du système *</Label>
+              <Input 
+                id="srs-name" 
+                name="name" 
+                value={srsForm.name} 
+                onChange={handleSrsChange} 
+                required 
+                className={srsErrors.name ? 'border-red-500' : ''}
+                placeholder="Ex: Lambert 93, WGS 84, UTM Zone 31N"
+                maxLength={100}
+              />
+              {srsErrors.name && <span className="text-red-500 text-sm mt-1">{srsErrors.name}</span>}
+            </div>
+            
+            <div>
+              <Label htmlFor="srs-srid">SRID (Code EPSG) *</Label>
+              <Input 
+                id="srs-srid" 
+                name="srid" 
+                type="number"
+                value={srsForm.srid || ''} 
+                onChange={handleSrsChange} 
+                required 
+                className={srsErrors.srid ? 'border-red-500' : ''}
+                placeholder="Ex: 4326, 2154, 26191"
+                min="1"
+                max="99999"
+              />
+              {srsErrors.srid && <span className="text-red-500 text-sm mt-1">{srsErrors.srid}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Code EPSG unique pour ce système de coordonnées
+              </p>
+            </div>
+            
+            <div>
+              <Label htmlFor="srs-proj4">Chaîne Proj4 *</Label>
+              <Textarea 
+                id="srs-proj4" 
+                name="proj4text" 
+                value={srsForm.proj4text} 
+                onChange={handleSrsChange} 
+                required 
+                className={srsErrors.proj4text ? 'border-red-500' : ''}
+                placeholder="Ex: +proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+                rows={3}
+              />
+              {srsErrors.proj4text && <span className="text-red-500 text-sm mt-1">{srsErrors.proj4text}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Définition complète de la projection en format Proj4
+              </p>
+            </div>
+            
+            <div>
+              <Label htmlFor="srs-description">Description</Label>
+              <Textarea 
+                id="srs-description" 
+                name="description" 
+                value={srsForm.description || ''} 
+                onChange={handleSrsChange} 
+                className={srsErrors.description ? 'border-red-500' : ''}
+                placeholder="Description détaillée du système de coordonnées"
+                rows={2}
+              />
+              {srsErrors.description && <span className="text-red-500 text-sm mt-1">{srsErrors.description}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Description optionnelle du système et de ses usages
+              </p>
+            </div>
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setSrsOpen(false)
+                  setSrsErrors({})
+                  setSrsForm({ 
+                    id: '', 
+                    name: '', 
+                    srid: 0, 
+                    proj4text: '',
+                    description: ''
+                  })
+                }}
+                disabled={srsIsSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={srsIsSubmitting}
+                className="flex-1"
+              >
+                {srsIsSubmitting ? 'Enregistrement...' : (srsForm.id ? 'Mettre à jour' : 'Créer')}
               </Button>
             </div>
           </form>

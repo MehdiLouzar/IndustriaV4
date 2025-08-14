@@ -2,6 +2,7 @@ package com.industria.platform.controller;
 
 import com.industria.platform.dto.ListResponse;
 import com.industria.platform.dto.ParcelDto;
+import com.industria.platform.dto.ParcelImageDto;
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.entity.AuditAction;
 import com.industria.platform.entity.Parcel;
@@ -303,6 +304,46 @@ public class ParcelController {
             countryCurrency = p.getZone().getRegion().getCountry().getCurrency();
         }
         
+        // Récupérer les images de la parcelle
+        List<ParcelImageDto> images = List.of();
+        String primaryImageUrl = null;
+        
+        if (p.getImages() != null && !p.getImages().isEmpty()) {
+            images = p.getImages().stream()
+                .sorted((img1, img2) -> {
+                    // Images principales d'abord, puis par ordre d'affichage
+                    if (Boolean.TRUE.equals(img1.getIsPrimary()) && !Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return -1;
+                    }
+                    if (!Boolean.TRUE.equals(img1.getIsPrimary()) && Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return 1;
+                    }
+                    return Integer.compare(
+                        img1.getDisplayOrder() != null ? img1.getDisplayOrder() : 0,
+                        img2.getDisplayOrder() != null ? img2.getDisplayOrder() : 0
+                    );
+                })
+                .map(img -> new ParcelImageDto(
+                    img.getId(),
+                    img.getFilename(),
+                    img.getOriginalFilename(),
+                    img.getContentType(),
+                    img.getFileSize(),
+                    img.getDescription(),
+                    img.getDisplayOrder(),
+                    img.getIsPrimary(),
+                    "/api/parcel-images/" + img.getId() + "/download"
+                ))
+                .toList();
+                
+            // Trouver l'URL de l'image principale
+            primaryImageUrl = images.stream()
+                .filter(img -> Boolean.TRUE.equals(img.isPrimary()))
+                .findFirst()
+                .map(ParcelImageDto::url)
+                .orElse(images.isEmpty() ? null : images.get(0).url());
+        }
+        
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -312,7 +353,7 @@ public class ParcelController {
                 p.getZone() == null ? null : p.getZone().getAddress(),
                 p.getZone() == null ? null : p.getZone().getPrice(),
                 p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()),
-                countryCurrency);
+                countryCurrency, images, primaryImageUrl);
     }
 
     private void updateEntity(Parcel p, ParcelDto dto) {

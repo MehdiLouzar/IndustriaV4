@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, memo } from 'react'
+import { useEffect, useState, useMemo, useCallback, memo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
@@ -147,7 +147,20 @@ export default function ZonesAdmin() {
   const [zones, setZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // Refs pour éviter les problèmes de closures
+  const currentPageRef = useRef(currentPage)
+  const searchTermRef = useRef(searchTerm)
+  
+  useEffect(() => {
+    currentPageRef.current = currentPage
+  }, [currentPage])
+  
+  useEffect(() => {
+    searchTermRef.current = searchTerm
+  }, [searchTerm])
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
@@ -208,14 +221,17 @@ export default function ZonesAdmin() {
     }
   }, [])
 
-  const loadZones = useCallback(async (page = currentPage, search = searchTerm) => {
+  const loadZones = useCallback(async (page?: number, search?: string) => {
+    const targetPage = page ?? currentPageRef.current
+    const targetSearch = search ?? searchTermRef.current
+    
     const params = new URLSearchParams({
-      page: page.toString(),
+      page: targetPage.toString(),
       limit: itemsPerPage.toString()
     })
     
-    if (search.trim()) {
-      params.append('search', search.trim())
+    if (targetSearch.trim()) {
+      params.append('search', targetSearch.trim())
     }
     
     const response = await fetchApi<ListResponse<Zone>>(
@@ -231,8 +247,9 @@ export default function ZonesAdmin() {
     }
     setZones(zonesData)
     setTotalPages(response?.totalPages ?? 1)
+    setTotalItems(response?.totalItems ?? 0)
     setCurrentPage(response?.page ?? 1)
-  }, [currentPage, itemsPerPage, searchTerm])
+  }, [itemsPerPage]) // Seule dépendance stable
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -246,15 +263,19 @@ export default function ZonesAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
 
-  // Effet pour la recherche
+  // Effet pour la recherche  
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
-      loadZones(1, searchTerm)
+      if (currentPage !== 1) {
+        setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      } else {
+        // Si on est déjà à la page 1, charger directement
+        loadZones(1, searchTerm)
+      }
     }, 300) // Debounce de 300ms
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, loadZones])
+  }, [searchTerm, loadZones]) // Maintenant loadZones est stable
 
 
   useEffect(() => {
@@ -453,9 +474,9 @@ export default function ZonesAdmin() {
         isPrimary: boolean;
         displayOrder: number;
       }>>(`/api/zones/${zoneId}/images`)
-      setExistingImages(images || [])
+      setExistingImages(Array.isArray(images) ? images : [])
     } catch (error) {
-      console.error('Erreur lors du chargement des images:', error)
+      console.error(`Erreur lors du chargement des images pour zone ${zoneId}:`, error)
       setExistingImages([])
     }
   }, [])
@@ -733,7 +754,7 @@ export default function ZonesAdmin() {
 
       {totalPages > 1 && (
         <Pagination
-          totalItems={totalPages * itemsPerPage}
+          totalItems={totalItems}
           itemsPerPage={itemsPerPage}
           currentPage={currentPage}
           onPageChange={setCurrentPage}
@@ -996,11 +1017,11 @@ export default function ZonesAdmin() {
               <Input type="file" multiple onChange={handleFiles} accept="image/*" />
               
               {/* Images existantes */}
-              {existingImages.length > 0 && (
+              {Array.isArray(existingImages) && existingImages.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">Images existantes:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {existingImages.map((img) => (
+                    {(Array.isArray(existingImages) ? existingImages : []).map((img) => (
                       <div key={img.id} className="relative">
                         <img 
                           src={`/api/zones/${form.id}/images/${img.id}/file`} 
@@ -1028,11 +1049,11 @@ export default function ZonesAdmin() {
               )}
 
               {/* Nouvelles images à uploader */}
-              {images.length > 0 && (
+              {Array.isArray(images) && images.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">Nouvelles images à ajouter:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {images.map((img, idx) => (
+                    {(Array.isArray(images) ? images : []).map((img, idx) => (
                       <div key={idx} className="relative">
                         <img src={img.url} className="w-24 h-24 object-cover rounded" alt={`Nouvelle image ${idx + 1}`} />
                         <button
@@ -1049,7 +1070,7 @@ export default function ZonesAdmin() {
                 </div>
               )}
 
-              {images.length === 0 && existingImages.length === 0 && (
+              {(!Array.isArray(images) || images.length === 0) && (!Array.isArray(existingImages) || existingImages.length === 0) && (
                 <p className="text-gray-500 text-xs mt-1">Aucune image. Vous pouvez ajouter des images pour illustrer cette zone.</p>
               )}
             </div>

@@ -132,33 +132,56 @@ export function getCurrentParameters(): ProjectionParams | null {
 }
 
 /**
- * Convertit les coordonnées Lambert vers WGS84 selon le pays configuré
- * ATTENTION: Cette conversion est approximative
+ * Convertit les coordonnées Lambert vers WGS84 en utilisant le backend
+ * Toutes les conversions sont effectuées côté serveur avec les données de la DB
  */
-export function lambertToWGS84(lambert: LambertCoordinate): WGS84Coordinate {
-  // Conversion approximative - À remplacer par une vraie transformation de projection
-  // Pour une conversion précise, utiliser une bibliothèque comme proj4js
-  
-  const { x, y } = lambert
-  
-  // Transformation approximative avec les paramètres actuels
-  const longitude = currentParams.centralMeridian + (x - currentParams.falseEasting) / 111320
-  const latitude = currentParams.centralParallel + (y - currentParams.falseNorthing) / 110540
-  
-  return {
-    longitude: Math.round(longitude * 1000000) / 1000000, // 6 décimales
-    latitude: Math.round(latitude * 1000000) / 1000000   // 6 décimales
+export async function lambertToWGS84(lambert: LambertCoordinate, srid?: number): Promise<WGS84Coordinate | null> {
+  try {
+    const response = await fetch('/api/coordinates/convert', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        x: lambert.x,
+        y: lambert.y,
+        sourceSrid: srid || (currentParams?.srid)
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return {
+      longitude: data.longitude,
+      latitude: data.latitude
+    }
+    
+  } catch (error) {
+    console.error('Erreur lors de la conversion des coordonnées:', error)
+    return null
   }
 }
 
 /**
  * Convertit un tableau de coordonnées Lambert vers WGS84
  */
-export function convertVerticesLambertToWGS84(vertices: LambertCoordinate[]): CoordinateWithBoth[] {
-  return vertices.map(vertex => ({
-    ...vertex,
-    ...lambertToWGS84(vertex)
-  }))
+export async function convertVerticesLambertToWGS84(vertices: LambertCoordinate[], srid?: number): Promise<CoordinateWithBoth[]> {
+  const results: CoordinateWithBoth[] = []
+  
+  for (const vertex of vertices) {
+    const wgs84 = await lambertToWGS84(vertex, srid)
+    if (wgs84) {
+      results.push({
+        ...vertex,
+        ...wgs84
+      })
+    }
+  }
+  
+  return results
 }
 
 /**
@@ -181,9 +204,9 @@ export function calculateCentroid(vertices: LambertCoordinate[]): LambertCoordin
 /**
  * Calcule le centre d'un polygone et le convertit en WGS84
  */
-export function calculateCentroidWGS84(vertices: LambertCoordinate[]): WGS84Coordinate {
+export async function calculateCentroidWGS84(vertices: LambertCoordinate[], srid?: number): Promise<WGS84Coordinate | null> {
   const centroidLambert = calculateCentroid(vertices)
-  return lambertToWGS84(centroidLambert)
+  return await lambertToWGS84(centroidLambert, srid)
 }
 
 /**
@@ -237,68 +260,80 @@ export async function testConversion(lambertX: number, lambertY: number): Promis
 }
 
 /**
- * Valide si des coordonnées Lambert sont dans les limites du pays configuré
+ * Valide si des coordonnées Lambert sont dans les limites du système configuré
  */
 export function validateLambertCoordinates(coord: LambertCoordinate): boolean {
+  if (!currentParams) return false
   return coord.x >= currentParams.minX && coord.x <= currentParams.maxX && 
          coord.y >= currentParams.minY && coord.y <= currentParams.maxY
 }
 
 /**
- * Valide si des coordonnées WGS84 sont dans les limites du pays configuré
+ * Valide si des coordonnées WGS84 sont dans les limites du système configuré
  */
 export function validateWGS84Coordinates(coord: WGS84Coordinate): boolean {
+  if (!currentParams) return false
   return coord.longitude >= currentParams.minLongitude && coord.longitude <= currentParams.maxLongitude && 
          coord.latitude >= currentParams.minLatitude && coord.latitude <= currentParams.maxLatitude
 }
 
 /**
- * Retourne la liste des pays supportés
+ * Récupère la liste des pays supportés depuis la base de données
  */
-export function getSupportedCountries(): string[] {
-  return Object.keys(COUNTRY_PARAMS)
-}
-
-/**
- * Retourne les informations détaillées des pays supportés
- */
-export function getCountriesInfo(): Record<string, {name: string, code: string, description: string}> {
-  return {
-    morocco: {
-      name: 'Maroc',
-      code: 'MA',
-      description: 'Maroc - Lambert Maroc'
-    },
-    france: {
-      name: 'France', 
-      code: 'FR',
-      description: 'France - Lambert 93'
-    },
-    algeria: {
-      name: 'Algérie',
-      code: 'DZ', 
-      description: 'Algérie - Lambert Algérie'
+export async function getSupportedCountries(): Promise<string[]> {
+  try {
+    const response = await fetch('/api/countries')
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
     }
+    
+    const data = await response.json()
+    return data.items ? data.items.map((country: any) => country.code) : []
+    
+  } catch (error) {
+    console.error('Erreur lors de la récupération des pays:', error)
+    return []
   }
 }
 
 /**
- * API pour récupérer les pays supportés depuis le backend
+ * Récupère les informations détaillées des pays depuis la base de données
+ */
+export async function getCountriesInfo(): Promise<Record<string, {name: string, code: string, description: string, srid: number}>> {
+  try {
+    const response = await fetch('/api/countries')
+    if (!response.ok) {
+      throw new Error(`Erreur HTTP: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const countries: Record<string, {name: string, code: string, description: string, srid: number}> = {}
+    
+    if (data.items) {
+      data.items.forEach((country: any) => {
+        countries[country.code.toLowerCase()] = {
+          name: country.name,
+          code: country.code,
+          description: `${country.name} - SRID ${country.defaultSrid}`,
+          srid: country.defaultSrid
+        }
+      })
+    }
+    
+    return countries
+    
+  } catch (error) {
+    console.error('Erreur lors de la récupération des informations des pays:', error)
+    return {}
+  }
+}
+
+/**
+ * API pour récupérer les pays supportés depuis le backend (utilise getCountriesInfo)
  */
 export async function fetchSupportedCountries(): Promise<{countries: string[], descriptions: Record<string, string>}> {
   try {
-    const response = await fetch('/api/map/config/countries')
-    const data = await response.json()
-    
-    if (data.success) {
-      return {
-        countries: data.countries,
-        descriptions: data.descriptions
-      }
-    }
-    
-    // Fallback aux données statiques
-    const countriesInfo = getCountriesInfo()
+    const countriesInfo = await getCountriesInfo()
     return {
       countries: Object.keys(countriesInfo),
       descriptions: Object.fromEntries(
@@ -307,32 +342,9 @@ export async function fetchSupportedCountries(): Promise<{countries: string[], d
     }
   } catch (error) {
     console.error('Erreur lors de la récupération des pays:', error)
-    const countriesInfo = getCountriesInfo()
     return {
-      countries: Object.keys(countriesInfo),
-      descriptions: Object.fromEntries(
-        Object.entries(countriesInfo).map(([key, info]) => [key, info.description])
-      )
+      countries: [],
+      descriptions: {}
     }
-  }
-}
-
-/**
- * API pour configurer les paramètres de pays côté backend
- */
-export async function setBackendCountryParameters(country: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/map/config/country/${country}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    
-    const data = await response.json()
-    return data.success
-  } catch (error) {
-    console.error('Erreur lors de la configuration du pays:', error)
-    return false
   }
 }

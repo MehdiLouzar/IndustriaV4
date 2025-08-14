@@ -230,9 +230,9 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   // Utiliser les images du carousel si disponibles, sinon fallback sur l'image unique
-  const displayImages = zone.images && zone.images.length > 0 ? zone.images : null
-  const hasImages = displayImages && displayImages.length > 0
-  const hasMultipleImages = displayImages && displayImages.length > 1
+  const displayImages = zone.images && Array.isArray(zone.images) && zone.images.length > 0 ? zone.images : null
+  const hasImages = Boolean(displayImages && displayImages.length > 0)
+  const hasMultipleImages = Boolean(displayImages && displayImages.length > 1)
   
   const nextImage = () => {
     if (displayImages) {
