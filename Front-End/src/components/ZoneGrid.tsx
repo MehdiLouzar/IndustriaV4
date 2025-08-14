@@ -180,10 +180,34 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
   // Fonction pour charger les images d'une zone
   const loadZoneImages = useCallback(async (zoneId: string): Promise<ZoneImage[]> => {
     try {
-      const images = await fetchPublicApi<ZoneImage[]>(`/api/zones/${zoneId}/images`)
-      return images || []
+      // Tentative avec l'API publique
+      const response = await fetch(`/api/zones/${zoneId}/images`)
+      
+      if (!response.ok) {
+        return []
+      }
+      
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        return []
+      }
+      
+      const responseText = await response.text()
+      
+      if (!responseText.trim()) {
+        return []
+      }
+      
+      let images: ZoneImage[]
+      try {
+        images = JSON.parse(responseText)
+      } catch (jsonError) {
+        console.error(`❌ Erreur parsing JSON pour zone ${zoneId}:`, jsonError)
+        return []
+      }
+      
+      return Array.isArray(images) ? images : []
     } catch (error) {
-      console.warn(`Erreur chargement images zone ${zoneId}:`, error)
       return []
     }
   }, [])

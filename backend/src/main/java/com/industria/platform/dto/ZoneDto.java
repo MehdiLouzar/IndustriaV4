@@ -30,6 +30,8 @@ import java.util.List;
  * @param countryId identifiant du pays
  * @param countryCode code du pays (ex: MA, FR, DZ)
  * @param countryCurrency devise du pays (ex: MAD, EUR, DZD)
+ * @param images liste des images de la zone
+ * @param primaryImageUrl URL de l'image principale
  * 
  * @author Industria Platform Team
  * @version 1.0
@@ -56,4 +58,6 @@ public record ZoneDto(String id,
                       List<ParcelDto> parcels,
                       String countryId,
                       String countryCode,
-                      String countryCurrency) {}
+                      String countryCurrency,
+                      List<ZoneImageDto> images,
+                      String primaryImageUrl) {}

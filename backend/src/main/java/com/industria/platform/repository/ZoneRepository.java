@@ -80,4 +80,12 @@ public interface ZoneRepository extends JpaRepository<Zone, String> {
      * @return nombre de zones dans la région
      */
     long countByRegionId(String regionId);
+    
+    /**
+     * Vérifie si une zone avec le nom donné existe (insensible à la casse).
+     * 
+     * @param name nom de la zone à vérifier
+     * @return true si une zone avec ce nom existe, false sinon
+     */
+    boolean existsByNameIgnoreCase(String name);
 }

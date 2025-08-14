@@ -7,6 +7,7 @@ import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,7 +31,7 @@ public class PostGISGeometryService {
     private final ParcelRepository parcelRepository;
     private final ZoneRepository zoneRepository;
     private final GeometryParsingService geometryParsingService;
-    private final CoordinateCalculationService coordinateCalculationService;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * Extrait les vertices géométriques d'une zone.
@@ -134,8 +135,15 @@ public class PostGISGeometryService {
             lambertX /= vertices.size();
             lambertY /= vertices.size();
             
-            // Utiliser le service de conversion avec configuration automatique du pays
-            double[] wgs84 = coordinateCalculationService.lambertToWGS84ForZone(lambertX, lambertY, zone);
+            // Utiliser PostGIS pour la conversion précise
+            double[] wgs84;
+            if (zone.getRegion() != null && zone.getRegion().getCountry() != null && zone.getRegion().getCountry().getDefaultSrid() != null) {
+                int srid = zone.getRegion().getCountry().getDefaultSrid();
+                wgs84 = transformCoordinates(lambertX, lambertY, srid, 4326);
+            } else {
+                // Fallback: utiliser les coordonnées comme WGS84
+                wgs84 = new double[]{lambertX, lambertY};
+            }
             return new double[]{wgs84[0], wgs84[1], lambertX, lambertY};
         }
         
@@ -176,8 +184,16 @@ public class PostGISGeometryService {
             lambertX /= vertices.size();
             lambertY /= vertices.size();
             
-            // Utiliser le service de conversion avec configuration automatique du pays
-            double[] wgs84 = coordinateCalculationService.lambertToWGS84ForParcel(lambertX, lambertY, parcel);
+            // Utiliser PostGIS pour la conversion précise
+            double[] wgs84;
+            if (parcel.getZone() != null && parcel.getZone().getRegion() != null && 
+                parcel.getZone().getRegion().getCountry() != null && parcel.getZone().getRegion().getCountry().getDefaultSrid() != null) {
+                int srid = parcel.getZone().getRegion().getCountry().getDefaultSrid();
+                wgs84 = transformCoordinates(lambertX, lambertY, srid, 4326);
+            } else {
+                // Fallback: utiliser les coordonnées comme WGS84
+                wgs84 = new double[]{lambertX, lambertY};
+            }
             return new double[]{wgs84[0], wgs84[1], lambertX, lambertY};
         }
         
@@ -198,9 +214,14 @@ public class PostGISGeometryService {
         
         return vertices.stream().map(vertex -> {
             try {
-                // Utiliser le service de conversion avec configuration automatique du pays
-                double[] wgs84 = coordinateCalculationService.lambertToWGS84ForZone(
-                    vertex.lambertX(), vertex.lambertY(), zone);
+                // Utiliser PostGIS pour la conversion précise
+                double[] wgs84;
+                if (zone.getRegion() != null && zone.getRegion().getCountry() != null && zone.getRegion().getCountry().getDefaultSrid() != null) {
+                    int srid = zone.getRegion().getCountry().getDefaultSrid();
+                    wgs84 = transformCoordinates(vertex.lambertX(), vertex.lambertY(), srid, 4326);
+                } else {
+                    wgs84 = new double[]{vertex.lambertX(), vertex.lambertY()};
+                }
                 return new VertexDto(vertex.seq(), vertex.lambertX(), vertex.lambertY(), 
                     wgs84[1], wgs84[0]); // longitude, latitude
             } catch (Exception e) {
@@ -220,9 +241,15 @@ public class PostGISGeometryService {
         
         return vertices.stream().map(vertex -> {
             try {
-                // Utiliser le service de conversion avec configuration automatique du pays
-                double[] wgs84 = coordinateCalculationService.lambertToWGS84ForParcel(
-                    vertex.lambertX(), vertex.lambertY(), parcel);
+                // Utiliser PostGIS pour la conversion précise
+                double[] wgs84;
+                if (parcel.getZone() != null && parcel.getZone().getRegion() != null && 
+                    parcel.getZone().getRegion().getCountry() != null && parcel.getZone().getRegion().getCountry().getDefaultSrid() != null) {
+                    int srid = parcel.getZone().getRegion().getCountry().getDefaultSrid();
+                    wgs84 = transformCoordinates(vertex.lambertX(), vertex.lambertY(), srid, 4326);
+                } else {
+                    wgs84 = new double[]{vertex.lambertX(), vertex.lambertY()};
+                }
                 return new VertexDto(vertex.seq(), vertex.lambertX(), vertex.lambertY(), 
                     wgs84[1], wgs84[0]); // longitude, latitude
             } catch (Exception e) {
@@ -258,5 +285,35 @@ public class PostGISGeometryService {
         }
         
         return geometry;
+    }
+    
+    /**
+     * Convertit des coordonnées d'un SRID vers un autre en utilisant PostGIS ST_Transform.
+     * 
+     * @param x coordonnée X dans le système source
+     * @param y coordonnée Y dans le système source
+     * @param sourceSrid SRID du système source
+     * @param targetSrid SRID du système cible (généralement 4326 pour WGS84)
+     * @return tableau [X_cible, Y_cible] dans le système cible
+     */
+    public double[] transformCoordinates(double x, double y, int sourceSrid, int targetSrid) {
+        try {
+            String sql = """
+                SELECT ST_X(transformed_point) as x, ST_Y(transformed_point) as y
+                FROM (
+                    SELECT ST_Transform(ST_SetSRID(ST_MakePoint(?, ?), ?), ?) as transformed_point
+                ) as t
+                """;
+            
+            log.debug("Transformation PostGIS: ({}, {}) de SRID {} vers SRID {}", x, y, sourceSrid, targetSrid);
+            
+            return jdbcTemplate.queryForObject(sql, 
+                (rs, rowNum) -> new double[]{rs.getDouble("x"), rs.getDouble("y")},
+                x, y, sourceSrid, targetSrid);
+                
+        } catch (Exception e) {
+            log.error("Erreur lors de la transformation PostGIS de SRID {} vers {}: {}", sourceSrid, targetSrid, e.getMessage());
+            throw new RuntimeException("Échec de transformation des coordonnées", e);
+        }
     }
 }

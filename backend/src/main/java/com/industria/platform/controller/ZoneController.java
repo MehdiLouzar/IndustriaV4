@@ -2,8 +2,10 @@ package com.industria.platform.controller;
 
 import com.industria.platform.dto.ListResponse;
 import com.industria.platform.dto.ParcelDto;
+import com.industria.platform.dto.ParcelImageDto;
 import com.industria.platform.dto.VertexDto;
 import com.industria.platform.dto.ZoneDto;
+import com.industria.platform.dto.ZoneImageDto;
 import com.industria.platform.entity.*;
 import com.industria.platform.exception.EntityNotFoundException;
 import com.industria.platform.exception.ForbiddenException;
@@ -192,6 +194,13 @@ public class ZoneController {
         Zone z = zoneRepository.findById(id).orElseThrow();
         return toDto(z);
     }
+    
+    @GetMapping("/check-name")
+    public ResponseEntity<CheckNameResponse> checkName(@RequestParam String name) {
+        log.debug("Checking if zone name exists: {}", name);
+        boolean exists = zoneRepository.existsByNameIgnoreCase(name.trim());
+        return ResponseEntity.ok(new CheckNameResponse(exists));
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ZONE_MANAGER') or hasRole('ADMIN')")
@@ -201,9 +210,8 @@ public class ZoneController {
             log.debug("Création d'une nouvelle zone: {}", dto.name());
 
             Zone z = new Zone();
-            updateEntity(z, dto);
             
-            // Définir automatiquement le créateur
+            // Définir automatiquement le créateur avant updateEntity
             User currentUser = userService.getCurrentUser();
             if (currentUser != null) {
                 z.setCreatedBy(currentUser);
@@ -213,7 +221,15 @@ public class ZoneController {
                 throw new RuntimeException("Utilisateur non authentifié : impossible de créer une zone");
             }
             
+            // Sauvegarder d'abord la zone de base pour avoir un ID et établir les relations
+            updateEntityWithoutGeometry(z, dto);
             Zone saved = zoneRepository.save(z);
+            
+            // Maintenant mettre à jour la géométrie avec les coordonnées
+            if (dto.vertices() != null && !dto.vertices().isEmpty()) {
+                updateGeometryAndCoordinates(saved, dto.vertices());
+                saved = zoneRepository.save(saved);
+            }
 
             log.debug("Zone sauvegardée avec ID: {}",saved.getId());
             
@@ -245,7 +261,13 @@ public class ZoneController {
         zoneClone.setDescription(oldZone.getDescription());
         zoneClone.setStatus(oldZone.getStatus());
         
-        updateEntity(oldZone, dto);
+        // Mettre à jour les propriétés de base
+        updateEntityWithoutGeometry(oldZone, dto);
+        
+        // Si il y a de nouvelles vertices, mettre à jour la géométrie
+        if (dto.vertices() != null && !dto.vertices().isEmpty()) {
+            updateGeometryAndCoordinates(oldZone, dto.vertices());
+        }
         zoneRepository.save(oldZone);
         
         auditService.log(AuditAction.UPDATE, "Zone", id, 
@@ -348,6 +370,46 @@ public class ZoneController {
             countryCurrency = z.getRegion().getCountry().getCurrency();
         }
         
+        // Récupérer les images de la zone
+        List<ZoneImageDto> images = List.of();
+        String primaryImageUrl = null;
+        
+        if (z.getImages() != null && !z.getImages().isEmpty()) {
+            images = z.getImages().stream()
+                .sorted((img1, img2) -> {
+                    // Images principales d'abord, puis par ordre d'affichage
+                    if (Boolean.TRUE.equals(img1.getIsPrimary()) && !Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return -1;
+                    }
+                    if (!Boolean.TRUE.equals(img1.getIsPrimary()) && Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return 1;
+                    }
+                    return Integer.compare(
+                        img1.getDisplayOrder() != null ? img1.getDisplayOrder() : 0,
+                        img2.getDisplayOrder() != null ? img2.getDisplayOrder() : 0
+                    );
+                })
+                .map(img -> new ZoneImageDto(
+                    img.getId(),
+                    img.getFilename(),
+                    img.getOriginalFilename(),
+                    img.getContentType(),
+                    img.getFileSize(),
+                    img.getDescription(),
+                    img.getDisplayOrder(),
+                    img.getIsPrimary(),
+                    "/api/zones/" + z.getId() + "/images/" + img.getId() + "/file"
+                ))
+                .toList();
+                
+            // Trouver l'URL de l'image principale
+            primaryImageUrl = images.stream()
+                .filter(img -> Boolean.TRUE.equals(img.isPrimary()))
+                .findFirst()
+                .map(ZoneImageDto::url)
+                .orElse(images.isEmpty() ? null : images.get(0).url());
+        }
+        
         return new ZoneDto(
                 z.getId(),
                 z.getName(),
@@ -370,7 +432,9 @@ public class ZoneController {
                 parcelDtos,
                 countryId,
                 countryCode,
-                countryCurrency
+                countryCurrency,
+                images,
+                primaryImageUrl
         );
     }
 
@@ -401,6 +465,46 @@ public class ZoneController {
             countryCurrency = p.getZone().getRegion().getCountry().getCurrency();
         }
         
+        // Récupérer les images de la parcelle
+        List<ParcelImageDto> images = List.of();
+        String primaryImageUrl = null;
+        
+        if (p.getImages() != null && !p.getImages().isEmpty()) {
+            images = p.getImages().stream()
+                .sorted((img1, img2) -> {
+                    // Images principales d'abord, puis par ordre d'affichage
+                    if (Boolean.TRUE.equals(img1.getIsPrimary()) && !Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return -1;
+                    }
+                    if (!Boolean.TRUE.equals(img1.getIsPrimary()) && Boolean.TRUE.equals(img2.getIsPrimary())) {
+                        return 1;
+                    }
+                    return Integer.compare(
+                        img1.getDisplayOrder() != null ? img1.getDisplayOrder() : 0,
+                        img2.getDisplayOrder() != null ? img2.getDisplayOrder() : 0
+                    );
+                })
+                .map(img -> new ParcelImageDto(
+                    img.getId(),
+                    img.getFilename(),
+                    img.getOriginalFilename(),
+                    img.getContentType(),
+                    img.getFileSize(),
+                    img.getDescription(),
+                    img.getDisplayOrder(),
+                    img.getIsPrimary(),
+                    "/api/parcels/" + p.getId() + "/images/" + img.getId() + "/file"
+                ))
+                .toList();
+                
+            // Trouver l'URL de l'image principale
+            primaryImageUrl = images.stream()
+                .filter(img -> Boolean.TRUE.equals(img.isPrimary()))
+                .findFirst()
+                .map(ParcelImageDto::url)
+                .orElse(images.isEmpty() ? null : images.get(0).url());
+        }
+        
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -410,7 +514,7 @@ public class ZoneController {
                 p.getZone() == null ? null : p.getZone().getAddress(),
                 p.getZone() == null ? null : p.getZone().getPrice(),
                 p.getZone() == null ? null : (p.getZone().getPriceType() == null ? null : p.getZone().getPriceType().name()),
-                countryCurrency);
+                countryCurrency, images, primaryImageUrl);
     }
 
     private List<VertexDto> parseParcelGeometry(String wkt) {
@@ -520,7 +624,7 @@ public class ZoneController {
                     ZoneActivity za = new ZoneActivity();
                     za.setZone(z);
                     za.setActivity(act);
-                    zoneActivityRepository.save(za);
+                    // Ne pas sauvegarder immédiatement, ajouter à la collection
                     z.getActivities().add(za);
                 }
             }
@@ -533,7 +637,7 @@ public class ZoneController {
                     ZoneAmenity zm = new ZoneAmenity();
                     zm.setZone(z);
                     zm.setAmenity(am);
-                    zoneAmenityRepository.save(zm);
+                    // Ne pas sauvegarder immédiatement, ajouter à la collection
                     z.getAmenities().add(zm);
                 }
             }
@@ -556,6 +660,116 @@ public class ZoneController {
         sb.append("))");
         return sb.toString();
     }
+    
+    /**
+     * Met à jour l'entité zone sans traiter la géométrie (pour la création)
+     */
+    private void updateEntityWithoutGeometry(Zone z, ZoneDto dto) {
+        log.trace("Updating zone entity without geometry");
+        z.setName(dto.name());
+        z.setDescription(dto.description());
+        z.setAddress(dto.address());
+        z.setTotalArea(dto.totalArea());
+        z.setPrice(dto.price());
+        
+        // Gérer le priceType
+        if (dto.priceType() != null) {
+            z.setPriceType(PriceType.valueOf(dto.priceType()));
+        }
+        
+        // Gérer le constructionType
+        if (dto.constructionType() != null) {
+            z.setConstructionType(ConstructionType.valueOf(dto.constructionType()));
+        }
+        
+        if (dto.status() != null) {
+            z.setStatus(ZoneStatus.valueOf(dto.status()));
+        }
+        if (dto.zoneTypeId() != null && !dto.zoneTypeId().isEmpty()) {
+            z.setZoneType(zoneTypeRepository.findById(dto.zoneTypeId()).orElse(null));
+        }
+        if (dto.regionId() != null && !dto.regionId().isEmpty()) {
+            z.setRegion(regionRepository.findById(dto.regionId()).orElse(null));
+        }
+
+        // Initialiser les collections si nécessaire
+        if (z.getActivities() == null) {
+            z.setActivities(new java.util.HashSet<>());
+        } else if (!z.getActivities().isEmpty()) {
+            // Pour les mises à jour, nettoyer les relations existantes
+            zoneActivityRepository.deleteAll(z.getActivities());
+            z.getActivities().clear();
+        }
+        if (z.getAmenities() == null) {
+            z.setAmenities(new java.util.HashSet<>());
+        } else if (!z.getAmenities().isEmpty()) {
+            // Pour les mises à jour, nettoyer les relations existantes
+            zoneAmenityRepository.deleteAll(z.getAmenities());
+            z.getAmenities().clear();
+        }
+
+        // Gérer les activités - ajouter à la collection sans sauvegarder immédiatement
+        if (dto.activityIds() != null) {
+            for (String aid : dto.activityIds()) {
+                Activity act = activityRepository.findById(aid).orElse(null);
+                if (act != null) {
+                    ZoneActivity za = new ZoneActivity();
+                    za.setZone(z);
+                    za.setActivity(act);
+                    // Ne pas sauvegarder immédiatement, ajouter à la collection
+                    z.getActivities().add(za);
+                }
+            }
+        }
+
+        // Gérer les amenities - ajouter à la collection sans sauvegarder immédiatement  
+        if (dto.amenityIds() != null) {
+            for (String mid : dto.amenityIds()) {
+                Amenity am = amenityRepository.findById(mid).orElse(null);
+                if (am != null) {
+                    ZoneAmenity zm = new ZoneAmenity();
+                    zm.setZone(z);
+                    zm.setAmenity(am);
+                    // Ne pas sauvegarder immédiatement, ajouter à la collection
+                    z.getAmenities().add(zm);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Met à jour la géométrie et calcule les coordonnées WGS84
+     */
+    private void updateGeometryAndCoordinates(Zone z, List<VertexDto> vertices) {
+        try {
+            String newGeometry = buildGeometry(vertices);
+            if (newGeometry != null) {
+                z.setGeometry(newGeometry);
+                z.setSrid(4326);
+
+                log.debug("Updating zone geometry with {} vertices", vertices.size());
+
+                // Calculer automatiquement les coordonnées WGS84
+                // La zone a maintenant un ID et ses relations sont établies
+                if (z.getRegion() != null && z.getRegion().getCountry() != null) {
+                    geometryUpdateService.updateZoneCoordinates(z, vertices);
+                    log.debug("Zone coordinates updated successfully");
+                } else {
+                    log.warn("Zone region/country not set, skipping coordinate calculation");
+                    z.setLatitude(null);
+                    z.setLongitude(null);
+                }
+            } else {
+                log.warn("Failed to build geometry from vertices");
+            }
+        } catch (Exception e) {
+            log.error("Error updating zone geometry and coordinates: {}", e.getMessage());
+            // Ne pas bloquer la création, juste laisser les coordonnées nulles
+            z.setLatitude(null);
+            z.setLongitude(null);
+        }
+    }
 
     public record StatusRequest(ZoneStatus status) {}
+    public record CheckNameResponse(boolean exists) {}
 }

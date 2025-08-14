@@ -28,6 +28,7 @@ import java.util.List;
 public class CoordinateCalculationService {
     
     private final SpatialReferenceSystemRepository spatialReferenceSystemRepository;
+    private final PostGISGeometryService postGISGeometryService;
 
 
     
@@ -100,7 +101,7 @@ public class CoordinateCalculationService {
     }
     
     /**
-     * Convertit les coordonnées d'un SRID donné vers WGS84.
+     * Convertit les coordonnées d'un SRID donné vers WGS84 en utilisant PostGIS.
      * 
      * @param x coordonnée X dans le système source
      * @param y coordonnée Y dans le système source  
@@ -119,18 +120,22 @@ public class CoordinateCalculationService {
             return new double[]{x, y}; // x=longitude, y=latitude
         }
         
-        // Récupérer les informations du système de référence spatiale depuis la DB
-        SpatialReferenceSystem srs = spatialReferenceSystemRepository.findBySrid(sourceSrid);
-        if (srs == null) {
-            log.warn("Système de référence spatiale introuvable pour SRID {}, utilisation approximative", sourceSrid);
+        try {
+            // Utiliser PostGIS pour la conversion précise avec ST_Transform
+            log.debug("Conversion PostGIS {} -> WGS84 pour point ({}, {})", sourceSrid, x, y);
+            return postGISGeometryService.transformCoordinates(x, y, sourceSrid, 4326);
+        } catch (Exception e) {
+            log.error("Erreur lors de la conversion PostGIS de SRID {} vers WGS84: {}", sourceSrid, e.getMessage());
+            
+            // Récupérer les informations du système de référence spatiale depuis la DB pour fallback
+            SpatialReferenceSystem srs = spatialReferenceSystemRepository.findBySrid(sourceSrid);
+            if (srs != null) {
+                log.warn("Utilisation d'une approximation comme fallback pour SRID {} ({})", sourceSrid, srs.getName());
+            }
+            
+            // Fallback vers l'approximation en cas d'échec PostGIS
             return convertUsingApproximation(x, y, sourceSrid);
         }
-        
-        log.debug("Conversion {} -> WGS84 pour le système {}", sourceSrid, srs.getName());
-        
-        // Pour l'instant, utilisation d'approximations basées sur le SRID
-        // TODO: Intégrer une vraie bibliothèque de projection comme GeoTools
-        return convertUsingApproximation(x, y, sourceSrid);
     }
     
     /**
