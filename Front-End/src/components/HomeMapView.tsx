@@ -47,7 +47,7 @@ import '@/styles/map.css'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye, Zap, Wifi, Car, Wrench, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Cog, Tool, Gauge, Settings2, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Shirt, Pill } from 'lucide-react'
+import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye, Zap, Wifi, Car, Wrench, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Cog, Gauge, Settings2, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Shirt, Pill } from 'lucide-react'
 import type { FeatureCollection } from 'geojson'
 
 import DynamicIcon from '@/components/DynamicIcon'
@@ -634,7 +634,6 @@ const loadZones = useCallback(async (precision: number, force = false) => {
       'Wrench': Wrench,
       'Settings': Settings,
       'Cog': Settings,
-      'Tool': Tool,
       'Gauge': Gauge,
       'Settings2': Settings2,
       

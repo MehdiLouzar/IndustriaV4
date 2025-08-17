@@ -22,6 +22,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import {getBaseUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Factory, Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane } from 'lucide-react'
 import { fetchPublicApi, type PublicZonesResponse } from '@/lib/publicApi'
@@ -180,8 +181,9 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
   // Fonction pour charger les images d'une zone
   const loadZoneImages = useCallback(async (zoneId: string): Promise<ZoneImage[]> => {
     try {
-      // Tentative avec l'API publique
-      const response = await fetch(`/api/zones/${zoneId}/images`)
+      // Tentative avec l'API publique      return `${getBaseUrl()}/api/zones/${zone.id}/images/${currentImage.id}/file` 
+
+      const response = await fetch(`${getBaseUrl()}/api/zones/${zoneId}/images/`)
       
       if (!response.ok) {
         return []

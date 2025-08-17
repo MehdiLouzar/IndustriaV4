@@ -8,13 +8,14 @@ import React, { memo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import {getBaseUrl } from '@/lib/utils'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { 
   MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight, Grid3X3,
   Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, 
   Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, 
-  HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill
+  HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill
 } from 'lucide-react'
 
 /**
@@ -178,7 +179,6 @@ function getLucideIcon(iconName?: string) {
     'Wrench': Wrench,
     'Settings': Settings,
     'Cog': Settings,
-    'Tool': Tool,
     'Gauge': Gauge,
     'Settings2': Settings2,
     
@@ -249,7 +249,7 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const getCurrentImageUrl = () => {
     if (hasImages) {
       const currentImage = displayImages[currentImageIndex]
-      return `/api/zones/${zone.id}/images/${currentImage.id}/file`
+      return `${getBaseUrl()}/api/zones/${zone.id}/images/${currentImage.id}/file` 
     }
     return zone.image
   }

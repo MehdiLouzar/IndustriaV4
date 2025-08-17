@@ -1,5 +1,6 @@
 package com.industria.platform.config;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -34,7 +36,11 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 @EnableMethodSecurity
 @Slf4j
+@AllArgsConstructor
 public class SecurityConfig {
+
+    private final CorsConfigurationSource corsConfigurationSource;
+
 
     /**
      * Configure la chaîne de filtres de sécurité.
@@ -49,35 +55,35 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain api(HttpSecurity http) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
+            .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 // Endpoints publics sans authentification
-                .requestMatchers(HttpMethod.GET, "/", "/api/zones/**", "/api/parcels/**", "/api/reservations/**", 
-                               "/api/regions/**", "/api/zone-types/**", "/api/activities/**", "/api/amenities/**", 
+                .requestMatchers(HttpMethod.GET, "/", "/api/zones/**", "/api/parcels/**", "/api/reservations/**",
+                               "/api/regions/**", "/api/zone-types/**", "/api/activities/**", "/api/amenities/**",
                                "/api/countries/**", "/api/map/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
                 .requestMatchers("/api/public/**", "/api/auth/**").permitAll()
-                
+
                 // Interface administration (ADMIN et ZONE_MANAGER)
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "ZONE_MANAGER")
-                
+
                 // CRUD zones et parcelles (ADMIN et ZONE_MANAGER avec restrictions métier)
                 .requestMatchers(HttpMethod.POST, "/api/zones/**", "/api/parcels/**").hasAnyRole("ADMIN", "ZONE_MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/zones/**", "/api/parcels/**").hasAnyRole("ADMIN", "ZONE_MANAGER")
                 .requestMatchers(HttpMethod.DELETE, "/api/zones/**", "/api/parcels/**").hasAnyRole("ADMIN", "ZONE_MANAGER")
-                
+
                 // CRUD données de référence (ADMIN uniquement)
-                .requestMatchers(HttpMethod.POST, "/api/regions/**", "/api/zone-types/**", "/api/activities/**", 
+                .requestMatchers(HttpMethod.POST, "/api/regions/**", "/api/zone-types/**", "/api/activities/**",
                                "/api/amenities/**", "/api/countries/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/regions/**", "/api/zone-types/**", "/api/activities/**", 
+                .requestMatchers(HttpMethod.PUT, "/api/regions/**", "/api/zone-types/**", "/api/activities/**",
                                "/api/amenities/**", "/api/countries/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/regions/**", "/api/zone-types/**", "/api/activities/**", 
+                .requestMatchers(HttpMethod.DELETE, "/api/regions/**", "/api/zone-types/**", "/api/activities/**",
                                "/api/amenities/**", "/api/countries/**").hasRole("ADMIN")
-                
+
                 // Gestion des rendez-vous (ADMIN et ZONE_MANAGER avec restrictions métier)
                 .requestMatchers("/api/appointments/**").hasAnyRole("ADMIN", "ZONE_MANAGER")
-                
+
                 // Toute autre requête nécessite une authentification
                 .anyRequest().authenticated()
             )
@@ -142,16 +148,5 @@ public class SecurityConfig {
      * 
      * @return source de configuration CORS
      */
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.addAllowedOrigin("http://localhost:3000");
-        config.addAllowedMethod("*");
-        config.addAllowedHeader("*");
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
 }

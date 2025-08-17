@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { fetchApi, getBaseUrl } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
@@ -1024,7 +1024,7 @@ export default function ZonesAdmin() {
                     {(Array.isArray(existingImages) ? existingImages : []).map((img) => (
                       <div key={img.id} className="relative">
                         <img 
-                          src={`/api/zones/${form.id}/images/${img.id}/file`} 
+                          src={`${getBaseUrl()}/api/zones/${form.id}/images/${img.id}/file`} 
                           className="w-24 h-24 object-cover rounded" 
                           alt={img.originalFilename}
                           title={img.description || img.originalFilename}

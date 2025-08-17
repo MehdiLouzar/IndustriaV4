@@ -206,9 +206,9 @@ function AdminDashboardContent() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-              <p className="text-gray-600">
+              <div className="text-gray-600">
                 Tableau de bord - Rôle: <Badge variant="outline">{permissions?.role}</Badge>
-              </p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <Button 

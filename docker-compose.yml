@@ -88,6 +88,30 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+  nginx:
+    build:
+      context: ./nginx
+    container_name: industria-nginx-dev
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+      - keycloak
+    networks:
+      - industria-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: industria-redis
+    restart: always
+    ports:
+      - "6379-6379"
+    command: redis-server --requirepass admin
+    volumes:
+      - redis_data:/data
+    networks:
+      - industria-network
 
   db-init:
     image: postgres:16
@@ -147,3 +171,4 @@ networks:
 volumes:
   db_data:
   frontend_node_modules:
+  redis_data:
