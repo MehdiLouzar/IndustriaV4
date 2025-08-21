@@ -298,8 +298,8 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="font-semibold mb-2">Zones Certifiées</h3>
-              <p className="text-gray-600 text-sm">Toutes nos zones respectent les normes internationales</p>
+              <h3 className="font-semibold mb-2">Zones Vérifiées</h3>
+              <p className="text-gray-600 text-sm">Les données de toutes nos zones sont vérifiées</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-industria-gray-light rounded-lg flex items-center justify-center mx-auto mb-4">

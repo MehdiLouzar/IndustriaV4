@@ -15,22 +15,23 @@ import { Badge } from '@/components/ui/badge';
 
 // Types pour le simulateur
 interface ProjectData {
-  // Step 1: Secteur et métier
-  secteur: string;
-  metier: string;
-  // Step 2: Localisation
+  // Secteurs
+  secteurSectorielle: string; // Pour prime sectorielle
+  metierAvenir: string; // Pour prime métiers d'avenir
+  activiteSpecifique?: string; // Activité d'avenir spécifique sélectionnée
+  // Localisation
   region: string;
   province: string;
-  // Step 3: Projet
+  // Projet
   montantTotal: number;
   emploisStables: number;
-  // Step 4: CAPEX
+  // CAPEX
   fraisEtude: number;
   foncierPrive: number;
   foncierPublic: number;
   constructions: number;
   equipements: number;
-  // Step 5: Primes spécifiques
+  // Primes spécifiques
   partFemmesPct: number;
   criteresDD: string[];
   achatLocaux: number;
@@ -53,8 +54,69 @@ interface SimulationResult {
   montantPrimesMAD: number;
 }
 
-// Nouveaux secteurs et métiers selon la liste fournie
-const SECTEURS_METIERS = {
+// Secteurs consolidés avec leurs secteurs porteurs
+const SECTEURS_CONSOLIDES = {
+  'Tourisme et loisir': {
+    prime: 5,
+    secteursPorteurs: []
+  },
+  'Industrie': {
+    prime: 5,
+    secteursPorteurs: [
+      'Industrie automobile',
+      'Industrie aéronautique', 
+      'Industrie agricole',
+      'Industrie diversifiée',
+      'Industrie Maritime',
+      'Industrie pharmaceutique',
+      'Secteur minier',
+      'Industrie du textile et du cuir',
+      'Autres secteurs'
+    ]
+  },
+  'Logistique': {
+    prime: 5,
+    secteursPorteurs: []
+  },
+  'Industrie culturelle': {
+    prime: 5,
+    secteursPorteurs: []
+  },
+  'Numérique': {
+    prime: 5,
+    secteursPorteurs: [
+      'Technologie numérique & Secteur numérique'
+    ]
+  },
+  'Transport': {
+    prime: 5,
+    secteursPorteurs: [
+      'Mobilité'
+    ]
+  },
+  'Outsourcing': {
+    prime: 5,
+    secteursPorteurs: []
+  },
+  'Aquaculture': {
+    prime: 5,
+    secteursPorteurs: []
+  },
+  'Énergie renouvelable': {
+    prime: 5,
+    secteursPorteurs: [
+      'Industrie énergies renouvelables',
+      'Transition énergétique'
+    ]
+  },
+  'Transformation et valorisation des déchets': {
+    prime: 5,
+    secteursPorteurs: []
+  }
+};
+
+// Métiers spécialisés d'avenir (pour prime 3% supplémentaire)
+const METIERS_SPECIALISES = {
   'Industrie automobile': [
     'Fabrication de pièces détachées et de composants pour moteurs thermiques et électriques',
     'Fabrication de pièces de rechange et composants pour véhicules lourds',
@@ -67,7 +129,7 @@ const SECTEURS_METIERS = {
   ],
   'Industrie agricole': [
     'Alimentation animale',
-    'Nourriture pour bébé',
+    'Nourriture pour bébé', 
     'Plats cuisinés',
     'Complément alimentaire',
     'Fabrication de produits alimentaires "sains"',
@@ -97,9 +159,6 @@ const SECTEURS_METIERS = {
     'Tissu technique',
     'Cuir technique'
   ],
-  'Transition énergétique': [
-    'Fabrication d\'équipements de dessalement d\'eau de mer'
-  ],
   'Technologie numérique & Secteur numérique': [
     'Biotechnologie',
     'Cybersécurité',
@@ -121,9 +180,12 @@ const SECTEURS_METIERS = {
   'Industrie énergies renouvelables': [
     'Installation de production et de stockage d\'énergie renouvelable'
   ],
+  'Transition énergétique': [
+    'Fabrication d\'équipements de dessalement d\'eau de mer'
+  ],
   'Mobilité': [
     'Mobilité autonome',
-    'Mobilité électrique',
+    'Mobilité électrique', 
     'Mobilité ferroviaire et maritime'
   ],
   'Autres secteurs': [
@@ -170,7 +232,7 @@ const PROVINCES_B = [
 ];
 
 const CRITERES_DD = [
-  'Système d\'économie d\'eau (obligatoire)',
+  'Système d\'économie d\'eau',
   'Énergies renouvelables',
   'Efficacité énergétique',
   'Traitement des déchets',
@@ -178,13 +240,23 @@ const CRITERES_DD = [
   'Certification environnementale'
 ];
 
+// Fonction pour formater les nombres avec des espaces comme séparateurs de milliers
+const formatNumber = (num: number): string => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
+
+// Fonction pour parser un nombre formaté avec des espaces
+const parseFormattedNumber = (str: string): number => {
+  return parseInt(str.replace(/\s/g, '')) || 0;
+};
+
 export default function SimulateurPrincipal() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedDisclaimer, setAcceptedDisclaimer] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectData, setProjectData] = useState<ProjectData>({
-    secteur: '',
-    metier: '',
+    secteurSectorielle: '',
+    metierAvenir: '',
     region: '',
     province: '',
     montantTotal: 0,
@@ -206,13 +278,16 @@ export default function SimulateurPrincipal() {
   const steps = [
     'Conditions d\'utilisation',
     'Critères d\'éligibilité',
-    'Secteur d\'activité',
-    'Métier spécialisé', 
     'Région',
     'Province',
     'Données projet',
     'Répartition CAPEX',
-    'Primes spécifiques',
+    'Prime ratio emploi/CAPEX',
+    'Prime genre',
+    'Secteur d\'activité',
+    'Métiers spécialisés',
+    'Prime développement durable',
+    'Prime intégration locale',
     'Résultats'
   ];
 
@@ -237,21 +312,27 @@ export default function SimulateurPrincipal() {
   const canProceed = () => {
     switch (currentStep) {
       case 1: return true; // Critères d'éligibilité - juste informatif
-      case 2: return projectData.secteur !== '';
-      case 3: return projectData.metier !== '';
-      case 4: return projectData.region !== '';
-      case 5: return projectData.province !== '';
-      case 6: return projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50;
-      case 7: return true; // CAPEX est optionnel pour continuer
-      case 8: return true; // Primes spécifiques sont optionnelles
+      case 2: return projectData.region !== '';
+      case 3: return projectData.province !== '';
+      case 4: return (projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50) || projectData.emploisStables >= 150;
+      case 5: return true; // CAPEX est optionnel pour continuer
+      case 6: return true; // Prime ratio emploi/CAPEX - automatique
+      case 7: return true; // Prime genre - optionnelle
+      case 8: return projectData.secteurSectorielle !== ''; // Secteur d'activité
+      case 9: return true; // Prime métiers d'avenir - optionnelle
+      case 10: return true; // Prime DD - optionnelle
+      case 11: return true; // Prime intégration locale - optionnelle
       default: return true;
     }
   };
 
   const calculatePrimes = () => {
-    // Vérifications d'éligibilité
-    if (projectData.montantTotal < 50000000 || projectData.emploisStables < 50) {
-      alert('Projet non éligible : Montant minimum 50M MAD et 50 emplois stables requis');
+    // Vérifications d'éligibilité : SOIT (50M MAD ET 50 emplois) OU 150 emplois
+    const eligibleByAmount = projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50;
+    const eligibleByEmployment = projectData.emploisStables >= 150;
+    
+    if (!eligibleByAmount && !eligibleByEmployment) {
+      alert('Projet non éligible : Il faut SOIT (50M MAD minimum ET 50 emplois stables) OU 150 emplois stables minimum');
       return;
     }
 
@@ -271,9 +352,8 @@ export default function SimulateurPrincipal() {
     else if (ratio > 1) primeRatioEmploi = 5;
 
     const primeGenre = projectData.partFemmesPct >= 30 ? 3 : 0;
-    // Vérifier si c'est un métier d'avenir (secteurs technologiques)
-    const secteursMetiersAvenir = ['Technologie numérique & Secteur numérique', 'Industrie pharmaceutique', 'Mobilité'];
-    const primeMetiersAvenir = secteursMetiersAvenir.includes(projectData.secteur) ? 3 : 0;
+    // Prime métiers d'avenir si activité spécifique sélectionnée
+    const primeMetiersAvenir = projectData.activiteSpecifique && projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
     const primeDD = projectData.criteresDD.includes('Système d\'économie d\'eau (obligatoire)') && 
                     projectData.criteresDD.length >= 3 ? 3 : 0;
 
@@ -281,12 +361,13 @@ export default function SimulateurPrincipal() {
     const tauxIntegration = projectData.chiffreAffaires > 0 
       ? ((projectData.achatLocaux + projectData.valeurAjoutee + projectData.margeBrute) / projectData.chiffreAffaires) * 100
       : 0;
-    const seuilSectoriel = ['pharmaceutique', 'agricole'].some(s => 
-      projectData.secteur.toLowerCase().includes(s)) ? 20 : 40;
+    const seuilSectoriel = (['pharmaceutique', 'agricole'].some(s => 
+      projectData.secteur?.toLowerCase().includes(s)) || 
+      projectData.secteur?.toLowerCase().includes('fournitures médicales')) ? 20 : 40;
     const primeIntegration = tauxIntegration >= seuilSectoriel ? 3 : 0;
 
-    // Tous les secteurs industriels sont prioritaires selon la nouvelle liste
-    const primeSectorielle = projectData.secteur !== '' ? 5 : 0;
+    // Prime sectorielle selon le secteur sélectionné
+    const primeSectorielle = projectData.secteurSectorielle && projectData.secteurSectorielle !== 'Pas dans la liste' ? 5 : 0;
     
     let primeTerritoriale = 0;
     if (PROVINCES_A.includes(projectData.province)) primeTerritoriale = 10;
@@ -346,20 +427,26 @@ export default function SimulateurPrincipal() {
       case 1:
         return renderEligibilityStep();
       case 2:
-        return renderSecteurStep();
-      case 3:
-        return renderMetierStep();
-      case 4:
         return renderRegionStep();
-      case 5:
+      case 3:
         return renderProvinceStep();
-      case 6:
+      case 4:
         return renderProjetStep();
-      case 7:
+      case 5:
         return renderCapexStep();
+      case 6:
+        return renderPrimeRatioEmploiStep();
+      case 7:
+        return renderPrimeGenreStep();
       case 8:
-        return renderPrimesStep();
+        return renderPrimeSectorielleStep();
       case 9:
+        return renderPrimeMetiersAvenirStep();
+      case 10:
+        return renderPrimeDDStep();
+      case 11:
+        return renderPrimeIntegrationStep();
+      case 12:
         return renderResultsStep();
       default:
         return null;
@@ -373,78 +460,64 @@ export default function SimulateurPrincipal() {
         <p className="text-gray-600">Vérifiez que votre projet répond aux conditions suivantes</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Critères obligatoires */}
-        <Card className="border-2 border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-lg text-green-700 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold">✓</div>
-              Critères obligatoires
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-600 mt-2"></div>
-              <div>
-                <p className="font-medium text-green-800">Montant d'investissement</p>
-                <p className="text-sm text-green-700">&ge; 50 000 000 MAD</p>
-                <p className="text-xs text-gray-600 mt-1">Investissement total minimum requis</p>
+      {/* Critères d'éligibilité unifiés */}
+      <Card className="border-2 border-green-200 bg-green-50">
+        <CardHeader>
+          <CardTitle className="text-lg text-green-700 flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold">✓</div>
+            Critères d'éligibilité
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+            <div className="space-y-4">
+              <h4 className="font-semibold text-green-800 text-center">Conditions d'éligibilité</h4>
+              <div className="text-center text-gray-700 mb-4">
+                Votre projet doit remplir <strong>l'une des deux conditions suivantes :</strong>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Option 1 */}
+                <div className="p-4 border-2 border-green-300 rounded-lg bg-green-100">
+                  <h5 className="font-semibold text-green-800 mb-3 text-center">Option 1</h5>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-600"></div>
+                      <span className="text-sm text-green-800">≥ 50 000 000 MAD</span>
+                    </div>
+                    <div className="text-center text-green-700 font-semibold">ET</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-600"></div>
+                      <span className="text-sm text-green-800">≥ 50 emplois stables</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Option 2 */}
+                <div className="p-4 border-2 border-blue-300 rounded-lg bg-blue-100">
+                  <h5 className="font-semibold text-blue-800 mb-3 text-center">Option 2</h5>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 justify-center">
+                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      <span className="text-sm text-blue-800">≥ 150 emplois stables</span>
+                    </div>
+                    <div className="text-xs text-gray-600 text-center">
+                      (pas de condition de montant minimum)
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-green-600 mt-2"></div>
-              <div>
-                <p className="font-medium text-green-800">Emplois stables</p>
-                <p className="text-sm text-green-700">&ge; 50 emplois</p>
-                <p className="text-xs text-gray-600 mt-1">Emplois stables à créer minimum</p>
-              </div>
-            </div>
-
-            <Alert className="bg-green-100 border-green-300">
-              <AlertCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
-                <strong>Important :</strong> Ces deux critères sont indispensables pour être éligible aux primes d'investissement.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        {/* Cas spéciaux */}
-        <Card className="border-2 border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-lg text-blue-700 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">i</div>
-              Cas spéciaux
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-blue-600 mt-2"></div>
-              <div>
-                <p className="font-medium text-blue-800">Projets &lt; 150 emplois</p>
-                <p className="text-xs text-gray-600 mt-1">Modalités d'aide spécifiques selon le secteur</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-blue-600 mt-2"></div>
-              <div>
-                <p className="font-medium text-blue-800">Projets &ge; 150 emplois</p>
-                <p className="text-xs text-gray-600 mt-1">Conditions préférentielles et primes majorées</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-blue-600 mt-2"></div>
-              <div>
-                <p className="font-medium text-blue-800">TPE/PME</p>
-                <p className="text-xs text-gray-600 mt-1">Dispositifs spéciaux Intelaka et Moussanada</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          
+          <Alert className="bg-blue-100 border-blue-300 mt-4">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Important :</strong> Votre projet doit respecter l'une des deux conditions ci-dessus pour être éligible aux primes d'investissement.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
 
       {/* Rubriques éligibles */}
       <Card>
@@ -522,8 +595,12 @@ export default function SimulateurPrincipal() {
               <h4 className="font-semibold text-gray-700 text-sm">Primes sectorielles</h4>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Prime sectorielle</span>
-                  <Badge variant="secondary" className="text-xs">5%</Badge>
+                  <span className="text-sm">Secteurs industriels</span>
+                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">5%</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Secteurs prioritaires</span>
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">8%</Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Développement durable</span>
@@ -651,56 +728,6 @@ export default function SimulateurPrincipal() {
     </div>
   );
 
-  const renderSecteurStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">Sélectionnez votre secteur d'activité</h3>
-        <p className="text-gray-600">Choisissez le secteur qui correspond le mieux à votre projet</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.keys(SECTEURS_METIERS).map((secteur) => (
-          <Card 
-            key={secteur} 
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              projectData.secteur === secteur ? 'ring-2 ring-industria-brown-gold bg-industria-brown-gold/5' : ''
-            }`}
-            onClick={() => setProjectData({...projectData, secteur, metier: ''})}
-          >
-            <CardContent className="p-4">
-              <h4 className="font-medium text-sm">{secteur}</h4>
-              <p className="text-xs text-gray-500 mt-1">
-                {SECTEURS_METIERS[secteur as keyof typeof SECTEURS_METIERS].length} métiers disponibles
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderMetierStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">Choisissez votre métier spécialisé</h3>
-        <p className="text-gray-600">Secteur sélectionné : <strong>{projectData.secteur}</strong></p>
-      </div>
-      <div className="space-y-3">
-        {projectData.secteur && SECTEURS_METIERS[projectData.secteur as keyof typeof SECTEURS_METIERS]?.map((metier) => (
-          <Card 
-            key={metier}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              projectData.metier === metier ? 'ring-2 ring-industria-brown-gold bg-industria-brown-gold/5' : ''
-            }`}
-            onClick={() => setProjectData({...projectData, metier})}
-          >
-            <CardContent className="p-4">
-              <p className="text-sm font-medium">{metier}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
 
   const renderRegionStep = () => (
     <div className="space-y-6">
@@ -774,29 +801,70 @@ export default function SimulateurPrincipal() {
           <Label htmlFor="montantTotal">Montant total investissement (MAD)</Label>
           <Input
             id="montantTotal"
-            type="number"
-            value={projectData.montantTotal || ''}
-            onChange={(e) => setProjectData({...projectData, montantTotal: Number(e.target.value)})}
-            placeholder="50 000 000 minimum"
+            type="text"
+            value={projectData.montantTotal ? formatNumber(projectData.montantTotal) : ''}
+            onChange={(e) => {
+              const numValue = parseFormattedNumber(e.target.value);
+              setProjectData({...projectData, montantTotal: numValue});
+            }}
+            placeholder="Montant investissement"
           />
-          {projectData.montantTotal > 0 && projectData.montantTotal < 50000000 && (
-            <p className="text-red-500 text-xs mt-1">Minimum requis : 50 000 000 MAD</p>
+          {projectData.montantTotal > 0 && projectData.emploisStables > 0 && projectData.montantTotal < 50000000 && projectData.emploisStables < 150 && (
+            <p className="text-red-500 text-xs mt-1">Pour être éligible : SOIT ≥50M MAD ET ≥50 emplois, OU ≥150 emplois</p>
           )}
         </div>
         <div>
           <Label htmlFor="emploisStables">Emplois stables à créer</Label>
           <Input
             id="emploisStables"
-            type="number"
-            value={projectData.emploisStables || ''}
-            onChange={(e) => setProjectData({...projectData, emploisStables: Number(e.target.value)})}
-            placeholder="50 minimum"
+            type="text"
+            value={projectData.emploisStables ? formatNumber(projectData.emploisStables) : ''}
+            onChange={(e) => {
+              const numValue = parseFormattedNumber(e.target.value);
+              setProjectData({...projectData, emploisStables: numValue});
+            }}
+            placeholder="Nombre d'emplois stables"
           />
-          {projectData.emploisStables > 0 && projectData.emploisStables < 50 && (
-            <p className="text-red-500 text-xs mt-1">Minimum requis : 50 emplois</p>
+          {projectData.montantTotal > 0 && projectData.emploisStables > 0 && projectData.montantTotal < 50000000 && projectData.emploisStables < 150 && (
+            <p className="text-red-500 text-xs mt-1">Pour être éligible : SOIT ≥50M MAD ET ≥50 emplois, OU ≥150 emplois</p>
           )}
         </div>
       </div>
+      
+      {/* Validation des critères d'éligibilité */}
+      {projectData.montantTotal > 0 && projectData.emploisStables > 0 && (
+        <Alert className={`${
+          (projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50) || projectData.emploisStables >= 150
+            ? 'bg-green-100 border-green-300' 
+            : 'bg-orange-100 border-orange-300'
+        }`}>
+          <AlertCircle className={`h-4 w-4 ${
+            (projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50) || projectData.emploisStables >= 150
+              ? 'text-green-600' 
+              : 'text-orange-600'
+          }`} />
+          <AlertDescription className={`${
+            (projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50) || projectData.emploisStables >= 150
+              ? 'text-green-800' 
+              : 'text-orange-800'
+          }`}>
+            {(projectData.montantTotal >= 50000000 && projectData.emploisStables >= 50) || projectData.emploisStables >= 150 ? (
+              <>
+                <strong>✓ Projet éligible !</strong>
+                {projectData.emploisStables >= 150 ? 
+                  ` Condition remplie : ${formatNumber(projectData.emploisStables)} emplois ≥ 150` :
+                  ` Condition remplie : ${formatNumber(projectData.montantTotal)} MAD ≥ 50M ET ${formatNumber(projectData.emploisStables)} emplois ≥ 50`
+                }
+              </>
+            ) : (
+              <>
+                <strong>⚠ Critères d'éligibilité non remplis</strong>
+                <br />Il faut SOIT (≥50M MAD ET ≥50 emplois) OU ≥150 emplois
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 
@@ -819,11 +887,20 @@ export default function SimulateurPrincipal() {
           <p className="text-gray-600">Détaillez la répartition de votre investissement (optionnel)</p>
         </div>
 
+        {/* Information MIP */}
+        <Alert className="bg-indigo-50 border-indigo-200">
+          <AlertCircle className="h-4 w-4 text-indigo-600" />
+          <AlertDescription className="text-indigo-800">
+            <strong>MIP (Montant d'Investissement Primable) :</strong> Il s'agit du montant sur lequel seront calculées les primes d'investissement. 
+            Le MIP exclut certains éléments comme le foncier public et applique des limitations sur le foncier privé (max 20% de l'investissement total).
+          </AlertDescription>
+        </Alert>
+
         {/* Récapitulatif montant total */}
         <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>Montant total à ventiler :</strong> {projectData.montantTotal.toLocaleString('fr-FR')} MAD
+            <strong>Montant total à ventiler :</strong> {formatNumber(projectData.montantTotal)} MAD
           </AlertDescription>
         </Alert>
 
@@ -832,45 +909,62 @@ export default function SimulateurPrincipal() {
             <Label htmlFor="fraisEtude">Frais d'étude, R&D (MAD)</Label>
             <Input
               id="fraisEtude"
-              type="number"
-              value={projectData.fraisEtude || ''}
-              onChange={(e) => setProjectData({...projectData, fraisEtude: Number(e.target.value)})}
+              type="text"
+              value={projectData.fraisEtude ? formatNumber(projectData.fraisEtude) : ''}
+              onChange={(e) => {
+                const numValue = parseFormattedNumber(e.target.value);
+                setProjectData({...projectData, fraisEtude: numValue});
+              }}
             />
           </div>
           <div>
             <Label htmlFor="foncierPrive">Foncier privé (MAD)</Label>
             <Input
               id="foncierPrive"
-              type="number"
-              value={projectData.foncierPrive || ''}
-              onChange={(e) => setProjectData({...projectData, foncierPrive: Number(e.target.value)})}
+              type="text"
+              value={projectData.foncierPrive ? formatNumber(projectData.foncierPrive) : ''}
+              onChange={(e) => {
+                const numValue = parseFormattedNumber(e.target.value);
+                setProjectData({...projectData, foncierPrive: numValue});
+              }}
             />
+            <p className="text-xs text-blue-600 mt-1">Peut inclure les 5 premières années de loyer</p>
           </div>
           <div>
             <Label htmlFor="foncierPublic">Foncier public (MAD)</Label>
             <Input
               id="foncierPublic"
-              type="number"
-              value={projectData.foncierPublic || ''}
-              onChange={(e) => setProjectData({...projectData, foncierPublic: Number(e.target.value)})}
+              type="text"
+              value={projectData.foncierPublic ? formatNumber(projectData.foncierPublic) : ''}
+              onChange={(e) => {
+                const numValue = parseFormattedNumber(e.target.value);
+                setProjectData({...projectData, foncierPublic: numValue});
+              }}
             />
+            <p className="text-xs text-red-600 mt-1">Non pris en compte dans le montant primable</p>
           </div>
           <div>
             <Label htmlFor="constructions">Constructions/Génie civil (MAD)</Label>
             <Input
               id="constructions"
-              type="number"
-              value={projectData.constructions || ''}
-              onChange={(e) => setProjectData({...projectData, constructions: Number(e.target.value)})}
+              type="text"
+              value={projectData.constructions ? formatNumber(projectData.constructions) : ''}
+              onChange={(e) => {
+                const numValue = parseFormattedNumber(e.target.value);
+                setProjectData({...projectData, constructions: numValue});
+              }}
             />
           </div>
           <div className="md:col-span-2">
             <Label htmlFor="equipements">Équipements & outillages (MAD)</Label>
             <Input
               id="equipements"
-              type="number"
-              value={projectData.equipements || ''}
-              onChange={(e) => setProjectData({...projectData, equipements: Number(e.target.value)})}
+              type="text"
+              value={projectData.equipements ? formatNumber(projectData.equipements) : ''}
+              onChange={(e) => {
+                const numValue = parseFormattedNumber(e.target.value);
+                setProjectData({...projectData, equipements: numValue});
+              }}
             />
           </div>
         </div>
@@ -1002,71 +1096,641 @@ export default function SimulateurPrincipal() {
     );
   };
 
-  const renderPrimesStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-xl font-semibold mb-2">Primes spécifiques</h3>
-        <p className="text-gray-600">Informations pour calculer les primes additionnelles</p>
+  // Calcul des primes individuelles pour affichage
+  const calculateIndividualPrime = (primeType: string) => {
+    const capexEnMDH = projectData.montantTotal / 1000000;
+    const ratio = projectData.emploisStables / capexEnMDH;
+
+    switch (primeType) {
+      case 'ratioEmploi':
+        if (ratio > 3) return 10;
+        else if (ratio > 1.5) return 7;
+        else if (ratio > 1) return 5;
+        return 0;
+      
+      case 'genre':
+        return projectData.partFemmesPct >= 30 ? 3 : 0;
+      
+      case 'metiersAvenir':
+        return projectData.activiteSpecifique && projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
+      
+      case 'dd':
+        return projectData.criteresDD.length >= 3 ? 3 : 0;
+      
+      case 'integration':
+        const tauxIntegration = projectData.chiffreAffaires > 0 
+          ? ((projectData.achatLocaux + projectData.valeurAjoutee + projectData.margeBrute) / projectData.chiffreAffaires) * 100
+          : 0;
+        const seuilSectoriel = (projectData.metierAvenir && 
+          (['pharmaceutique', 'agricole'].some(s => 
+            projectData.metierAvenir?.toLowerCase().includes(s)) || 
+            projectData.metierAvenir?.toLowerCase().includes('fournitures médicales'))) ? 20 : 40;
+        return tauxIntegration >= seuilSectoriel ? 3 : 0;
+      
+      case 'sectorielle':
+        if (!projectData.secteurSectorielle || projectData.secteurSectorielle === 'Pas dans la liste') return 0;
+        const secteurConfig = SECTEURS_CONSOLIDES[projectData.secteurSectorielle as keyof typeof SECTEURS_CONSOLIDES];
+        return secteurConfig ? secteurConfig.prime : 0;
+      
+      case 'territoriale':
+        if (PROVINCES_A.includes(projectData.province)) return 10;
+        else if (PROVINCES_B.includes(projectData.province)) return 15;
+        return 0;
+      
+      default:
+        return 0;
+    }
+  };
+
+  const renderPrimeRatioEmploiStep = () => {
+    const capexEnMDH = projectData.montantTotal / 1000000;
+    const ratio = projectData.emploisStables / capexEnMDH;
+    const primeCalculee = calculateIndividualPrime('ratioEmploi');
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Prime Ratio Emploi/CAPEX</h3>
+          <p className="text-gray-600">Calculée automatiquement selon le ratio emplois créés / investissement</p>
+        </div>
+
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-xl text-blue-700 flex items-center gap-2">
+              <Calculator className="w-6 h-6" />
+              Calcul automatique
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="bg-white p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Investissement total</p>
+                <p className="text-2xl font-bold text-blue-700">{capexEnMDH.toFixed(1)} MDH</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Emplois stables</p>
+                <p className="text-2xl font-bold text-blue-700">{projectData.emploisStables}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Ratio</p>
+                <p className="text-2xl font-bold text-blue-700">{ratio.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg">
+              <h4 className="font-semibold mb-4">Grille de calcul</h4>
+              <div className="space-y-3">
+                <div className={`flex justify-between items-center p-3 rounded ${ratio > 3 ? 'bg-green-100 border-2 border-green-300' : 'bg-gray-50'}`}>
+                  <span>Ratio &gt; 3</span>
+                  <Badge variant={ratio > 3 ? 'default' : 'secondary'} className={ratio > 3 ? 'bg-green-600' : ''}>10%</Badge>
+                </div>
+                <div className={`flex justify-between items-center p-3 rounded ${ratio > 1.5 && ratio <= 3 ? 'bg-green-100 border-2 border-green-300' : 'bg-gray-50'}`}>
+                  <span>Ratio &gt; 1.5</span>
+                  <Badge variant={ratio > 1.5 && ratio <= 3 ? 'default' : 'secondary'} className={ratio > 1.5 && ratio <= 3 ? 'bg-green-600' : ''}>7%</Badge>
+                </div>
+                <div className={`flex justify-between items-center p-3 rounded ${ratio > 1 && ratio <= 1.5 ? 'bg-green-100 border-2 border-green-300' : 'bg-gray-50'}`}>
+                  <span>Ratio &gt; 1</span>
+                  <Badge variant={ratio > 1 && ratio <= 1.5 ? 'default' : 'secondary'} className={ratio > 1 && ratio <= 1.5 ? 'bg-green-600' : ''}>5%</Badge>
+                </div>
+                <div className={`flex justify-between items-center p-3 rounded ${ratio <= 1 ? 'bg-red-100 border-2 border-red-300' : 'bg-gray-50'}`}>
+                  <span>Ratio ≤ 1</span>
+                  <Badge variant={ratio <= 1 ? 'destructive' : 'secondary'}>0%</Badge>
+                </div>
+              </div>
+            </div>
+
+            <Alert className={`${primeCalculee > 0 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'}`}>
+              <AlertCircle className={`h-4 w-4 ${primeCalculee > 0 ? 'text-green-600' : 'text-orange-600'}`} />
+              <AlertDescription className={`${primeCalculee > 0 ? 'text-green-800' : 'text-orange-800'}`}>
+                <strong>Résultat :</strong> Prime ratio emploi/CAPEX = {primeCalculee}%
+                {primeCalculee === 0 && ' - Non éligible (ratio trop faible)'}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       </div>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="partFemmes">Part de femmes dans la masse salariale (%)</Label>
-          <Input
-            id="partFemmes"
-            type="number"
-            max="100"
-            value={projectData.partFemmesPct || ''}
-            onChange={(e) => setProjectData({...projectData, partFemmesPct: Number(e.target.value)})}
-            placeholder="Minimum 30% pour prime genre"
-          />
+    );
+  };
+
+  const renderPrimeGenreStep = () => {
+    const primeCalculee = calculateIndividualPrime('genre');
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Prime Genre</h3>
+          <p className="text-gray-600">3% si au moins 30% de femmes dans la masse salariale</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="achatLocaux">Achats locaux (MAD/an)</Label>
-            <Input
-              id="achatLocaux"
-              type="number"
-              value={projectData.achatLocaux || ''}
-              onChange={(e) => setProjectData({...projectData, achatLocaux: Number(e.target.value)})}
-            />
-          </div>
-          <div>
-            <Label htmlFor="chiffreAffaires">Chiffre d'affaires prévisionnel (MAD/an)</Label>
-            <Input
-              id="chiffreAffaires"
-              type="number"
-              value={projectData.chiffreAffaires || ''}
-              onChange={(e) => setProjectData({...projectData, chiffreAffaires: Number(e.target.value)})}
-            />
-          </div>
+
+        <Card className="border-2 border-pink-200 bg-pink-50">
+          <CardHeader>
+            <CardTitle className="text-xl text-pink-700">Part de femmes dans la masse salariale</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="partFemmes">Pourcentage de femmes (%)</Label>
+              <Input
+                id="partFemmes"
+                type="number"
+                max="100"
+                min="0"
+                value={projectData.partFemmesPct || ''}
+                onChange={(e) => setProjectData({...projectData, partFemmesPct: Number(e.target.value)})}
+                placeholder="Saisissez le pourcentage"
+                className="mt-2"
+              />
+            </div>
+
+            <div className="bg-white p-4 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium">Seuil requis</span>
+                <Badge variant="secondary">≥ 30%</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Votre pourcentage</span>
+                <Badge variant={projectData.partFemmesPct >= 30 ? 'default' : 'destructive'} 
+                       className={projectData.partFemmesPct >= 30 ? 'bg-green-600' : ''}>
+                  {projectData.partFemmesPct || 0}%
+                </Badge>
+              </div>
+            </div>
+
+            <Alert className={`${primeCalculee > 0 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'}`}>
+              <AlertCircle className={`h-4 w-4 ${primeCalculee > 0 ? 'text-green-600' : 'text-orange-600'}`} />
+              <AlertDescription className={`${primeCalculee > 0 ? 'text-green-800' : 'text-orange-800'}`}>
+                <strong>Résultat :</strong> Prime genre = {primeCalculee}%
+                {primeCalculee === 0 && ' - Augmentez la part de femmes à 30% minimum'}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+  const renderPrimeMetiersAvenirStep = () => {
+    const secteurPorteurSelectionne = projectData.metierAvenir;
+    const metiersDisponibles = secteurPorteurSelectionne && METIERS_SPECIALISES[secteurPorteurSelectionne as keyof typeof METIERS_SPECIALISES] || [];
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Activités d'avenir / Montée en gamme</h3>
+          <p className="text-gray-600">Sélectionnez votre activité spécifique pour +3%</p>
         </div>
+
+        {secteurPorteurSelectionne ? (
+          <Card className="border-2 border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-700">
+                Activités disponibles pour {secteurPorteurSelectionne}
+              </CardTitle>
+              <p className="text-sm text-purple-600">Choisissez votre activité spécifique pour bénéficier de la prime de 3%</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Votre activité d'avenir / montée en gamme</Label>
+                <select
+                  value={projectData.activiteSpecifique || ''}
+                  onChange={(e) => setProjectData({...projectData, activiteSpecifique: e.target.value})}
+                  className="w-full mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">-- Choisissez votre activité --</option>
+                  {metiersDisponibles.map((metier, index) => (
+                    <option key={index} value={metier}>{metier}</option>
+                  ))}
+                  <option value="Pas dans la liste">Pas dans la liste (0%)</option>
+                </select>
+              </div>
+
+              {projectData.activiteSpecifique && (
+                <div className="p-3 bg-white rounded border-l-4 border-purple-500">
+                  <p className="text-sm text-gray-700">
+                    <strong>Activité sélectionnée:</strong> {projectData.activiteSpecifique}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Alert className="bg-gray-100 border-gray-300">
+            <AlertCircle className="h-4 w-4 text-gray-600" />
+            <AlertDescription className="text-gray-800">
+              <strong>Aucun secteur porteur sélectionné.</strong> 
+              Vous devez d'abord sélectionner un secteur porteur dans l'étape précédente.
+            </AlertDescription>
+          </Alert>
+        )}
         
-        <div>
-          <Label>Critères développement durable</Label>
-          <div className="mt-2 space-y-2">
-            {CRITERES_DD.map((critere) => (
-              <div key={critere} className="flex items-center space-x-2">
-                <Checkbox
-                  id={critere}
-                  checked={projectData.criteresDD.includes(critere)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setProjectData({...projectData, criteresDD: [...projectData.criteresDD, critere]});
-                    } else {
-                      setProjectData({...projectData, criteresDD: projectData.criteresDD.filter(c => c !== critere)});
-                    }
+        <Alert className={`${
+          projectData.activiteSpecifique ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'
+        }`}>
+          <AlertCircle className={`h-4 w-4 ${
+            projectData.activiteSpecifique ? 'text-green-600' : 'text-orange-600'
+          }`} />
+          <AlertDescription className={`${
+            projectData.activiteSpecifique ? 'text-green-800' : 'text-orange-800'
+          }`}>
+            {projectData.activiteSpecifique ? (
+              projectData.activiteSpecifique === 'Pas dans la liste' ? (
+                <>
+                  <strong>✓ Sélection:</strong> Pas dans la liste
+                  <br />
+                  <strong>Prime métiers d'avenir: 0%</strong>
+                </>
+              ) : (
+                <>
+                  <strong>✓ Activité sélectionnée:</strong> {projectData.activiteSpecifique}
+                  <br />
+                  <strong>Prime métiers d'avenir: +3%</strong>
+                </>
+              )
+            ) : (
+              <>
+                <strong>Aucune activité sélectionnée.</strong> 
+                Sélectionnez une activité d'avenir pour bénéficier de la prime de 3%, ou choisissez "Pas dans la liste" pour continuer sans prime.
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  };
+
+  const renderPrimeDDStep = () => {
+    const primeCalculee = projectData.criteresDD.length >= 3 ? 3 : 0;
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Prime Développement Durable</h3>
+          <p className="text-gray-600">3% pour 3 critères minimum</p>
+        </div>
+
+        <Card className="border-2 border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-lg text-green-700">Critères développement durable</CardTitle>
+            <p className="text-sm text-green-600">Sélectionnez au minimum 3 critères pour obtenir la prime de 3%</p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {CRITERES_DD.map((critere) => (
+                <div key={critere} className="flex items-center space-x-2 p-2 rounded bg-white">
+                  <Checkbox
+                    id={critere}
+                    checked={projectData.criteresDD.includes(critere)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setProjectData({...projectData, criteresDD: [...projectData.criteresDD, critere]});
+                      } else {
+                        setProjectData({...projectData, criteresDD: projectData.criteresDD.filter(c => c !== critere)});
+                      }
+                    }}
+                  />
+                  <Label htmlFor={critere} className="text-sm">
+                    {critere}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            
+            <Alert className={`mt-4 ${
+              projectData.criteresDD.length >= 3 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'
+            }`}>
+              <AlertCircle className={`h-4 w-4 ${
+                projectData.criteresDD.length >= 3 ? 'text-green-600' : 'text-orange-600'
+              }`} />
+              <AlertDescription className={`${
+                projectData.criteresDD.length >= 3 ? 'text-green-800' : 'text-orange-800'
+              }`}>
+                <strong>Critères sélectionnés :</strong> {projectData.criteresDD.length} / 3 minimum
+                {projectData.criteresDD.length >= 3 
+                  ? ' ✓ Éligible pour prime DD (3%)' 
+                  : ` ⚠ Choisissez ${3 - projectData.criteresDD.length} critère(s) supplémentaire(s)`
+                }
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderPrimeIntegrationStep = () => {
+    const primeCalculee = calculateIndividualPrime('integration');
+    const tauxIntegration = projectData.chiffreAffaires > 0 
+      ? ((projectData.achatLocaux + projectData.valeurAjoutee + projectData.margeBrute) / projectData.chiffreAffaires) * 100
+      : 0;
+    const seuilSectoriel = (['pharmaceutique', 'agricole'].some(s => 
+      projectData.secteur?.toLowerCase().includes(s)) || 
+      projectData.secteur?.toLowerCase().includes('fournitures médicales')) ? 20 : 40;
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Prime Intégration Locale</h3>
+          <p className="text-gray-600">3% si taux d'intégration locale ≥ seuil sectoriel</p>
+        </div>
+
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-lg text-blue-700">Taux d'intégration locale</CardTitle>
+            <p className="text-sm text-blue-600">Formule: (Achats domestiques + Valeur ajoutée + Marge brute) / Chiffre d'Affaires</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="achatLocaux">Achats domestiques (MAD/an)</Label>
+                <Input
+                  id="achatLocaux"
+                  type="text"
+                  value={projectData.achatLocaux ? formatNumber(projectData.achatLocaux) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({...projectData, achatLocaux: numValue});
                   }}
                 />
-                <Label htmlFor={critere} className="text-sm">
-                  {critere}
-                </Label>
               </div>
-            ))}
-          </div>
-        </div>
+              <div>
+                <Label htmlFor="chiffreAffaires">Chiffre d'affaires prévisionnel (MAD/an)</Label>
+                <Input
+                  id="chiffreAffaires"
+                  type="text"
+                  value={projectData.chiffreAffaires ? formatNumber(projectData.chiffreAffaires) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({...projectData, chiffreAffaires: numValue});
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="valeurAjoutee">Valeur ajoutée (MAD/an)</Label>
+                <Input
+                  id="valeurAjoutee"
+                  type="text"
+                  value={projectData.valeurAjoutee ? formatNumber(projectData.valeurAjoutee) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({...projectData, valeurAjoutee: numValue});
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="margeBrute">Marge brute (MAD/an)</Label>
+                <Input
+                  id="margeBrute"
+                  type="text"
+                  value={projectData.margeBrute ? formatNumber(projectData.margeBrute) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({...projectData, margeBrute: numValue});
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Calcul du taux en temps réel */}
+            {projectData.chiffreAffaires > 0 && (
+              <Alert className="bg-white border-blue-300">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p>Taux calculé: <strong>{tauxIntegration.toFixed(1)}%</strong></p>
+                    </div>
+                    <div>
+                      <p>Seuil requis: <strong>
+                        {seuilSectoriel}%
+                        {projectData.secteur?.toLowerCase().includes('pharmaceutique') ? ' (Pharmaceutique)' : 
+                         projectData.secteur?.toLowerCase().includes('agricole') ? ' (Agro-alimentaire)' : ' (Autres secteurs)'}
+                      </strong></p>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Alert className={`${primeCalculee > 0 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'}`}>
+              <AlertCircle className={`h-4 w-4 ${primeCalculee > 0 ? 'text-green-600' : 'text-orange-600'}`} />
+              <AlertDescription className={`${primeCalculee > 0 ? 'text-green-800' : 'text-orange-800'}`}>
+                <strong>Résultat :</strong> Prime intégration locale = {primeCalculee}%
+                {primeCalculee === 0 && projectData.chiffreAffaires > 0 && 
+                  ` - Taux insuffisant (${tauxIntegration.toFixed(1)}% < ${seuilSectoriel}%)`}
+                {primeCalculee === 0 && projectData.chiffreAffaires === 0 && 
+                  ' - Renseignez vos données financières'}
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderPrimeSectorielleStep = () => {
+    const secteurConfig = projectData.secteurSectorielle ? 
+      SECTEURS_CONSOLIDES[projectData.secteurSectorielle as keyof typeof SECTEURS_CONSOLIDES] : null;
+    const selectedSecteurPorteur = projectData.metierAvenir; // Réutilise pour secteur porteur
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Secteur d'activité</h3>
+          <p className="text-gray-600">1. Choisissez d'abord votre secteur principal</p>
+        </div>
+
+        {/* Sélection secteur principal */}
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-lg text-blue-700">Secteurs prioritaires (5%)</CardTitle>
+            <p className="text-sm text-blue-600">Sélectionnez votre secteur d'activité principal</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {Object.entries(SECTEURS_CONSOLIDES).map(([secteur, config]) => (
+                <div
+                  key={secteur}
+                  className={`p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                    projectData.secteurSectorielle === secteur 
+                      ? 'bg-blue-100 border-2 border-blue-300 font-semibold' 
+                      : 'bg-white hover:bg-blue-50'
+                  }`}
+                  onClick={() => {
+                    setProjectData({
+                      ...projectData, 
+                      secteurSectorielle: secteur,
+                      metierAvenir: '' // Reset secteur porteur
+                    });
+                  }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">{secteur}</span>
+                    {projectData.secteurSectorielle === secteur && (
+                      <Badge className="bg-blue-600">5%</Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Option "Pas dans la liste" */}
+              <div
+                className={`p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                  projectData.secteurSectorielle === 'Pas dans la liste' 
+                    ? 'bg-gray-100 border-2 border-gray-300 font-semibold' 
+                    : 'bg-white hover:bg-gray-50'
+                }`}
+                onClick={() => {
+                  setProjectData({
+                    ...projectData, 
+                    secteurSectorielle: 'Pas dans la liste',
+                    metierAvenir: '' // Reset secteur porteur
+                  });
+                }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Pas dans la liste</span>
+                  {projectData.secteurSectorielle === 'Pas dans la liste' && (
+                    <Badge variant="secondary">0%</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Option générique pour secteur porteur si "Pas dans la liste" sélectionné */}
+        {projectData.secteurSectorielle === 'Pas dans la liste' && (
+          <Card className="border-2 border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-700">
+                2. Secteur porteur (optionnel)
+              </CardTitle>
+              <p className="text-sm text-purple-600">Vous pouvez tout de même sélectionner un secteur porteur</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {/* Tous les secteurs porteurs disponibles */}
+                {Object.values(SECTEURS_CONSOLIDES).flatMap(config => config.secteursPorteurs).map((secteurPorteur) => (
+                  <div
+                    key={secteurPorteur}
+                    className={`p-2 rounded cursor-pointer transition-all hover:shadow-sm ${
+                      projectData.metierAvenir === secteurPorteur 
+                        ? 'bg-purple-100 border-2 border-purple-300 font-semibold' 
+                        : 'bg-white hover:bg-purple-50'
+                    }`}
+                    onClick={() => setProjectData({
+                      ...projectData, 
+                      metierAvenir: projectData.metierAvenir === secteurPorteur ? '' : secteurPorteur
+                    })}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">{secteurPorteur}</span>
+                      {projectData.metierAvenir === secteurPorteur && (
+                        <Badge className="bg-purple-600">+3%</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Option "Pas dans la liste" */}
+                <div
+                  className={`p-2 rounded cursor-pointer transition-all hover:shadow-sm ${
+                    projectData.metierAvenir === 'Pas dans la liste' 
+                      ? 'bg-gray-100 border-2 border-gray-300 font-semibold' 
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                  onClick={() => setProjectData({
+                    ...projectData, 
+                    metierAvenir: projectData.metierAvenir === 'Pas dans la liste' ? '' : 'Pas dans la liste'
+                  })}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Pas dans la liste</span>
+                    {projectData.metierAvenir === 'Pas dans la liste' && (
+                      <Badge variant="secondary">0%</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sélection secteur porteur si disponible */}
+        {projectData.secteurSectorielle && projectData.secteurSectorielle !== 'Pas dans la liste' && secteurConfig && secteurConfig.secteursPorteurs.length > 0 && (
+          <Card className="border-2 border-purple-200 bg-purple-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-700">
+                2. Secteurs porteurs pour {projectData.secteurSectorielle}
+              </CardTitle>
+              <p className="text-sm text-purple-600">Optionnel : Sélectionnez un secteur porteur pour 3% supplémentaire</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {secteurConfig.secteursPorteurs.map((secteurPorteur) => (
+                  <div
+                    key={secteurPorteur}
+                    className={`p-2 rounded cursor-pointer transition-all hover:shadow-sm ${
+                      selectedSecteurPorteur === secteurPorteur 
+                        ? 'bg-purple-100 border-2 border-purple-300 font-semibold' 
+                        : 'bg-white hover:bg-purple-50'
+                    }`}
+                    onClick={() => setProjectData({
+                      ...projectData, 
+                      metierAvenir: selectedSecteurPorteur === secteurPorteur ? '' : secteurPorteur
+                    })}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs">{secteurPorteur}</span>
+                      {selectedSecteurPorteur === secteurPorteur && (
+                        <Badge className="bg-purple-600">+3%</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Option "Pas dans la liste" pour secteurs porteurs */}
+                <div
+                  className={`p-2 rounded cursor-pointer transition-all hover:shadow-sm ${
+                    selectedSecteurPorteur === 'Pas dans la liste' 
+                      ? 'bg-gray-100 border-2 border-gray-300 font-semibold' 
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                  onClick={() => setProjectData({
+                    ...projectData, 
+                    metierAvenir: selectedSecteurPorteur === 'Pas dans la liste' ? '' : 'Pas dans la liste'
+                  })}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Pas dans la liste</span>
+                    {selectedSecteurPorteur === 'Pas dans la liste' && (
+                      <Badge variant="secondary">0%</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Résumé */}
+        {projectData.secteurSectorielle && (
+          <Alert className={`${projectData.secteurSectorielle === 'Pas dans la liste' ? 'bg-gray-100 border-gray-300' : 'bg-green-100 border-green-300'}`}>
+            <AlertCircle className={`h-4 w-4 ${projectData.secteurSectorielle === 'Pas dans la liste' ? 'text-gray-600' : 'text-green-600'}`} />
+            <AlertDescription className={`${projectData.secteurSectorielle === 'Pas dans la liste' ? 'text-gray-800' : 'text-green-800'}`}>
+              <strong>Secteur principal :</strong> {projectData.secteurSectorielle} 
+              <strong>({projectData.secteurSectorielle === 'Pas dans la liste' ? '0' : secteurConfig?.prime}%)</strong>
+              {selectedSecteurPorteur && selectedSecteurPorteur !== 'Pas dans la liste' && (
+                <><br /><strong>Secteur porteur :</strong> {selectedSecteurPorteur} <strong>(+3%)</strong></>
+              )}
+              {selectedSecteurPorteur === 'Pas dans la liste' && (
+                <><br /><strong>Secteur porteur :</strong> Pas dans la liste <strong>(0%)</strong></>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+    );
+  };
+
 
   const renderResultsStep = () => {
     if (!result) {
@@ -1131,37 +1795,96 @@ export default function SimulateurPrincipal() {
             <CardHeader>
               <CardTitle className="text-lg">Détail des primes</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {result.primeRatioEmploi > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm">Prime ratio emploi/CAPEX</span>
-                  <Badge variant="secondary">{result.primeRatioEmploi}%</Badge>
+            <CardContent className="space-y-3">
+              {/* Primes obtenues */}
+              <div>
+                <h4 className="font-semibold text-green-700 text-sm mb-2">✓ Primes obtenues</h4>
+                <div className="space-y-2">
+                  {result.primeRatioEmploi > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime ratio emploi/CAPEX</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeRatioEmploi}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime ratio emploi/CAPEX</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeGenre > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime genre</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeGenre}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime genre</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeMetiersAvenir > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime métiers d'avenir</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeMetiersAvenir}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime métiers d'avenir</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeSectorielle > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime sectorielle</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeSectorielle}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime sectorielle</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeDD > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime développement durable</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeDD}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime développement durable</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeIntegration > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime intégration locale</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeIntegration}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime intégration locale</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
+                  
+                  {result.primeTerritoriale > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Prime territoriale</span>
+                      <Badge variant="default" className="bg-green-600">{result.primeTerritoriale}%</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Prime territoriale</span>
+                      <Badge variant="destructive">Non éligible</Badge>
+                    </div>
+                  )}
                 </div>
-              )}
-              {result.primeGenre > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm">Prime genre</span>
-                  <Badge variant="secondary">{result.primeGenre}%</Badge>
-                </div>
-              )}
-              {result.primeMetiersAvenir > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm">Prime métiers d'avenir</span>
-                  <Badge variant="secondary">{result.primeMetiersAvenir}%</Badge>
-                </div>
-              )}
-              {result.primeSectorielle > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm">Prime sectorielle</span>
-                  <Badge variant="secondary">{result.primeSectorielle}%</Badge>
-                </div>
-              )}
-              {result.primeTerritoriale > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm">Prime territoriale</span>
-                  <Badge variant="secondary">{result.primeTerritoriale}%</Badge>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>
