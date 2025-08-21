@@ -49,6 +49,11 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
     { title: 'Politique de recrutement', href: '/groupe/recrutement' },
   ];
 
+  const investmentLinks = [
+    { title: 'Simulateur de dispositif principal', href: '/simulateur/principal' },
+    { title: 'Simulateur de dispositif secondaire', href: '/simulateur/secondaire' },
+  ];
+
   const navItems = [
     {
       title: 'Média',
@@ -57,6 +62,10 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
     {
       title: 'Le Groupe',
       items: groupLinks,
+    },
+    {
+      title: 'Booster votre investissement',
+      items: investmentLinks,
     },
   ];
 

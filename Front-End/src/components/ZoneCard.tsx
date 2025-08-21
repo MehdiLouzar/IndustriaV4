@@ -249,7 +249,7 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const getCurrentImageUrl = () => {
     if (hasImages) {
       const currentImage = displayImages[currentImageIndex]
-      return `/api/zones/${zone.id}/images/${currentImage.id}/file`
+      return `${process.env.NEXT_PUBLIC_API_URL}/api/zones/${zone.id}/images/${currentImage.id}/file`
     }
     return zone.image
   }
@@ -258,7 +258,7 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
     <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
       <div className="relative">
         {hasImages || zone.image ? (
-          <div className="relative w-full h-48 overflow-hidden">
+          <div className="relative w-full h-32 overflow-hidden">
             <Image
               src={getCurrentImageUrl() || ''}
               alt={zone.name}
@@ -304,8 +304,8 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
             )}
           </div>
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-colors duration-300">
-            <Factory className="w-12 h-12 text-gray-400" />
+          <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-colors duration-300">
+            <Factory className="w-8 h-8 text-gray-400" />
           </div>
         )}
         <div className="absolute top-3 left-3">
@@ -327,32 +327,32 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
         )}
       </div>
       
-      <CardHeader className="pb-3">
-        <h3 className="font-bold text-lg leading-tight text-gray-900 group-hover:text-industria-brown-gold transition-colors line-clamp-2">
+      <CardHeader className="pb-2">
+        <h3 className="font-bold text-base leading-tight text-gray-900 group-hover:text-industria-brown-gold transition-colors line-clamp-1">
           {zone.name}
         </h3>
-        <p className="text-sm text-gray-600 line-clamp-2">{zone.description}</p>
+        <p className="text-xs text-gray-600 line-clamp-1">{zone.description}</p>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+      <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <MapPin className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span className="truncate">{zone.location}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Ruler className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Ruler className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span>{zone.area}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Factory className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Factory className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span className="truncate">{zone.type}</span>
           </div>
           {(zone.totalParcels !== undefined && zone.availableParcels !== undefined) && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Grid3X3 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Grid3X3 className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
               <span>
-                {zone.availableParcels} / {zone.totalParcels} parcelles disponibles
+                {zone.availableParcels} / {zone.totalParcels} parcelles
               </span>
             </div>
           )}
@@ -360,30 +360,30 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
         
         {/* Section Activités et Équipements */}
         {((zone.activities && zone.activities.length > 0) || (zone.amenities && zone.amenities.length > 0)) && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Activités autorisées */}
             {zone.activities && zone.activities.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                  Activités autorisées
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                  Activités
                 </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {zone.activities.slice(0, 4).map((activity) => {
+                <div className="flex flex-wrap gap-1">
+                  {zone.activities.slice(0, 3).map((activity) => {
                     const IconComponent = getLucideIcon(activity.icon)
                     return (
                       <div
                         key={activity.id}
-                        className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full border border-blue-200"
+                        className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded-full border border-blue-200"
                         title={activity.description || activity.name}
                       >
                         <IconComponent className="w-3 h-3" />
-                        <span className="truncate max-w-16">{activity.name}</span>
+                        <span className="truncate max-w-12 text-xs">{activity.name}</span>
                       </div>
                     )
                   })}
-                  {zone.activities.length > 4 && (
-                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-                      +{zone.activities.length - 4}
+                  {zone.activities.length > 3 && (
+                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">
+                      +{zone.activities.length - 3}
                     </div>
                   )}
                 </div>
@@ -393,26 +393,26 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
             {/* Équipements disponibles */}
             {zone.amenities && zone.amenities.length > 0 && (
               <div>
-                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                   Équipements
                 </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {zone.amenities.slice(0, 4).map((amenity) => {
+                <div className="flex flex-wrap gap-1">
+                  {zone.amenities.slice(0, 3).map((amenity) => {
                     const IconComponent = getLucideIcon(amenity.icon)
                     return (
                       <div
                         key={amenity.id}
-                        className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full border border-green-200"
+                        className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-1.5 py-0.5 rounded-full border border-green-200"
                         title={amenity.description || amenity.name}
                       >
                         <IconComponent className="w-3 h-3" />
-                        <span className="truncate max-w-16">{amenity.name}</span>
+                        <span className="truncate max-w-12 text-xs">{amenity.name}</span>
                       </div>
                     )
                   })}
-                  {zone.amenities.length > 4 && (
-                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
-                      +{zone.amenities.length - 4}
+                  {zone.amenities.length > 3 && (
+                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">
+                      +{zone.amenities.length - 3}
                     </div>
                   )}
                 </div>
@@ -421,25 +421,25 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
           </div>
         )}
         
-        <div className="pt-2 border-t">
-          <p className="font-semibold text-gray-900">{zone.price}</p>
+        <div className="pt-1 border-t">
+          <p className="font-semibold text-sm text-gray-900">{zone.price}</p>
         </div>
         
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           {zone.id.startsWith('demo-') || zone.id.startsWith('fallback-') ? (
-            <Button size="sm" className="flex-1 bg-gray-400 text-white cursor-not-allowed" disabled>
-              <Eye className="w-4 h-4 mr-1" /> Démonstration
+            <Button size="sm" className="flex-1 bg-gray-400 text-white cursor-not-allowed text-xs" disabled>
+              <Eye className="w-3 h-3 mr-1" /> Démo
             </Button>
           ) : (
-            <Button asChild size="sm" className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white">
+            <Button asChild size="sm" className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white text-xs">
               <Link href={`/zones/${zone.id}`}>
-                <Eye className="w-4 h-4 mr-1" /> Voir
+                <Eye className="w-3 h-3 mr-1" /> Voir
               </Link>
             </Button>
           )}
-          <Button asChild variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold">
+          <Button asChild variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold text-xs">
             <Link href={`/contact?zone=${zone.id}`}>
-              <Phone className="w-4 h-4 mr-1" /> Contact
+              <Phone className="w-3 h-3 mr-1" /> Contact
             </Link>
           </Button>
         </div>
