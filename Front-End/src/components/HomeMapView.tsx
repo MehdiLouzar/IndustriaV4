@@ -38,6 +38,7 @@ import {
   Marker,
   Popup,
   Polygon,
+  useMap,
   type LatLngTuple,
 } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-markercluster'
@@ -60,6 +61,74 @@ L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 /*************************
  *  Types & Constantes   *
  *************************/
+
+/**
+ * Composant de légende intégré à la carte
+ */
+function MapLegend() {
+  const map = useMap()
+
+  useEffect(() => {
+    const legend = L.control({ position: 'bottomleft' })
+
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'leaflet-control-legend')
+      div.style.backgroundColor = 'white'
+      div.style.padding = '12px'
+      div.style.borderRadius = '8px'
+      div.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      div.style.border = '1px solid #e5e7eb'
+      div.style.maxWidth = '200px'
+      div.style.fontSize = '12px'
+      
+      // Créer les icônes SVG avec renderToStaticMarkup
+      const factoryIcon = renderToStaticMarkup(<Factory width={10} height={10} stroke="white" />)
+      const shipIcon = renderToStaticMarkup(<Ship width={10} height={10} stroke="white" />)
+      const planeIcon = renderToStaticMarkup(<Plane width={10} height={10} stroke="white" />)
+      const trainIcon = renderToStaticMarkup(<TrainFront width={10} height={10} stroke="white" />)
+      
+      div.innerHTML = `
+        <h4 style="font-weight: 600; color: #374151; margin: 0 0 8px 0;">Légende</h4>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #d4a574; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${factoryIcon}
+            </div>
+            <span style="color: #4b5563;">Zones industrielles</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #3b82f6; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${shipIcon}
+            </div>
+            <span style="color: #4b5563;">Ports</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${planeIcon}
+            </div>
+            <span style="color: #4b5563;">Aéroports</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #f97316; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${trainIcon}
+            </div>
+            <span style="color: #4b5563;">Gares</span>
+          </div>
+        </div>
+      `
+
+      return div
+    }
+
+    legend.addTo(map)
+
+    return () => {
+      legend.remove()
+    }
+  }, [map])
+
+  return null
+}
 
 /**
  * Représentation d'une zone avec géométrie
@@ -513,7 +582,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
     return {
       station: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-olive-light p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-orange-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
             <TrainFront width={12} height={12} stroke="white" />
           </div>,
         ),
@@ -523,7 +592,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
       }),
       port: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-black p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-blue-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
             <Ship width={12} height={12} stroke="white" />
           </div>,
         ),
@@ -533,7 +602,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
       }),
       airport: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-yellow-gold p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-green-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
             <Plane width={12} height={12} stroke="white" />
           </div>,
         ),
@@ -1099,6 +1168,9 @@ const loadZones = useCallback(async (precision: number, force = false) => {
         {allPois.map((poi) => (
           <PoiMarker key={`home-poi-${poi.id}`} poi={poi} />
         ))}
+
+        {/* Légende intégrée à la carte */}
+        <MapLegend />
       </MapContainer>
     </div>
   )

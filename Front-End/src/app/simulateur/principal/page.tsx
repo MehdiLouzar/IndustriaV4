@@ -631,7 +631,7 @@ export default function SimulateurPrincipal() {
           <Alert className="mt-4 bg-yellow-50 border-yellow-200">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertDescription className="text-yellow-800">
-              <strong>Plafond légal :</strong> Le total des primes ne peut dépasser 30% du MIP (Montant d'Investissement Productif).
+              <strong>Plafond légal :</strong> Le total des primes ne peut dépasser 30% du MIP (Montant d'Investissement Primable).
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -880,6 +880,13 @@ export default function SimulateurPrincipal() {
     
     const isCoherent = ecartMontant <= (projectData.montantTotal * 0.01); // Tolérance de 1%
 
+    // Calcul du MIP (Montant d'Investissement Primable)
+    const partFoncierPrivePct = projectData.montantTotal > 0 ? 
+      (projectData.foncierPrive / projectData.montantTotal) * 100 : 0;
+    const mip = partFoncierPrivePct <= 20 
+      ? projectData.montantTotal - projectData.foncierPublic
+      : (projectData.montantTotal - projectData.foncierPrive - projectData.foncierPublic) + (0.20 * projectData.montantTotal);
+
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -903,6 +910,28 @@ export default function SimulateurPrincipal() {
             <strong>Montant total à ventiler :</strong> {formatNumber(projectData.montantTotal)} MAD
           </AlertDescription>
         </Alert>
+
+        {/* Affichage du MIP calculé */}
+        {projectData.montantTotal > 0 && (
+          <Alert className="bg-green-50 border-green-200">
+            <AlertCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              <div className="space-y-2">
+                <div>
+                  <strong>Montant d'Investissement Primable (MIP) :</strong> {formatNumber(Math.max(0, mip))} MAD
+                </div>
+                <div className="text-sm text-green-700">
+                  {partFoncierPrivePct <= 20 ? (
+                    <>Calcul : Investissement total ({formatNumber(projectData.montantTotal)} MAD) - Foncier public ({formatNumber(projectData.foncierPublic)} MAD)</>
+                  ) : (
+                    <>Calcul : Foncier privé plafonné à 20% + Autres investissements - Foncier public<br/>
+                    <span className="text-orange-600">⚠ Foncier privé dépasse 20% ({partFoncierPrivePct.toFixed(1)}%), limitation appliquée</span></>
+                  )}
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
