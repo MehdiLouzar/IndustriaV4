@@ -57,18 +57,11 @@ export default function Footer() {
               <Phone className="w-5 h-5" />
               Appel (Centre d'appel)
             </Button>
-            <Button asChild variant="ghost" className="text-white hover:bg-gray-600 flex items-center gap-2">
+            <Button asChild variant="ghost" className="header-brown text-white hover:opacity-90 flex items-center gap-2">
               <a href="/contact">
                 <Mail className="w-5 h-5" />
                 Être contacté
               </a>
-            </Button>
-            <Button
-              className="header-brown text-white hover:opacity-90 flex items-center gap-2"
-              onClick={() => setShowForm(true)}
-            >
-              <Calendar className="w-5 h-5" />
-              Prise de rendez-vous
             </Button>
           </div>
         </div>
@@ -130,10 +123,10 @@ export default function Footer() {
                 <span className="text-xl font-bold">+212 5 37 57 20 00</span>
               </div>
               <Button
-                className="w-full header-brown text-white hover:opacity-90 mt-3"
-                onClick={() => setShowForm(true)}
-              >
-                Prise de rendez-vous
+                className="w-full header-brown text-white hover:opacity-90 mt-3">
+                <a href="/contact">
+                  Être contacté
+                </a>
               </Button>
             </div>
           </div>

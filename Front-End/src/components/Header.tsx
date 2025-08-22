@@ -54,7 +54,15 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
     { title: 'Simulateur de dispositif TPME', href: '/simulateur/secondaire' },
   ];
 
-  const navItems = [
+  const discoursLinks = [
+    { title: 'Discours de Sa Majesté', href: '/discours-royaux' },
+  ];
+
+  const navItems: Array<{title: string; items: Array<{title: string; href: string}>}> = [
+    {
+      title: 'Discours Royaux',
+      items: discoursLinks,
+    },
     {
       title: 'Média',
       items: mediaLinks,

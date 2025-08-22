@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Calculator, FileText, TrendingUp } from 'lucide-react';
+import { AlertCircle, Calculator, FileText, TrendingUp, Download } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,7 @@ interface ProjectData {
   // Primes spécifiques
   partFemmesPct: number;
   criteresDD: string[];
+  critereDDObligatoire: boolean;
   achatLocaux: number;
   valeurAjoutee: number;
   margeBrute: number;
@@ -65,7 +66,7 @@ const SECTEURS_CONSOLIDES = {
     secteursPorteurs: [
       'Industrie automobile',
       'Industrie aéronautique', 
-      'Industrie agricole',
+      'Industrie agricole / agro-alimentaire',
       'Industrie diversifiée',
       'Industrie Maritime',
       'Industrie pharmaceutique',
@@ -127,7 +128,7 @@ const METIERS_SPECIALISES = {
     'Fabrication de pièces et composants de moteurs d\'avions',
     'Maintenance et démontage d\'avions'
   ],
-  'Industrie agricole': [
+  'Industrie agricole / agro-alimentaire': [
     'Alimentation animale',
     'Nourriture pour bébé', 
     'Plats cuisinés',
@@ -231,13 +232,18 @@ const PROVINCES_B = [
   'Tan-Tan', 'Boujdour', 'Tarfaya', 'Es-Semara', 'Aousserd'
 ];
 
-const CRITERES_DD = [
-  'Système d\'économie d\'eau',
+// Critère obligatoire pour la prime DD
+const CRITERE_DD_OBLIGATOIRE = 'Utilisation des eaux non conventionnelles telles que les eaux recyclées, les eaux usées retraitées ou les eaux dessalées et mise en place d\'un système d\'économie d\'eau';
+
+// Critères optionnels pour la prime DD (minimum 2 requis en plus de l'obligatoire)
+const CRITERES_DD_OPTIONNELS = [
   'Énergies renouvelables',
   'Efficacité énergétique',
   'Traitement des déchets',
   'Programmes sociaux',
-  'Certification environnementale'
+  'Certification environnementale',
+  'Gestion durable des ressources naturelles',
+  'Formation et sensibilisation environnementale'
 ];
 
 // Fonction pour formater les nombres avec des espaces comme séparateurs de milliers
@@ -268,12 +274,257 @@ export default function SimulateurPrincipal() {
     equipements: 0,
     partFemmesPct: 0,
     criteresDD: [],
+    critereDDObligatoire: false,
     achatLocaux: 0,
     valeurAjoutee: 0,
     margeBrute: 0,
     chiffreAffaires: 0,
   });
   const [result, setResult] = useState<SimulationResult | null>(null);
+
+  // Reset result whenever projectData changes to ensure recalculation
+  useEffect(() => {
+    setResult(null);
+  }, [projectData]);
+
+  // Generate PDF export of simulation results
+  const exportToPDF = () => {
+    if (!result) return;
+
+    // Create a new window with the PDF content
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const currentDate = new Date().toLocaleDateString('fr-FR');
+    const montantFormate = (num: number) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Simulateur d'Investissement - Résultats</title>
+        <style>
+          body { 
+            font-family: 'Arial', sans-serif; 
+            margin: 40px; 
+            line-height: 1.6; 
+            color: #333;
+          }
+          .header { 
+            text-align: center; 
+            border-bottom: 3px solid #8B4513; 
+            padding-bottom: 20px; 
+            margin-bottom: 30px; 
+          }
+          .header h1 { 
+            color: #8B4513; 
+            font-size: 24px; 
+            margin: 0; 
+          }
+          .header p { 
+            color: #666; 
+            font-size: 14px; 
+            margin: 5px 0; 
+          }
+          .section { 
+            margin-bottom: 25px; 
+            page-break-inside: avoid; 
+          }
+          .section-title { 
+            background: linear-gradient(135deg, #8B4513, #A0522D); 
+            color: white; 
+            padding: 10px 15px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+          }
+          .info-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-bottom: 15px; 
+          }
+          .info-item { 
+            padding: 8px; 
+            border-left: 4px solid #8B4513; 
+            background: #f9f9f9; 
+          }
+          .info-label { 
+            font-weight: bold; 
+            color: #8B4513; 
+          }
+          .primes-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+          }
+          .primes-table th, .primes-table td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+          }
+          .primes-table th { 
+            background: #8B4513; 
+            color: white; 
+            font-weight: bold; 
+          }
+          .prime-eligible { 
+            background: #e8f5e8; 
+            color: #2d5a2d; 
+          }
+          .prime-non-eligible { 
+            background: #ffeaea; 
+            color: #8b4513; 
+          }
+          .total-row { 
+            font-weight: bold; 
+            background: #f0f0f0; 
+          }
+          .footer { 
+            margin-top: 40px; 
+            text-align: center; 
+            font-size: 12px; 
+            color: #666; 
+            border-top: 1px solid #ddd; 
+            padding-top: 20px; 
+          }
+          @media print { 
+            body { margin: 20px; } 
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SIMULATEUR D'INVESTISSEMENT - RÉSULTATS</h1>
+          <p>Dispositif Principal d'Aide à l'Investissement</p>
+          <p>Généré le ${currentDate}</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">📊 Récapitulatif du Projet</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">Secteur d'activité</div>
+              <div>${projectData.secteurSectorielle || 'Non spécifié'}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Métier d'avenir</div>
+              <div>${projectData.metierAvenir || 'Non spécifié'}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Localisation</div>
+              <div>${projectData.region} - ${projectData.province}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Montant total</div>
+              <div>${montantFormate(projectData.montantTotal)} MAD</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Emplois stables</div>
+              <div>${projectData.emploisStables} emplois</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">MIP</div>
+              <div>${montantFormate(Math.round(result.mip))} MAD</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🎯 Détail des Primes</div>
+          <table class="primes-table">
+            <thead>
+              <tr>
+                <th>Type de Prime</th>
+                <th>Taux</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="${result.primeRatioEmploi > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime ratio emploi/CAPEX</td>
+                <td>${result.primeRatioEmploi}%</td>
+                <td>${result.primeRatioEmploi > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeGenre > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime genre (≥30% femmes)</td>
+                <td>${result.primeGenre}%</td>
+                <td>${result.primeGenre > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeSectorielle > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime sectorielle</td>
+                <td>${result.primeSectorielle}%</td>
+                <td>${result.primeSectorielle > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeMetiersAvenir > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime métiers d'avenir</td>
+                <td>${result.primeMetiersAvenir}%</td>
+                <td>${result.primeMetiersAvenir > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeDD > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime développement durable</td>
+                <td>${result.primeDD}%</td>
+                <td>${result.primeDD > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeIntegration > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime intégration locale</td>
+                <td>${result.primeIntegration}%</td>
+                <td>${result.primeIntegration > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="${result.primeTerritoriale > 0 ? 'prime-eligible' : 'prime-non-eligible'}">
+                <td>Prime territoriale</td>
+                <td>${result.primeTerritoriale}%</td>
+                <td>${result.primeTerritoriale > 0 ? 'Éligible' : 'Non éligible'}</td>
+              </tr>
+              <tr class="total-row">
+                <td><strong>Total des primes (plafonné à 30%)</strong></td>
+                <td><strong>${result.totalPrimesAjustePct}%</strong></td>
+                <td><strong>${montantFormate(Math.round(result.montantPrimesMAD))} MAD</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">💰 Résumé Financier</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">Montant d'investissement total</div>
+              <div>${montantFormate(projectData.montantTotal)} MAD</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Montant d'investissement primable (MIP)</div>
+              <div>${montantFormate(Math.round(result.mip))} MAD</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Taux de prime total</div>
+              <div>${result.totalPrimesAjustePct}%</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Montant de la prime estimée</div>
+              <div><strong>${montantFormate(Math.round(result.montantPrimesMAD))} MAD</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>INDUSTRIA</strong> - Simulateur d'Investissement</p>
+          <p>Ce document est une estimation basée sur les informations fournies. Les montants définitifs sont soumis à validation officielle.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    
+    // Wait for content to load then trigger print dialog
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  };
 
   const steps = [
     'Conditions d\'utilisation',
@@ -297,15 +548,57 @@ export default function SimulateurPrincipal() {
     }
   };
 
+  // Détermine si l'étape Activités d'avenir doit être ignorée
+  const shouldSkipMetiersAvenirStep = () => {
+    if (!projectData.secteurSectorielle) return false;
+    if (projectData.secteurSectorielle === 'Pas dans la liste') return true;
+    
+    const secteurConfig = SECTEURS_CONSOLIDES[projectData.secteurSectorielle as keyof typeof SECTEURS_CONSOLIDES];
+    if (!secteurConfig || secteurConfig.secteursPorteurs.length === 0) return true;
+    
+    // Si "Pas dans la liste" est sélectionné pour le métier d'avenir, ignorer l'étape suivante
+    if (projectData.metierAvenir === 'Pas dans la liste') return true;
+    
+    return false;
+  };
+
+  // Calcule le nombre total d'étapes effectives et la position actuelle
+  const getEffectiveStepInfo = () => {
+    const totalSteps = steps.length;
+    const skippedSteps = shouldSkipMetiersAvenirStep() ? 1 : 0;
+    const effectiveTotalSteps = totalSteps - skippedSteps;
+    
+    let effectiveCurrentStep = currentStep + 1;
+    if (currentStep > 9 && shouldSkipMetiersAvenirStep()) {
+      effectiveCurrentStep = currentStep; // Réduire de 1 car étape 9 ignorée
+    }
+    
+    return { effectiveCurrentStep, effectiveTotalSteps };
+  };
+
   const handleNextStep = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      let nextStep = currentStep + 1;
+      
+      // Skip step 9 (métiers d'avenir) if no secteurs porteurs available
+      if (nextStep === 9 && shouldSkipMetiersAvenirStep()) {
+        nextStep = 10;
+      }
+      
+      setCurrentStep(nextStep);
     }
   };
 
   const handlePrevStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      let prevStep = currentStep - 1;
+      
+      // Skip step 9 (métiers d'avenir) if no secteurs porteurs available
+      if (prevStep === 9 && shouldSkipMetiersAvenirStep()) {
+        prevStep = 8;
+      }
+      
+      setCurrentStep(prevStep);
     }
   };
 
@@ -353,17 +646,18 @@ export default function SimulateurPrincipal() {
 
     const primeGenre = projectData.partFemmesPct >= 30 ? 3 : 0;
     // Prime métiers d'avenir si activité spécifique sélectionnée
-    const primeMetiersAvenir = projectData.activiteSpecifique && projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
-    const primeDD = projectData.criteresDD.includes('Système d\'économie d\'eau (obligatoire)') && 
-                    projectData.criteresDD.length >= 3 ? 3 : 0;
+    const primeMetiersAvenir = projectData.activiteSpecifique && 
+                              projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
+    const primeDD = projectData.critereDDObligatoire && projectData.criteresDD.length >= 2 ? 3 : 0;
 
     // Prime intégration locale
     const tauxIntegration = projectData.chiffreAffaires > 0 
       ? ((projectData.achatLocaux + projectData.valeurAjoutee + projectData.margeBrute) / projectData.chiffreAffaires) * 100
       : 0;
-    const seuilSectoriel = (['pharmaceutique', 'agricole'].some(s => 
-      projectData.secteur?.toLowerCase().includes(s)) || 
-      projectData.secteur?.toLowerCase().includes('fournitures médicales')) ? 20 : 40;
+    const seuilSectoriel = (projectData.metierAvenir && 
+      (['pharmaceutique', 'agricole'].some(s => 
+        projectData.metierAvenir?.toLowerCase().includes(s)) || 
+        projectData.metierAvenir?.toLowerCase().includes('fournitures médicales'))) ? 20 : 40;
     const primeIntegration = tauxIntegration >= seuilSectoriel ? 3 : 0;
 
     // Prime sectorielle selon le secteur sélectionné
@@ -599,10 +893,6 @@ export default function SimulateurPrincipal() {
                   <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">5%</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Secteurs prioritaires</span>
-                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">8%</Badge>
-                </div>
-                <div className="flex justify-between items-center">
                   <span className="text-sm">Développement durable</span>
                   <Badge variant="secondary" className="text-xs">3%</Badge>
                 </div>
@@ -662,7 +952,7 @@ export default function SimulateurPrincipal() {
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-industria-brown-gold text-white flex items-center justify-center mx-auto mb-2 font-bold">4</div>
               <p className="text-sm font-medium">Convention</p>
-              <p className="text-xs text-gray-600">Signature et décaissement</p>
+              <p className="text-xs text-gray-600">Signature de la convention</p>
             </div>
           </div>
         </CardContent>
@@ -1141,10 +1431,11 @@ export default function SimulateurPrincipal() {
         return projectData.partFemmesPct >= 30 ? 3 : 0;
       
       case 'metiersAvenir':
-        return projectData.activiteSpecifique && projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
+        return projectData.activiteSpecifique && 
+               projectData.activiteSpecifique !== 'Pas dans la liste' ? 3 : 0;
       
       case 'dd':
-        return projectData.criteresDD.length >= 3 ? 3 : 0;
+        return projectData.critereDDObligatoire && projectData.criteresDD.length >= 2 ? 3 : 0;
       
       case 'integration':
         const tauxIntegration = projectData.chiffreAffaires > 0 
@@ -1316,38 +1607,79 @@ export default function SimulateurPrincipal() {
               <p className="text-sm text-purple-600">Choisissez votre activité spécifique pour bénéficier de la prime de 3%</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label>Votre activité d'avenir / montée en gamme</Label>
-                <select
-                  value={projectData.activiteSpecifique || ''}
-                  onChange={(e) => setProjectData({...projectData, activiteSpecifique: e.target.value})}
-                  className="w-full mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {metiersDisponibles.map((metier, index) => (
+                  <div
+                    key={index}
+                    className={`p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                      projectData.activiteSpecifique === metier 
+                        ? 'bg-purple-100 border-2 border-purple-300 font-semibold' 
+                        : 'bg-white hover:bg-purple-50'
+                    }`}
+                    onClick={() => {
+                      setProjectData({
+                        ...projectData, 
+                        activiteSpecifique: metier
+                      });
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">{metier}</span>
+                      {projectData.activiteSpecifique === metier && (
+                        <Badge className="bg-purple-600">3%</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Option "Pas dans la liste" */}
+                <div
+                  className={`p-3 rounded cursor-pointer transition-all hover:shadow-md ${
+                    projectData.activiteSpecifique === 'Pas dans la liste' 
+                      ? 'bg-gray-100 border-2 border-gray-300 font-semibold' 
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                  onClick={() => {
+                    setProjectData({
+                      ...projectData, 
+                      activiteSpecifique: 'Pas dans la liste'
+                    });
+                  }}
                 >
-                  <option value="">-- Choisissez votre activité --</option>
-                  {metiersDisponibles.map((metier, index) => (
-                    <option key={index} value={metier}>{metier}</option>
-                  ))}
-                  <option value="Pas dans la liste">Pas dans la liste (0%)</option>
-                </select>
-              </div>
-
-              {projectData.activiteSpecifique && (
-                <div className="p-3 bg-white rounded border-l-4 border-purple-500">
-                  <p className="text-sm text-gray-700">
-                    <strong>Activité sélectionnée:</strong> {projectData.activiteSpecifique}
-                  </p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Pas dans la liste</span>
+                    {projectData.activiteSpecifique === 'Pas dans la liste' && (
+                      <Badge variant="secondary">0%</Badge>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         ) : (
-          <Alert className="bg-gray-100 border-gray-300">
-            <AlertCircle className="h-4 w-4 text-gray-600" />
-            <AlertDescription className="text-gray-800">
-              <strong>Aucun secteur porteur sélectionné.</strong> 
-              Vous devez d'abord sélectionner un secteur porteur dans l'étape précédente.
-            </AlertDescription>
-          </Alert>
+          <Card className="border-2 border-gray-200 bg-gray-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-gray-700">
+                Aucun secteur porteur sélectionné
+              </CardTitle>
+              <p className="text-sm text-gray-600">Pas de secteur porteur ou "Pas dans la liste" sélectionné dans l'étape précédente</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-blue-100 border-blue-300">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Information :</strong> Votre secteur d'activité n'a pas de secteurs porteurs définis ou vous avez choisi "Pas dans la liste". 
+                  Vous pouvez continuer sans activité d'avenir (prime = 0%).
+                </AlertDescription>
+              </Alert>
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Vous pouvez passer à l'étape suivante sans sélectionner d'activité d'avenir.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
         
         <Alert className={`${
@@ -1360,9 +1692,9 @@ export default function SimulateurPrincipal() {
             projectData.activiteSpecifique ? 'text-green-800' : 'text-orange-800'
           }`}>
             {projectData.activiteSpecifique ? (
-              projectData.activiteSpecifique === 'Pas dans la liste' ? (
+              (projectData.activiteSpecifique === 'Pas dans la liste') ? (
                 <>
-                  <strong>✓ Sélection:</strong> Pas dans la liste
+                  <strong>✓ Sélection:</strong> {projectData.activiteSpecifique}
                   <br />
                   <strong>Prime métiers d'avenir: 0%</strong>
                 </>
@@ -1376,7 +1708,7 @@ export default function SimulateurPrincipal() {
             ) : (
               <>
                 <strong>Aucune activité sélectionnée.</strong> 
-                Sélectionnez une activité d'avenir pour bénéficier de la prime de 3%, ou choisissez "Pas dans la liste" pour continuer sans prime.
+                Sélectionnez une activité d'avenir pour bénéficier de la prime de 3%, ou choisissez une option à 0% pour continuer sans prime.
               </>
             )}
           </AlertDescription>
@@ -1386,60 +1718,117 @@ export default function SimulateurPrincipal() {
   };
 
   const renderPrimeDDStep = () => {
-    const primeCalculee = projectData.criteresDD.length >= 3 ? 3 : 0;
+    const primeCalculee = projectData.critereDDObligatoire && projectData.criteresDD.length >= 2 ? 3 : 0;
     
     return (
       <div className="space-y-6">
         <div className="text-center">
           <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Prime Développement Durable</h3>
-          <p className="text-gray-600">3% pour 3 critères minimum</p>
+          <p className="text-gray-600">3% pour le critère obligatoire + 2 critères optionnels minimum</p>
         </div>
 
-        <Card className="border-2 border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-lg text-green-700">Critères développement durable</CardTitle>
-            <p className="text-sm text-green-600">Sélectionnez au minimum 3 critères pour obtenir la prime de 3%</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {CRITERES_DD.map((critere) => (
-                <div key={critere} className="flex items-center space-x-2 p-2 rounded bg-white">
-                  <Checkbox
-                    id={critere}
-                    checked={projectData.criteresDD.includes(critere)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setProjectData({...projectData, criteresDD: [...projectData.criteresDD, critere]});
-                      } else {
-                        setProjectData({...projectData, criteresDD: projectData.criteresDD.filter(c => c !== critere)});
-                      }
-                    }}
-                  />
-                  <Label htmlFor={critere} className="text-sm">
-                    {critere}
-                  </Label>
-                </div>
-              ))}
-            </div>
-            
-            <Alert className={`mt-4 ${
-              projectData.criteresDD.length >= 3 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'
-            }`}>
-              <AlertCircle className={`h-4 w-4 ${
-                projectData.criteresDD.length >= 3 ? 'text-green-600' : 'text-orange-600'
-              }`} />
-              <AlertDescription className={`${
-                projectData.criteresDD.length >= 3 ? 'text-green-800' : 'text-orange-800'
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Carte du critère obligatoire */}
+          <Card className="border-2 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-700">Critère Obligatoire en utilisation d'eau non conventionnelles</CardTitle>
+              <p className="text-sm text-green-600">Ce critère est obligatoire pour obtenir la prime DD</p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start space-x-3 p-3 rounded bg-white">
+                <Checkbox
+                  id="critere-obligatoire"
+                  checked={projectData.critereDDObligatoire}
+                  onCheckedChange={(checked) => {
+                    setProjectData({...projectData, critereDDObligatoire: !!checked});
+                  }}
+                />
+                <Label htmlFor="critere-obligatoire" className="text-sm leading-5 cursor-pointer">
+                  {CRITERE_DD_OBLIGATOIRE}
+                </Label>
+              </div>
+              
+              <Alert className={`mt-4 ${
+                projectData.critereDDObligatoire ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'
               }`}>
-                <strong>Critères sélectionnés :</strong> {projectData.criteresDD.length} / 3 minimum
-                {projectData.criteresDD.length >= 3 
-                  ? ' ✓ Éligible pour prime DD (3%)' 
-                  : ` ⚠ Choisissez ${3 - projectData.criteresDD.length} critère(s) supplémentaire(s)`
-                }
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
+                <AlertCircle className={`h-4 w-4 ${
+                  projectData.critereDDObligatoire ? 'text-green-600' : 'text-orange-600'
+                }`} />
+                <AlertDescription className={`${
+                  projectData.critereDDObligatoire ? 'text-green-800' : 'text-orange-800'
+                }`}>
+                  {projectData.critereDDObligatoire 
+                    ? '✓ Critère obligatoire validé' 
+                    : '⚠ Critère obligatoire requis'
+                  }
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Carte des critères optionnels */}
+          <Card className="border-2 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-700">Critères Obligatoire en développement durable et énérgie</CardTitle>
+              <p className="text-sm text-green-600">Sélectionnez au minimum 2 critères supplémentaires</p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {CRITERES_DD_OPTIONNELS.map((critere) => (
+                  <div key={critere} className="flex items-center space-x-2 p-2 rounded bg-white">
+                    <Checkbox
+                      id={critere}
+                      checked={projectData.criteresDD.includes(critere)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setProjectData({...projectData, criteresDD: [...projectData.criteresDD, critere]});
+                        } else {
+                          setProjectData({...projectData, criteresDD: projectData.criteresDD.filter(c => c !== critere)});
+                        }
+                      }}
+                    />
+                    <Label htmlFor={critere} className="text-sm cursor-pointer">
+                      {critere}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              
+              <Alert className={`mt-4 ${
+                projectData.criteresDD.length >= 2 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'
+              }`}>
+                <AlertCircle className={`h-4 w-4 ${
+                  projectData.criteresDD.length >= 2 ? 'text-green-600' : 'text-orange-600'
+                }`} />
+                <AlertDescription className={`${
+                  projectData.criteresDD.length >= 2 ? 'text-green-800' : 'text-orange-800'
+                }`}>
+                  <strong>Critères sélectionnés :</strong> {projectData.criteresDD.length} / 2 minimum
+                  {projectData.criteresDD.length >= 2 
+                    ? ' ✓ Objectif atteint' 
+                    : ` ⚠ Choisissez ${2 - projectData.criteresDD.length} critère(s) supplémentaire(s)`
+                  }
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Résumé global */}
+        <Alert className={`${primeCalculee > 0 ? 'bg-green-100 border-green-300' : 'bg-orange-100 border-orange-300'}`}>
+          <AlertCircle className={`h-4 w-4 ${primeCalculee > 0 ? 'text-green-600' : 'text-orange-600'}`} />
+          <AlertDescription className={`${primeCalculee > 0 ? 'text-green-800' : 'text-orange-800'}`}>
+            <strong>Résultat :</strong> Prime Développement Durable = {primeCalculee}%
+            {primeCalculee > 0 ? (
+              <> - Critère obligatoire ✓ + {projectData.criteresDD.length} critères optionnels</>
+            ) : (
+              <>
+                {!projectData.critereDDObligatoire && ' - Critère obligatoire manquant'}
+                {projectData.critereDDObligatoire && projectData.criteresDD.length < 2 && ' - Critères optionnels insuffisants'}
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   };
@@ -1449,9 +1838,10 @@ export default function SimulateurPrincipal() {
     const tauxIntegration = projectData.chiffreAffaires > 0 
       ? ((projectData.achatLocaux + projectData.valeurAjoutee + projectData.margeBrute) / projectData.chiffreAffaires) * 100
       : 0;
-    const seuilSectoriel = (['pharmaceutique', 'agricole'].some(s => 
-      projectData.secteur?.toLowerCase().includes(s)) || 
-      projectData.secteur?.toLowerCase().includes('fournitures médicales')) ? 20 : 40;
+    const seuilSectoriel = (projectData.metierAvenir && 
+      (['pharmaceutique', 'agricole'].some(s => 
+        projectData.metierAvenir?.toLowerCase().includes(s)) || 
+        projectData.metierAvenir?.toLowerCase().includes('fournitures médicales'))) ? 20 : 40;
     
     return (
       <div className="space-y-6">
@@ -1529,8 +1919,9 @@ export default function SimulateurPrincipal() {
                     <div>
                       <p>Seuil requis: <strong>
                         {seuilSectoriel}%
-                        {projectData.secteur?.toLowerCase().includes('pharmaceutique') ? ' (Pharmaceutique)' : 
-                         projectData.secteur?.toLowerCase().includes('agricole') ? ' (Agro-alimentaire)' : ' (Autres secteurs)'}
+                        {projectData.metierAvenir?.toLowerCase().includes('pharmaceutique') ? ' (Pharmaceutique)' : 
+                         projectData.metierAvenir?.toLowerCase().includes('agricole') ? ' (Agro-alimentaire)' : 
+                         projectData.metierAvenir?.toLowerCase().includes('fournitures médicales') ? ' (Fournitures médicales)' : ' (Autres secteurs)'}
                       </strong></p>
                     </div>
                   </div>
@@ -1569,7 +1960,7 @@ export default function SimulateurPrincipal() {
         {/* Sélection secteur principal */}
         <Card className="border-2 border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-lg text-blue-700">Secteurs prioritaires (5%)</CardTitle>
+            <CardTitle className="text-lg text-blue-700">Secteur d'activité (5%)</CardTitle>
             <p className="text-sm text-blue-600">Sélectionnez votre secteur d'activité principal</p>
           </CardHeader>
           <CardContent>
@@ -1586,7 +1977,8 @@ export default function SimulateurPrincipal() {
                     setProjectData({
                       ...projectData, 
                       secteurSectorielle: secteur,
-                      metierAvenir: '' // Reset secteur porteur
+                      metierAvenir: '', // Reset secteur porteur
+                      activiteSpecifique: '' // Reset activité spécifique
                     });
                   }}
                 >
@@ -1610,7 +2002,8 @@ export default function SimulateurPrincipal() {
                   setProjectData({
                     ...projectData, 
                     secteurSectorielle: 'Pas dans la liste',
-                    metierAvenir: '' // Reset secteur porteur
+                    metierAvenir: '', // Reset secteur porteur
+                    activiteSpecifique: '' // Reset activité spécifique
                   });
                 }}
               >
@@ -1625,8 +2018,8 @@ export default function SimulateurPrincipal() {
           </CardContent>
         </Card>
 
-        {/* Option générique pour secteur porteur si "Pas dans la liste" sélectionné */}
-        {projectData.secteurSectorielle === 'Pas dans la liste' && (
+        {/* Option générique pour secteur porteur si "Pas dans la liste" sélectionné - SUPPRIMÉ */}
+        {false && projectData.secteurSectorielle === 'Pas dans la liste' && (
           <Card className="border-2 border-purple-200 bg-purple-50">
             <CardHeader>
               <CardTitle className="text-lg text-purple-700">
@@ -1688,7 +2081,7 @@ export default function SimulateurPrincipal() {
           <Card className="border-2 border-purple-200 bg-purple-50">
             <CardHeader>
               <CardTitle className="text-lg text-purple-700">
-                2. Secteurs porteurs pour {projectData.secteurSectorielle}
+                2. Métier d'avenir / Montée en gamme pour {projectData.secteurSectorielle}
               </CardTitle>
               <p className="text-sm text-purple-600">Optionnel : Sélectionnez un secteur porteur pour 3% supplémentaire</p>
             </CardHeader>
@@ -1709,9 +2102,6 @@ export default function SimulateurPrincipal() {
                   >
                     <div className="flex justify-between items-center">
                       <span className="text-xs">{secteurPorteur}</span>
-                      {selectedSecteurPorteur === secteurPorteur && (
-                        <Badge className="bg-purple-600">+3%</Badge>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -1745,14 +2135,7 @@ export default function SimulateurPrincipal() {
           <Alert className={`${projectData.secteurSectorielle === 'Pas dans la liste' ? 'bg-gray-100 border-gray-300' : 'bg-green-100 border-green-300'}`}>
             <AlertCircle className={`h-4 w-4 ${projectData.secteurSectorielle === 'Pas dans la liste' ? 'text-gray-600' : 'text-green-600'}`} />
             <AlertDescription className={`${projectData.secteurSectorielle === 'Pas dans la liste' ? 'text-gray-800' : 'text-green-800'}`}>
-              <strong>Secteur principal :</strong> {projectData.secteurSectorielle} 
-              <strong>({projectData.secteurSectorielle === 'Pas dans la liste' ? '0' : secteurConfig?.prime}%)</strong>
-              {selectedSecteurPorteur && selectedSecteurPorteur !== 'Pas dans la liste' && (
-                <><br /><strong>Secteur porteur :</strong> {selectedSecteurPorteur} <strong>(+3%)</strong></>
-              )}
-              {selectedSecteurPorteur === 'Pas dans la liste' && (
-                <><br /><strong>Secteur porteur :</strong> Pas dans la liste <strong>(0%)</strong></>
-              )}
+              <strong>Secteur principal : </strong> {projectData.secteurSectorielle} 
             </AlertDescription>
           </Alert>
         )}
@@ -1795,11 +2178,15 @@ export default function SimulateurPrincipal() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Secteur:</span>
-                <span className="font-medium">{projectData.secteur}</span>
+                <span className="font-medium">{projectData.secteurSectorielle}</span>
               </div>
               <div className="flex justify-between">
                 <span>Métier:</span>
-                <span className="font-medium text-xs">{projectData.metier}</span>
+                <span className="font-medium">{projectData.metierAvenir}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Métier d'avenir:</span>
+                <span className="font-medium">{projectData.activiteSpecifique?.trim() || "-"}</span>
               </div>
               <div className="flex justify-between">
                 <span>Localisation:</span>
@@ -1971,13 +2358,13 @@ export default function SimulateurPrincipal() {
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-2xl font-bold text-gray-900">Simulateur de Dispositif Principal</h2>
               <Badge variant="outline" className="px-3 py-1">
-                Étape {currentStep + 1} sur {steps.length}
+                Étape {getEffectiveStepInfo().effectiveCurrentStep} sur {getEffectiveStepInfo().effectiveTotalSteps}
               </Badge>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-industria-brown-gold to-industria-olive-light h-2 rounded-full transition-all duration-500"
-                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                style={{ width: `${(getEffectiveStepInfo().effectiveCurrentStep / getEffectiveStepInfo().effectiveTotalSteps) * 100}%` }}
               ></div>
             </div>
             <p className="text-sm text-gray-600 mt-2">{steps[currentStep]}</p>
@@ -2003,12 +2390,21 @@ export default function SimulateurPrincipal() {
             
             <div className="flex gap-3">
               {currentStep === steps.length - 1 ? (
-                <Button 
-                  onClick={() => window.location.reload()}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6"
-                >
-                  Nouvelle simulation
-                </Button>
+                <>
+                  <Button 
+                    onClick={exportToPDF}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Exporter en PDF
+                  </Button>
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-6"
+                  >
+                    Nouvelle simulation
+                  </Button>
+                </>
               ) : (
                 <Button 
                   onClick={handleNextStep}
