@@ -51,7 +51,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
 
   const investmentLinks = [
     { title: 'Simulateur de dispositif principal', href: '/simulateur/principal' },
-    { title: 'Simulateur de dispositif TPME', href: '/simulateur/secondaire' },
+    { title: 'Simulateur TPME', href: '/simulateur/tpme' },
   ];
 
   const discoursLinks = [
