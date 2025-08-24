@@ -14,7 +14,7 @@ import {
   MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight, Grid3X3,
   Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, 
   Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, 
-  HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill
+  HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill
 } from 'lucide-react'
 
 /**
@@ -178,7 +178,6 @@ function getLucideIcon(iconName?: string) {
     'Wrench': Wrench,
     'Settings': Settings,
     'Cog': Settings,
-    'Tool': Tool,
     'Gauge': Gauge,
     'Settings2': Settings2,
     

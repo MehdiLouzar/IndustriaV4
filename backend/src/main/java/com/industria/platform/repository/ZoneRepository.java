@@ -88,4 +88,9 @@ public interface ZoneRepository extends JpaRepository<Zone, String> {
      * @return true si une zone avec ce nom existe, false sinon
      */
     boolean existsByNameIgnoreCase(String name);
+
+    long countByCreatedBy_Id(String creatorId);
+
+
+
 }

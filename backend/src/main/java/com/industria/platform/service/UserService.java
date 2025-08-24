@@ -1,22 +1,34 @@
 package com.industria.platform.service;
 
 import com.industria.platform.entity.User;
+import com.industria.platform.entity.UserRole;
 import com.industria.platform.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Service de gestion des utilisateurs.
- * 
- * Ce service gère la synchronisation entre Keycloak et la base de données locale,
- * ainsi que l'obtention des informations de l'utilisateur courant.
- * 
- * @author Industria Platform Team
- * @version 1.0
- * @since 1.0
+ *
+ * - Récupère l'utilisateur courant depuis le contexte de sécurité.
+ * - Provisionne/Met à jour le User local à partir d'un JWT validé (Keycloak).
+ * - Évite la création de doublons via keycloakId (sub) et e-mail.
+ *
+ * Notes sécurité:
+ * - On ne lit plus les rôles directement depuis les claims: on dérive le rôle
+ *   depuis les autorités Spring (déjà mappées/validées par JwtAuthenticationConverter).
+ * - 'sub' (Keycloak ID) est la source d'identité principale; l'e-mail peut changer.
  */
 @Service
 @RequiredArgsConstructor
@@ -26,100 +38,154 @@ public class UserService {
     private final UserRepository userRepository;
 
     /**
-     * Obtient l'utilisateur actuel depuis le contexte de sécurité
-     * Crée automatiquement l'utilisateur local s'il n'existe pas (synchronisation Keycloak)
+     * Retourne l'utilisateur courant ou null si non authentifié.
+     * (Compatibilité descendante avec votre signature actuelle.)
      */
     public User getCurrentUser() {
+        return findCurrentUser().orElse(null);
+    }
+
+    /**
+     * Retourne l'utilisateur courant (provisionné/à jour si besoin), sinon Optional.empty().
+     * Préférer cette méthode à getCurrentUser() pour éviter les nulls.
+     */
+    public Optional<User> findCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) {
-            return null;
+        if (!(auth instanceof JwtAuthenticationToken jwtAuth) || !auth.isAuthenticated()) {
+            return Optional.empty();
+        }
+        return Optional.of(provisionOrUpdateFromSecurity(jwtAuth));
+    }
+
+    /**
+     * Provisionne/Met à jour un utilisateur local à partir du JWT validé + autorités Spring.
+     * Transactionnel pour éviter les races (deux requêtes simultanées).
+     */
+    @Transactional
+    protected User provisionOrUpdateFromSecurity(JwtAuthenticationToken jwtAuth) {
+        Jwt jwt = jwtAuth.getToken();
+
+        // Identité principale: sub (Keycloak ID)
+        String keycloakId = jwt.getSubject();
+        if (keycloakId == null || keycloakId.isBlank()) {
+            // JWT invalide (mais normalement filtré avant d’arriver ici)
+            throw new IllegalStateException("Le token ne contient pas de 'sub'.");
         }
 
-        String userEmail = getCurrentUserEmail(auth);
-        if (userEmail != null) {
-            // Chercher l'utilisateur local
-            return userRepository.findByEmail(userEmail)
-                .orElseGet(() -> createUserFromKeycloak(auth, userEmail));
+        String email = safeEmail(jwt);
+        String name = displayName(jwt, email);
+        String phone = jwt.getClaimAsString("phone_number");
+
+        // Rôle effectif: dérivé des autorités Spring (ROLE_*)
+        UserRole role = highestRoleFromAuthorities(jwtAuth.getAuthorities())
+                .orElse(UserRole.USER);
+
+        // 1) Tenter par keycloakId, 2) sinon par e-mail (si présent)
+        User user = userRepository.findByKeycloakId(keycloakId)
+                .orElseGet(() -> (email != null)
+                        ? userRepository.findByEmail(email).orElse(new User())
+                        : new User());
+
+        boolean changed = false;
+
+        // Toujours forcer le keycloakId (source de vérité)
+        if (!Objects.equals(user.getKeycloakId(), keycloakId)) {
+            user.setKeycloakId(keycloakId);
+            changed = true;
         }
 
+        // Mettre à jour e-mail (si présent) sans écraser avec null
+        if (email != null && !Objects.equals(user.getEmail(), email)) {
+            user.setEmail(email);
+            changed = true;
+        }
+
+        // Mettre à jour nom si différent
+        if (name != null && !name.isBlank() && !Objects.equals(user.getName(), name)) {
+            user.setName(name);
+            changed = true;
+        }
+
+        // Mettre à jour téléphone uniquement si présent (ne pas écraser par null)
+        if (phone != null && !Objects.equals(user.getPhone(), phone)) {
+            user.setPhone(phone);
+            changed = true;
+        }
+
+        // Mettre à jour rôle s’il a évolué
+        if (user.getRole() == null || user.getRole() != role) {
+            user.setRole(role);
+            changed = true;
+        }
+
+        // Ne pas écraser company avec une valeur par défaut. Laisser tel quel si déjà rempli.
+
+        if (user.getId() == null || changed) {
+            // NB: Assurez-vous d’avoir des index/contraintes uniques en DB:
+            //  - UNIQUE(keycloak_id)
+            //  - UNIQUE(email) (facultatif si l’e-mail peut manquer/varier)
+            return userRepository.save(user);
+        }
+
+        return user;
+    }
+
+    /**
+     * Extrait un e-mail fiable:
+     * - 'email' si présent (éventuellement vérifier 'email_verified' si vous l’exigez)
+     * - sinon 'preferred_username' si c’est un e-mail
+     * - sinon null (on reste basé sur sub).
+     */
+    private String safeEmail(Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        if (email != null && !email.isBlank()) {
+            // Boolean verified = jwt.getClaim("email_verified");
+            // Si nécessaire, imposez verified == true ici.
+            return email;
+        }
+        String preferred = jwt.getClaimAsString("preferred_username");
+        if (preferred != null && preferred.contains("@")) {
+            return preferred;
+        }
         return null;
     }
 
     /**
-     * Crée ou met à jour un utilisateur local à partir des informations Keycloak JWT
+     * Construit un nom d’affichage à partir de given_name/family_name; fallback sur e-mail; sinon sub.
      */
-    private User createUserFromKeycloak(Authentication auth, String email) {
-        try {
-            if (auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-                // Vérifier si l'utilisateur existe déjà (créé par initDB.sql par exemple)
-                User user = userRepository.findByEmail(email).orElse(new User());
-                user.setEmail(email);
-                
-                // Construire le nom complet de manière sûre
-                String firstName = jwt.getClaimAsString("given_name");
-                String lastName = jwt.getClaimAsString("family_name");
-                String fullName = "";
-                if (firstName != null && !firstName.isEmpty()) {
-                    fullName = firstName;
-                }
-                if (lastName != null && !lastName.isEmpty()) {
-                    if (!fullName.isEmpty()) fullName += " ";
-                    fullName += lastName;
-                }
-                user.setName(fullName.isEmpty() ? email : fullName);
-                
-                user.setCompany("Keycloak Import");
-                user.setPhone(jwt.getClaimAsString("phone_number"));
-                
-                // Extraire le rôle depuis les claims Keycloak
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-                if (realmAccess != null && realmAccess.get("roles") instanceof java.util.List<?> roles) {
-                    // Définir le rôle le plus élevé trouvé
-                    if (roles.contains("ADMIN")) {
-                        user.setRole(com.industria.platform.entity.UserRole.ADMIN);
-                    } else if (roles.contains("ZONE_MANAGER")) {
-                        user.setRole(com.industria.platform.entity.UserRole.ZONE_MANAGER);
-                    } else {
-                        user.setRole(com.industria.platform.entity.UserRole.USER);
-                    }
-                } else {
-                    // Rôle par défaut si aucun rôle trouvé
-                    user.setRole(com.industria.platform.entity.UserRole.USER);
-                }
-                
-                return userRepository.save(user);
-            }
-        } catch (Exception e) {
-            // Log l'erreur mais continue avec null
-            log.error("Erreur lors de la création d'utilisateur depuis Keycloak: {}", e.getMessage(), e);
+    private String displayName(Jwt jwt, String email) {
+        String first = jwt.getClaimAsString("given_name");
+        String last = jwt.getClaimAsString("family_name");
+
+        StringBuilder sb = new StringBuilder();
+        if (first != null && !first.isBlank()) sb.append(first);
+        if (last != null && !last.isBlank()) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(last);
         }
-        return null;
+
+        if (!sb.isEmpty()) return sb.toString();
+        if (email != null && !email.isBlank()) return email;
+        return jwt.getSubject();
     }
 
     /**
-     * Obtient l'email de l'utilisateur actuel depuis le JWT
+     * Calcule le rôle le plus élevé à partir des autorités Spring (ROLE_ADMIN > ROLE_ZONE_MANAGER > ROLE_USER).
+     * Évite de relire les claims bruts; respecte votre JwtAuthenticationConverter.
      */
-    public String getCurrentUserEmail() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return getCurrentUserEmail(auth);
+    private Optional<UserRole> highestRoleFromAuthorities(Collection<? extends GrantedAuthority> authorities) {
+        boolean isAdmin = hasRole(authorities, "ROLE_ADMIN");
+        boolean isZoneManager = hasRole(authorities, "ROLE_ZONE_MANAGER");
+        if (isAdmin) return Optional.of(UserRole.ADMIN);
+        if (isZoneManager) return Optional.of(UserRole.ZONE_MANAGER);
+        if (!authorities.isEmpty()) return Optional.of(UserRole.USER);
+        return Optional.empty();
     }
 
-    private String getCurrentUserEmail(Authentication auth) {
-        if (auth == null) return null;
-        
-        // Extraire l'email du token JWT (subject ou claim email)
-        if (auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-            // Essayer d'abord le claim 'email', puis 'preferred_username', puis le 'subject'
-            String email = jwt.getClaimAsString("email");
-            if (email != null) return email;
-            
-            email = jwt.getClaimAsString("preferred_username");
-            if (email != null) return email;
-            
-            return jwt.getSubject();
+    private boolean hasRole(Collection<? extends GrantedAuthority> authorities, String role) {
+        for (GrantedAuthority ga : authorities) {
+            if (role.equalsIgnoreCase(ga.getAuthority())) return true;
         }
-        
-        return auth.getName();
+        return false;
     }
 }

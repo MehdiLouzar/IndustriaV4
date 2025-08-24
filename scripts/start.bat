@@ -48,6 +48,7 @@ set cnt=0
 :wait_keycloak
 curl -sf "http://keycloak:8081/realms/industria" >nul 2>&1
 if not errorlevel 1 (
+  docker compose exec keycloak bash /opt/keycloak/data/import/import-users-and-roles.sh 
   echo ✅ Keycloak est prêt !
 ) else (
   set /a cnt+=1

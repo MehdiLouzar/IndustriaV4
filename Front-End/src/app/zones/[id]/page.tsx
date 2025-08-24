@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import DynamicIcon from "@/components/DynamicIcon";
 import { fetchApi } from "@/lib/utils";
 import { fetchPublicApi } from "@/lib/publicApi";
-import { Zap, Wifi, Car, Wrench, Factory, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
+import { Zap, Wifi, Car, Wrench, Factory, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
 import type { ListResponse } from "@/types";
 
 interface Parcel {
@@ -115,7 +115,6 @@ function getLucideIcon(iconName?: string) {
     'Wrench': Wrench,
     'Settings': Settings,
     'Cog': Settings,
-    'Tool': Tool,
     'Gauge': Gauge,
     'Settings2': Settings2,
     

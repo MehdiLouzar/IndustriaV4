@@ -8,6 +8,20 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { fetchApi } from '@/lib/utils';
+
+interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  tokenType: string;
+  userInfo: {
+    id: string;
+    email: string;
+    name: string;
+    roles: string[];
+  };
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,42 +32,36 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
     try {
-      const params = new URLSearchParams()
-      params.append('grant_type', 'password')
-      params.append('client_id', 'frontend')
-      params.append('username', email)
-      params.append('password', password)
+      // Call backend auth endpoint instead of Keycloak directly
+      const response = await fetchApi<LoginResponse>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
 
-      const res = await fetch(
-        'http://localhost:8081/realms/industria/protocol/openid-connect/token',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString(),
-        }
-      )
-      if (!res.ok) {
-        throw new Error('Email ou mot de passe incorrect')
-      }
-      const data = await res.json()
-      localStorage.setItem('token', data.access_token)
-      document.cookie = `token=${data.access_token}; path=/; max-age=3600; secure=${window.location.protocol === 'https:'}; samesite=lax`
-      router.push('/admin')
+      // Store tokens and user info
+      localStorage.setItem('token', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+      localStorage.setItem('userInfo', JSON.stringify(response.userInfo));
+      
+      // Set cookie for SSR support
+      document.cookie = `token=${response.accessToken}; path=/; max-age=${response.expiresIn}; secure=${window.location.protocol === 'https:'}; samesite=lax`;
+      
+      router.push('/admin');
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
           : 'Une erreur est survenue lors de la connexion'
-      )
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const demoAccounts = [
     { email: 'admin@industria.ma', role: 'Administrateur', password: 'password123' },

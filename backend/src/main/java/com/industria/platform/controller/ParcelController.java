@@ -24,7 +24,7 @@ import java.util.List;
 
 /**
  * Contrôleur REST pour la gestion des parcelles.
- * 
+ *
  * @author Industria Platform Team
  * @version 1.0
  * @since 1.0
@@ -45,105 +45,87 @@ public class ParcelController {
     private final GeometryParsingService geometryParsingService;
     private final PostGISGeometryService postGISGeometryService;
 
-    /**
-     * Récupère toutes les parcelles avec pagination et filtrage.
-     *
-     * @param zoneId identifiant de la zone pour filtrer (optionnel)
-     * @param page numéro de la page (défaut: 1)
-     * @param limit nombre d'éléments par page (défaut: 10, max: 100)
-     * @param search terme de recherche pour filtrer par référence (optionnel)
-     * @return réponse paginée des parcelles
-     */
     @GetMapping
     public ListResponse<ParcelDto> all(@RequestParam(required = false) String zoneId,
-                                       @RequestParam(defaultValue = "1") int page,
-                                       @RequestParam(defaultValue = "10") int limit,
-                                       @RequestParam(required = false) String search) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String search) {
         int p = Math.max(1, page);
         int l = Math.min(Math.max(1, limit), 100);
-        
-        // Récupérer TOUTES les parcelles selon les critères (pas de pagination initiale)
+
         List<Parcel> allParcels;
-        
+
         if (search != null && !search.trim().isEmpty()) {
-            // Recherche par référence - récupérer toutes qui correspondent
-            var searchPageable = PageRequest.of(0, 10000); // Limite raisonnable
-            allParcels = parcelRepository.findByReferenceContainingIgnoreCase(search.trim(), searchPageable).getContent();
+            var searchPageable = PageRequest.of(0, 10000);
+            allParcels = parcelRepository
+                    .findByReferenceContainingIgnoreCase(search.trim(), searchPageable)
+                    .getContent();
         } else if (zoneId != null) {
-            // Filtrer par zone - récupérer toutes de cette zone
             allParcels = new ArrayList<>(parcelRepository.findByZoneId(zoneId));
         } else {
-            // Récupérer toutes les parcelles
             allParcels = parcelRepository.findAll();
         }
-        
+
         log.debug("Found {} parcels before filtering", allParcels.size());
-        
-        // Filtrer selon les permissions seulement pour les ZONE_MANAGER connectés
+
+        // Filter for ZONE_MANAGER: only their own parcels, by creator ID (not email)
         List<Parcel> permissionFilteredParcels;
-        try {
-            if (permissionService.hasRole("ZONE_MANAGER")) {
-                // ZONE_MANAGER voit seulement ses parcelles
-                String currentUserEmail = userService.getCurrentUserEmail();
-                permissionFilteredParcels = allParcels.stream()
-                    .filter(parcel -> parcel.getCreatedBy() != null && 
-                                  parcel.getCreatedBy().getEmail().equals(currentUserEmail))
-                    .toList();
+        if (permissionService.hasRole("ZONE_MANAGER")) {
+            String currentUserId = userService.findCurrentUser()
+                    .map(User::getId)
+                    .orElse(null);
+
+            if (currentUserId == null) {
+                // No user loaded; safest is to return empty for a manager
+                permissionFilteredParcels = List.of();
             } else {
-                // ADMIN et utilisateurs non connectés voient toutes les parcelles
-                permissionFilteredParcels = allParcels;
+                permissionFilteredParcels = allParcels.stream()
+                        .filter(parcel -> parcel.getCreatedBy() != null
+                                && currentUserId.equals(parcel.getCreatedBy().getId()))
+                        .toList();
             }
-        } catch (Exception e) {
-            // Utilisateur non connecté - voir toutes les parcelles
+        } else {
+            // ADMIN and public users see all parcels (as per your policy)
             permissionFilteredParcels = allParcels;
         }
-        
+
         log.debug("After permission filtering: {} parcels", permissionFilteredParcels.size());
-        
-        // MAINTENANT appliquer la pagination sur les résultats filtrés
+
         long totalFiltered = permissionFilteredParcels.size();
         int totalPagesFiltered = (int) Math.ceil((double) totalFiltered / l);
-        
+
         int startIndex = (p - 1) * l;
         int endIndex = Math.min(startIndex + l, (int) totalFiltered);
-        
-        List<Parcel> paginatedParcels = startIndex < totalFiltered ? 
-            permissionFilteredParcels.subList(startIndex, endIndex) : List.of();
-                
+
+        List<Parcel> paginatedParcels =
+                startIndex < totalFiltered ? permissionFilteredParcels.subList(startIndex, endIndex) : List.of();
+
         var items = paginatedParcels.stream().map(this::toDto).toList();
         return new ListResponse<>(items, totalFiltered, totalPagesFiltered, p, l);
     }
 
-    /**
-     * Récupère toutes les parcelles sans pagination.
-     *
-     * @return liste complète des parcelles
-     */
     @GetMapping("/all")
     public List<ParcelDto> allParcels() {
         List<Parcel> parcels = parcelRepository.findAll();
-        
-        // Filtrer selon les permissions seulement pour les ZONE_MANAGER connectés
-        try {
-            if (permissionService.hasRole("ZONE_MANAGER")) {
-                // ZONE_MANAGER voit seulement ses parcelles
-                String currentUserEmail = userService.getCurrentUserEmail();
-                parcels = parcels.stream()
-                    .filter(parcel -> parcel.getCreatedBy() != null && 
-                                  parcel.getCreatedBy().getEmail().equals(currentUserEmail))
-                    .toList();
-            }
-            // ADMIN et utilisateurs non connectés voient toutes les parcelles
-        } catch (Exception e) {
-            // Utilisateur non connecté - voir toutes les parcelles (pas de filtrage)
-        }
-        // ADMIN voit toutes les parcelles (pas de filtrage)
-        
-        return parcels.stream()
-                .map(this::toDto)
-                .toList();
-    }
 
+        if (permissionService.hasRole("ZONE_MANAGER")) {
+            String currentUserId = userService.findCurrentUser()
+                    .map(User::getId)
+                    .orElse(null);
+
+            if (currentUserId != null) {
+                parcels = parcels.stream()
+                        .filter(parcel -> parcel.getCreatedBy() != null
+                                && currentUserId.equals(parcel.getCreatedBy().getId()))
+                        .toList();
+            } else {
+                parcels = List.of(); // safest default for a manager without a loaded user
+            }
+        }
+        // ADMIN and unauthenticated users: no filtering
+
+        return parcels.stream().map(this::toDto).toList();
+    }
     /**
      * Récupère une parcelle par son identifiant.
      *
@@ -169,10 +151,10 @@ public class ParcelController {
         if (dto.zoneId() != null && !permissionService.canModifyZone(dto.zoneId())) {
             throw new RuntimeException("Accès refusé : vous ne pouvez créer des parcelles que dans vos zones");
         }
-        
+
         Parcel p = new Parcel();
         updateEntity(p, dto);
-        
+
         // Définir automatiquement le créateur
         User currentUser = userService.getCurrentUser();
         if (currentUser != null) {
@@ -180,13 +162,13 @@ public class ParcelController {
         } else {
             throw new RuntimeException("Utilisateur non authentifié : impossible de créer une parcelle");
         }
-        
+
         parcelRepository.save(p);
-        
-        auditService.log(AuditAction.CREATE, "Parcel", p.getId(), 
-            null, p, 
+
+        auditService.log(AuditAction.CREATE, "Parcel", p.getId(),
+            null, p,
             "Création de la parcelle: " + p.getReference());
-        
+
         return toDto(p);
     }
 
@@ -204,20 +186,20 @@ public class ParcelController {
         if (!permissionService.canModifyParcel(id)) {
             return ResponseEntity.status(403).build(); // Forbidden
         }
-        
+
         Parcel oldParcel = parcelRepository.findById(id).orElseThrow();
         Parcel parcelClone = new Parcel();
         parcelClone.setReference(oldParcel.getReference());
         parcelClone.setArea(oldParcel.getArea());
         parcelClone.setStatus(oldParcel.getStatus());
-        
+
         updateEntity(oldParcel, dto);
         parcelRepository.save(oldParcel);
-        
-        auditService.log(AuditAction.UPDATE, "Parcel", id, 
-            parcelClone, oldParcel, 
+
+        auditService.log(AuditAction.UPDATE, "Parcel", id,
+            parcelClone, oldParcel,
             "Modification de la parcelle: " + oldParcel.getReference());
-        
+
         return ResponseEntity.ok(toDto(oldParcel));
     }
 
@@ -234,14 +216,14 @@ public class ParcelController {
         if (!permissionService.canModifyParcel(id)) {
             return ResponseEntity.status(403).build(); // Forbidden
         }
-        
+
         Parcel parcel = parcelRepository.findById(id).orElse(null);
         parcelRepository.deleteById(id);
-        
-        auditService.log(AuditAction.DELETE, "Parcel", id, 
-            parcel, null, 
+
+        auditService.log(AuditAction.DELETE, "Parcel", id,
+            parcel, null,
             "Suppression de la parcelle: " + (parcel != null ? parcel.getReference() : id));
-        
+
         return ResponseEntity.ok().build();
     }
 
@@ -259,26 +241,26 @@ public class ParcelController {
         if (!permissionService.canModifyParcel(id)) {
             return ResponseEntity.status(403).build(); // Forbidden
         }
-        
+
         Parcel oldParcel = parcelRepository.findById(id).orElse(null);
         Parcel parcel = statusService.updateParcelStatus(id, request.status());
-        
-        auditService.log(AuditAction.UPDATE, "Parcel", id, 
-            oldParcel != null ? oldParcel.getStatus() : null, 
-            parcel.getStatus(), 
+
+        auditService.log(AuditAction.UPDATE, "Parcel", id,
+            oldParcel != null ? oldParcel.getStatus() : null,
+            parcel.getStatus(),
             "Changement de statut de la parcelle: " + parcel.getReference());
-        
+
         return ResponseEntity.ok(parcel);
     }
 
     private ParcelDto toDto(Parcel p) {
         List<VertexDto> vertices = List.of();
-        
+
         // Récupérer la géométrie - d'abord essayer depuis l'entity, puis via PostGIS service
         try {
             String geometry = p.getGeometry();
             log.debug("Parcel {} geometry: {}", p.getId(), geometry != null ? geometry.substring(0, Math.min(100, geometry.length())) + "..." : "null");
-            
+
             if (geometry != null && !geometry.trim().isEmpty()) {
                 vertices = geometryParsingService.parseWKTGeometry(geometry);
                 log.debug("Parcel {} parsed {} vertices via entity", p.getId(), vertices.size());
@@ -297,17 +279,17 @@ public class ParcelController {
         } catch (Exception e) {
             log.error("Error parsing parcel geometry for {}: {}", p.getId(), e.getMessage(), e);
         }
-        
+
         // Récupérer la devise du pays via zone → région → pays
         String countryCurrency = null;
         if (p.getZone() != null && p.getZone().getRegion() != null && p.getZone().getRegion().getCountry() != null) {
             countryCurrency = p.getZone().getRegion().getCountry().getCurrency();
         }
-        
+
         // Récupérer les images de la parcelle
         List<ParcelImageDto> images = List.of();
         String primaryImageUrl = null;
-        
+
         if (p.getImages() != null && !p.getImages().isEmpty()) {
             images = p.getImages().stream()
                 .sorted((img1, img2) -> {
@@ -335,7 +317,7 @@ public class ParcelController {
                     "/api/parcel-images/" + img.getId() + "/download"
                 ))
                 .toList();
-                
+
             // Trouver l'URL de l'image principale
             primaryImageUrl = images.stream()
                 .filter(img -> Boolean.TRUE.equals(img.isPrimary()))
@@ -343,7 +325,7 @@ public class ParcelController {
                 .map(ParcelImageDto::url)
                 .orElse(images.isEmpty() ? null : images.get(0).url());
         }
-        
+
         return new ParcelDto(p.getId(), p.getReference(), p.getArea(),
                 p.getStatus() == null ? null : p.getStatus().name(), p.getIsShowroom(),
                 p.getZone() == null ? null : p.getZone().getId(),
@@ -361,25 +343,25 @@ public class ParcelController {
         p.setArea(dto.area());
         if (dto.status() != null) p.setStatus(ParcelStatus.valueOf(dto.status()));
         p.setIsShowroom(dto.isShowroom());
-        
+
         // Ajouter les contraintes techniques
         p.setCos(dto.cos());
         p.setCus(dto.cus());
         p.setHeightLimit(dto.heightLimit());
         p.setSetback(dto.setback());
-        
+
         if (dto.zoneId() != null) {
             Zone z = zoneRepository.findById(dto.zoneId()).orElse(null);
             p.setZone(z);
         }
-        
+
         // Préserver la géométrie existante si pas de nouveaux vertices
         if (dto.vertices() != null && !dto.vertices().isEmpty()) {
             String newGeometry = buildGeometry(dto.vertices());
             if (newGeometry != null) {
                 p.setGeometry(newGeometry);
                 p.setSrid(4326);
-                
+
                 log.debug("Vertices reçus pour parcelle: {}", dto.vertices());
                 log.debug("Nouvelle géométrie générée: {}", newGeometry);
                 // Calculer automatiquement les coordonnées WGS84
@@ -392,12 +374,12 @@ public class ParcelController {
             // Ne pas appeler geometryUpdateService pour éviter de réinitialiser les coordonnées
         }
     }
-    
+
     private List<VertexDto> parseGeometry(String wkt) {
         if (wkt == null || wkt.trim().isEmpty()) return List.of();
-        
+
         log.debug("Parsing WKT: {}", wkt);
-        
+
         // Extraire les coordonnées du POLYGON((x1 y1, x2 y2, ...))
         String coords = wkt;
         if (coords.startsWith("POLYGON((")) {
@@ -406,18 +388,18 @@ public class ParcelController {
         if (coords.endsWith("))")) {
             coords = coords.substring(0, coords.length() - 2); // Remove "))"
         }
-        
+
         log.debug("Extracted coords: {}", coords);
-        
+
         List<VertexDto> verts = new ArrayList<>();
         String[] coordPairs = coords.split(",");
-        
+
         for (int i = 0; i < coordPairs.length; i++) {
             String[] xy = coordPairs[i].trim().split("\\s+");
             if (xy.length >= 2) {
                 double x = Double.parseDouble(xy[0]);
                 double y = Double.parseDouble(xy[1]);
-                
+
                 // Éviter de dupliquer le premier point (qui ferme le polygone)
                 if (i == coordPairs.length - 1 && verts.size() > 0) {
                     VertexDto firstVertex = verts.get(0);
@@ -425,7 +407,7 @@ public class ParcelController {
                         break; // Skip the closing duplicate point
                     }
                 }
-                
+
                 verts.add(new VertexDto(i, x, y));
             }
         }
@@ -434,7 +416,7 @@ public class ParcelController {
 
     private String buildGeometry(List<VertexDto> verts) {
         if (verts == null || verts.isEmpty()) return null;
-        
+
         StringBuilder sb = new StringBuilder("POLYGON((");
         for (int i = 0; i < verts.size(); i++) {
             VertexDto v = verts.get(i);

@@ -3,7 +3,7 @@
  * 
  * Regroupe les fonctions utilitaires essentielles :
  * - Fusion de classes CSS avec TailwindCSS
- * - Client API sécurisé avec authentification JWT
+ * - Client API sécurisé avec authentification JWT et refresh automatique
  * - Système de cache mémoire avec TTL et limites
  * - Gestion sécurisée des téléchargements de fichiers
  * - Configuration d'URLs d'API selon l'environnement
@@ -157,14 +157,75 @@ if (typeof window !== 'undefined') {
   })
 }
 
+// Flag pour éviter les refresh en boucle
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
 
 /**
- * Client API principal avec authentification JWT
+ * Ajoute un callback à exécuter après le refresh du token
+ */
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+/**
+ * Notifie tous les subscribers après un refresh réussi
+ */
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
+/**
+ * Rafraîchit le token d'accès
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to refresh token');
+    }
+
+    const data = await response.json();
+    
+    // Mettre à jour les tokens
+    localStorage.setItem('token', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    if (data.userInfo) {
+      localStorage.setItem('userInfo', JSON.stringify(data.userInfo));
+    }
+    
+    // Mettre à jour le cookie
+    document.cookie = `token=${data.accessToken}; path=/; max-age=${data.expiresIn}; secure=${window.location.protocol === 'https:'}; samesite=lax`;
+    
+    return data.accessToken;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Client API principal avec authentification JWT et refresh automatique
  * 
  * Gère automatiquement :
  * - Authentification Bearer token depuis localStorage
+ * - Refresh automatique du token en cas d'expiration
  * - Headers appropriés selon le type de contenu
- * - Redirection automatique en cas d'expiration de token (401)
+ * - Redirection automatique en cas d'échec du refresh
  * - Gestion d'erreurs robuste
  * - Support des uploads de fichiers (FormData)
  * 
@@ -180,7 +241,7 @@ export async function fetchApi<T>(
   options: RequestInit = {}
 ): Promise<T> {
   // Get the token from localStorage
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
   // Prepare headers
   const headers: HeadersInit = {
@@ -199,19 +260,66 @@ export async function fetchApi<T>(
   
   // Make the request with the full URL
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}${url}`, {
+  let response = await fetch(`${baseUrl}${url}`, {
     ...options,
     headers,
   });
   
-  // Handle 401 Unauthorized
-  if (response.status === 401) {
-    // Token is invalid or expired
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      window.location.href = '/auth/login';
+  // Handle 401 Unauthorized - try to refresh token
+  if (response.status === 401 && !url.includes('/auth/')) {
+    // If not already refreshing, start the refresh process
+    if (!isRefreshing) {
+      isRefreshing = true;
+      
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+      
+      if (newToken) {
+        onTokenRefreshed(newToken);
+        
+        // Retry the original request with new token
+        headers['Authorization'] = `Bearer ${newToken}`;
+        response = await fetch(`${baseUrl}${url}`, {
+          ...options,
+          headers,
+        });
+      } else {
+        // Refresh failed, redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('userInfo');
+          window.location.href = '/auth/login';
+        }
+        throw new Error('Unauthorized');
+      }
+    } else {
+      // Wait for the ongoing refresh to complete
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh((newToken: string) => {
+          // Retry the original request with new token
+          headers['Authorization'] = `Bearer ${newToken}`;
+          fetch(`${baseUrl}${url}`, {
+            ...options,
+            headers,
+          })
+            .then(async (retryResponse) => {
+              if (!retryResponse.ok) {
+                const error = await retryResponse.text().catch(() => 'Request failed');
+                throw new Error(error);
+              }
+              const text = await retryResponse.text();
+              if (!text) return resolve({} as T);
+              try {
+                resolve(JSON.parse(text));
+              } catch {
+                resolve(text as unknown as T);
+              }
+            })
+            .catch(reject);
+        });
+      });
     }
-    throw new Error('Unauthorized');
   }
   
   // Handle other errors
@@ -293,5 +401,59 @@ export async function downloadFile(
 
   } catch (error) {
     throw error;
+  }
+}
+
+/**
+ * Récupère les informations de l'utilisateur courant
+ */
+export function getCurrentUser() {
+  if (typeof window === 'undefined') return null;
+  
+  const userInfo = localStorage.getItem('userInfo');
+  if (!userInfo) return null;
+  
+  try {
+    return JSON.parse(userInfo);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Vérifie si l'utilisateur a un rôle spécifique
+ */
+export function hasRole(role: string): boolean {
+  const user = getCurrentUser();
+  if (!user || !user.roles) return false;
+  
+  return user.roles.includes(role);
+}
+
+/**
+ * Déconnecte l'utilisateur
+ */
+export async function logout() {
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Appeler l'endpoint de logout backend
+      await fetchApi('/api/auth/logout', {
+        method: 'POST',
+      }).catch(() => {
+        // Ignorer les erreurs de logout
+      });
+    }
+  } finally {
+    // Nettoyer le stockage local
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userInfo');
+    
+    // Nettoyer les cookies
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
+    // Rediriger vers la page de login
+    window.location.href = '/auth/login';
   }
 }

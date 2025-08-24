@@ -198,7 +198,7 @@ export default function ProfilePage() {
                   <p className="text-lg">{profile.name || 'Non défini'}</p>
                 </div>
               </div>
-              
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Prénom</Label>
@@ -212,18 +212,21 @@ export default function ProfilePage() {
 
               <div>
                 <Label className="text-sm font-medium text-gray-600 flex items-center gap-1">
-                  <Mail className="w-4 h-4" />
+                  <Mail className="w-4 h-4"/>
                   Adresse email
                 </Label>
-                <p className="text-lg flex items-center gap-2">
-                  {profile.email}
+
+                {/* Use a div + span so the badge isn't inside <p> */}
+                <div className="text-lg flex items-center gap-2">
+                  <span>{profile.email}</span>
                   {profile.emailVerified && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      ✓ Vérifié
-                    </Badge>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        ✓ Vérifié
+                      </Badge>
                   )}
-                </p>
+                </div>
               </div>
+
             </CardContent>
           </Card>
 
@@ -231,7 +234,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
+                <Shield className="w-5 h-5"/>
                 Rôles et permissions
               </CardTitle>
             </CardHeader>

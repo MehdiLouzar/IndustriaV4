@@ -29,6 +29,9 @@ public interface ParcelRepository extends JpaRepository<Parcel, String> {
      */
     Set<Parcel> findByZoneId(String zoneId);
 
+    long countByCreatedBy_Id(String creatorId);
+    long countByCreatedBy_IdAndStatus(String creatorId, ParcelStatus status);
+
     /**
      * Récupère les parcelles d'une zone avec pagination.
      * 

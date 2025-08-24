@@ -34,4 +34,8 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
      * @return nombre de rendez-vous créés dans la période
      */
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+
+    long countByParcel_CreatedBy_Id(String creatorId);
+    long countByParcel_CreatedBy_IdAndStatus(String creatorId, AppointmentStatus status);
 }

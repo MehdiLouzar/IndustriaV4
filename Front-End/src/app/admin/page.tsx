@@ -206,14 +206,15 @@ function AdminDashboardContent() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-              <p className="text-gray-600">
-                Tableau de bord - Rôle: <Badge variant="outline">{permissions?.role}</Badge>
-              </p>
+              <div className="text-gray-600">
+                <p>Tableau de bord - Rôle:</p>
+                <Badge variant="outline" className="mt-1 inline-flex">{permissions?.role}</Badge>
+              </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push('/')}
+              <Button
+                  variant="outline"
+                  onClick={() => router.push('/')}
                 className="bg-industria-brown-gold text-white hover:bg-industria-olive-light"
               >
                 <Building2 className="w-4 h-4 mr-2" />

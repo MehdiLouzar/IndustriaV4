@@ -10,18 +10,30 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Users de base pour les données de test (seront synchronisés avec Keycloak lors de la première connexion)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'users' AND column_name = 'keycloak_id') THEN
+        ALTER TABLE users ADD COLUMN keycloak_id VARCHAR(255) UNIQUE;
+    END IF;
+END $$;
+
+-- CHANGE the users insert - remove the password values and add keycloak_id:
 INSERT INTO users (
     id, email, password, name, company, phone, role,
-    created_at, updated_at, deleted_at
+    created_at, updated_at, deleted_at, keycloak_id
 )
 SELECT * FROM (VALUES
-    ('user-admin', 'admin@industria.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-     'Administrateur Industria', 'Industria Management', '+212 5 37 57 20 00', 'ADMIN', NOW(), NOW(), NULL::timestamp without time zone),
-    ('user-manager', 'manager@industria.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-     'Manager Commercial', 'Industria Management', '+212 5 37 57 20 01', 'ZONE_MANAGER', NOW(), NOW(), NULL::timestamp without time zone),
-    ('user-demo', 'demo@entreprise.ma', '$2b$10$VQl88VBIZ6aR46F7Ju2sgO0LH8oTFbm0Mb8ayY1KeuU261EfwEnZS',
-     'Utilisateur Démo', 'Entreprise Démo SA', '+212 6 12 34 56 78', 'USER', NOW(), NOW(), NULL::timestamp without time zone)
-) AS data(id, email, password, name, company, phone, role, created_at, updated_at, deleted_at)
+    ('user-admin', 'admin@industria.ma', NULL,  -- Changed: password is NULL
+     'Administrateur Industria', 'Industria Management', '+212 5 37 57 20 00', 'ADMIN', 
+     NOW(), NOW(), NULL::timestamp without time zone, NULL),  -- Added: keycloak_id
+    ('user-manager', 'manager@industria.ma', NULL,  -- Changed: password is NULL
+     'Manager Commercial', 'Industria Management', '+212 5 37 57 20 01', 'ZONE_MANAGER', 
+     NOW(), NOW(), NULL::timestamp without time zone, NULL),  -- Added: keycloak_id
+    ('user-demo', 'demo@entreprise.ma', NULL,  -- Changed: password is NULL
+     'Utilisateur Démo', 'Entreprise Démo SA', '+212 6 12 34 56 78', 'USER', 
+     NOW(), NOW(), NULL::timestamp without time zone, NULL)  -- Added: keycloak_id
+) AS data(id, email, password, name, company, phone, role, created_at, updated_at, deleted_at, keycloak_id)
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = data.email);
 
 -- Spatial reference systems
@@ -565,5 +577,13 @@ BEGIN
     RAISE NOTICE '   - Parcels: % records', (SELECT count(*) FROM parcel);
     RAISE NOTICE '   - Activities: % records', (SELECT count(*) FROM activity);
     RAISE NOTICE '   - Amenities: % records', (SELECT count(*) FROM amenity);
-    RAISE NOTICE '   - Appointments: % records', (SELECT count(*) FROM appointment);
+    RAISE NOTICE '   - Appointments: % records (if table exists)', 
+        (SELECT CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'appointment') 
+         THEN (SELECT count(*) FROM appointment)::text 
+         ELSE 'N/A' END);
+    RAISE NOTICE '';
+    RAISE NOTICE '🔐 Authentication Note:';
+    RAISE NOTICE '   - Users are synchronized with Keycloak on first login';
+    RAISE NOTICE '   - Passwords are managed in Keycloak, not in the database';
+    RAISE NOTICE '   - keycloak_id field will be populated automatically';
 END $$;

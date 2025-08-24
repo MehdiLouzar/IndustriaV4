@@ -29,7 +29,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import L from "leaflet";
 import proj4 from "proj4";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapPin, Square, Building2, Zap, Wifi, Car, Wrench, Factory, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
+import { MapPin, Square, Building2, Zap, Wifi, Car, Wrench, Factory, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AppointmentForm from "@/components/AppointmentForm";
 
@@ -175,7 +175,6 @@ export default function ZoneMap({ zone }: { zone: Zone }) {
       'Wrench': Wrench,
       'Settings': Settings,
       'Cog': Settings,
-      'Tool': Tool,
       'Gauge': Gauge,
       'Settings2': Settings2,
       

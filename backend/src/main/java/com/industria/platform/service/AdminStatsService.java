@@ -1,31 +1,26 @@
 package com.industria.platform.service;
 
 import com.industria.platform.dto.AdminStatsDto;
-import com.industria.platform.entity.ParcelStatus;
 import com.industria.platform.entity.AppointmentStatus;
-import com.industria.platform.repository.*;
+import com.industria.platform.entity.ParcelStatus;
+import com.industria.platform.repository.AppointmentRepository;
+import com.industria.platform.repository.ParcelRepository;
+import com.industria.platform.repository.UserRepository;
+import com.industria.platform.repository.ZoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Service pour la génération des statistiques administrateur.
- * 
- * Calcule et agrège les données statistiques pour le tableau de bord
- * d'administration avec gestion des permissions par rôle.
- * 
- * @author Industria Platform Team
- * @version 1.0
- * @since 1.0
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class AdminStatsService {
 
     private final UserRepository userRepository;
@@ -35,16 +30,10 @@ public class AdminStatsService {
     private final PermissionService permissionService;
     private final UserService userService;
 
-    /**
-     * Génère les statistiques complètes pour le tableau de bord admin.
-     * 
-     * @return Statistiques du système
-     */
     public AdminStatsDto getAdminStats() {
-        Long totalUsers, totalZones, totalParcels, availableParcels;
-        Long totalAppointments, pendingAppointments;
-        
-        // Si l'utilisateur est ADMIN, voir toutes les statistiques
+        long totalUsers = 0, totalZones = 0, totalParcels = 0, availableParcels = 0;
+        long totalAppointments = 0, pendingAppointments = 0;
+
         if (permissionService.hasRole("ADMIN")) {
             totalUsers = userRepository.count();
             totalZones = zoneRepository.count();
@@ -52,92 +41,72 @@ public class AdminStatsService {
             availableParcels = parcelRepository.countByStatus(ParcelStatus.LIBRE);
             totalAppointments = appointmentRepository.count();
             pendingAppointments = appointmentRepository.countByStatus(AppointmentStatus.PENDING);
-        } 
-        // Si l'utilisateur est ZONE_MANAGER, voir seulement ses parcelles
-        else if (permissionService.hasRole("ZONE_MANAGER")) {
-            String currentUserEmail = userService.getCurrentUserEmail();
-            
-            // Récupérer toutes les parcelles et filtrer par email du créateur
-            List<com.industria.platform.entity.Parcel> allParcels = parcelRepository.findAll();
-            List<com.industria.platform.entity.Parcel> userParcels = allParcels.stream()
-                .filter(parcel -> parcel.getCreatedBy() != null && 
-                              parcel.getCreatedBy().getEmail().equals(currentUserEmail))
-                .toList();
-            
-            totalParcels = (long) userParcels.size();
-            availableParcels = userParcels.stream()
-                .filter(p -> ParcelStatus.LIBRE.equals(p.getStatus()))
-                .count();
-                
-            // Compter les zones créées par le manager  
-            List<com.industria.platform.entity.Zone> allZones = zoneRepository.findAll();
-            totalZones = allZones.stream()
-                .filter(zone -> zone.getCreatedBy() != null && 
-                              zone.getCreatedBy().getEmail().equals(currentUserEmail))
-                .count();
-            
-            // Les Zone Managers ne voient que leurs propres créations
-            totalUsers = 0L; // Pas d'accès aux statistiques utilisateurs
-            totalAppointments = 0L; // À implémenter si nécessaire
-            pendingAppointments = 0L;
+        } else if (permissionService.hasRole("ZONE_MANAGER")) {
+            var currentUserOpt = userService.findCurrentUser();
+            if (currentUserOpt.isPresent()) {
+                String userId = currentUserOpt.get().getId();
+
+                totalParcels = parcelRepository.countByCreatedBy_Id(userId);
+                availableParcels = parcelRepository.countByCreatedBy_IdAndStatus(userId, ParcelStatus.LIBRE);
+
+                totalZones = zoneRepository.countByCreatedBy_Id(userId);
+
+                totalAppointments = appointmentRepository.countByParcel_CreatedBy_Id(userId);
+                pendingAppointments = appointmentRepository.countByParcel_CreatedBy_IdAndStatus(userId, AppointmentStatus.PENDING);
+
+                totalUsers = 0; // managers do not see system-wide user stats
+            } else {
+                // not authenticated or cannot load user
+                log.debug("No current user found for manager stats, returning zeros");
+            }
+        } else {
+            // other roles: zeros by policy
         }
-        // Par défaut (autres rôles), aucune statistique
-        else {
-            totalUsers = 0L;
-            totalZones = 0L;
-            totalParcels = 0L;
-            availableParcels = 0L;
-            totalAppointments = 0L;
-            pendingAppointments = 0L;
-        }
-        
-        // Générer des activités récentes (simulées pour l'instant)
+
         List<AdminStatsDto.RecentActivityDto> recentActivities = generateRecentActivities();
-        
+
         return new AdminStatsDto(
-            totalUsers,
-            totalZones,
-            availableParcels,
-            totalParcels,
-            pendingAppointments,
-            totalAppointments,
-            recentActivities
+                totalUsers,
+                totalZones,
+                availableParcels,
+                totalParcels,
+                pendingAppointments,
+                totalAppointments,
+                recentActivities
         );
     }
 
     /**
-     * Génère des activités récentes simulées.
-     * TODO: Implémenter un vrai système d'audit log
+     * Demo data for now. Replace with real audit feed when ready.
      */
     private List<AdminStatsDto.RecentActivityDto> generateRecentActivities() {
-        List<AdminStatsDto.RecentActivityDto> activities = new ArrayList<>();
-        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        
-        // Quelques activités d'exemple
+        var activities = new ArrayList<AdminStatsDto.RecentActivityDto>();
+        var fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
         activities.add(new AdminStatsDto.RecentActivityDto(
-            "1",
-            "Nouvelle zone créée",
-            "Zone industrielle 'Parc Technologique Casa' ajoutée",
-            new AdminStatsDto.UserSummaryDto("Admin Système"),
-            LocalDateTime.now().minusHours(2).format(formatter)
+                "1",
+                "Nouvelle zone créée",
+                "Zone industrielle 'Parc Technologique Casa' ajoutée",
+                new AdminStatsDto.UserSummaryDto("Admin Système"),
+                LocalDateTime.now().minusHours(2).format(fmt)
         ));
-        
+
         activities.add(new AdminStatsDto.RecentActivityDto(
-            "2", 
-            "Rendez-vous confirmé",
-            "RDV pour parcelle P-123 confirmé",
-            new AdminStatsDto.UserSummaryDto("Manager Commercial"),
-            LocalDateTime.now().minusHours(5).format(formatter)
+                "2",
+                "Rendez-vous confirmé",
+                "RDV pour parcelle P-123 confirmé",
+                new AdminStatsDto.UserSummaryDto("Manager Commercial"),
+                LocalDateTime.now().minusHours(5).format(fmt)
         ));
-        
+
         activities.add(new AdminStatsDto.RecentActivityDto(
-            "3",
-            "Utilisateur créé", 
-            "Nouveau compte client enregistré",
-            new AdminStatsDto.UserSummaryDto("Système"),
-            LocalDateTime.now().minusDays(1).format(formatter)
+                "3",
+                "Utilisateur créé",
+                "Nouveau compte client enregistré",
+                new AdminStatsDto.UserSummaryDto("Système"),
+                LocalDateTime.now().minusDays(1).format(fmt)
         ));
-        
+
         return activities;
     }
 }

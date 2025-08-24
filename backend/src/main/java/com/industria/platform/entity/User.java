@@ -56,6 +56,9 @@ public class User {
     
     /** Date de suppression (soft delete) */
     private LocalDateTime deletedAt;
+
+    @Column(unique = true)
+    private String keycloakId;
     
     /**
      * Callback exécuté avant la persistance initiale.

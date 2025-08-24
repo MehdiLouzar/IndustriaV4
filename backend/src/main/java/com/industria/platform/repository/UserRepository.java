@@ -34,4 +34,5 @@ public interface UserRepository extends JpaRepository<User, String> {
      * @return nombre d'utilisateurs créés dans la période
      */
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+    Optional<User> findByKeycloakId(String keycloakId);
 }
