@@ -8,25 +8,29 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Calculator, FileText, TrendingUp, Download } from 'lucide-react';
+import { AlertCircle, Calculator, FileText, TrendingUp, Download, Factory, Building2 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Badge } from '@/components/ui/badge';
 
 // Types pour le simulateur TPME
 interface TPMEProjectData {
-  // Type d'entreprise
-  typeEntreprise: 'TPE' | 'PE' | 'ME';
-  chiffreAffaires: number;
-  chiffreAffairesExport: number;
-  capitalDetenu: boolean; // < 25% par société ≥ 200M DH
-  personneMorale: boolean;
+  // Secteur d'activité
+  secteurType: 'manufacturier' | 'touristique' | '';
+  ratioMinRequis: number; // 1.5 pour manufacturier, 1 pour touristique
 
   // Investissement
   montantInvestissement: number;
   secteurActivite: string;
   secteurActiviteAutre?: string; // Pour saisie manuelle si "autre"
   fondsPropresPct: number;
+
+  // CAPEX - Ventilation du montant d'investissement
+  fraisEtude: number;
+  foncierPrive: number;
+  foncierPublic: number;
+  constructions: number;
+  equipements: number;
 
   // Emplois
   emploisStablesCreus: number;
@@ -63,7 +67,7 @@ const SECTEURS_TPME = [
   { value: 'aquaculture', label: 'Aquaculture', prioritaire: true },
   { value: 'energie-renouvelable', label: 'Energie renouvelable', prioritaire: true },
   { value: 'transformation-dechets', label: 'Transformation et valorisation des déchets', prioritaire: true },
-  { value: 'artisanat', label: 'Artisanat', prioritaire: false },
+  { value: 'artisanat', label: 'Artisanat', prioritaire: true },
   { value: 'autre', label: 'Autre (non prioritaire)', prioritaire: false }
 ];
 
@@ -106,15 +110,17 @@ export default function SimulateurTPME() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedDisclaimer, setAcceptedDisclaimer] = useState(false);
   const [projectData, setProjectData] = useState<TPMEProjectData>({
-    typeEntreprise: 'TPE',
-    chiffreAffaires: 0,
-    chiffreAffairesExport: 0,
-    capitalDetenu: true,
-    personneMorale: true,
+    secteurType: '',
+    ratioMinRequis: 0,
     montantInvestissement: 0,
     secteurActivite: '',
     secteurActiviteAutre: '',
     fondsPropresPct: 10,
+    fraisEtude: 0,
+    foncierPrive: 0,
+    foncierPublic: 0,
+    constructions: 0,
+    equipements: 0,
     emploisStablesCreus: 0,
     region: '',
     province: '',
@@ -129,7 +135,10 @@ export default function SimulateurTPME() {
 
   // Generate PDF export
   const exportToPDF = () => {
-    if (!result) return;
+    if (!result) {
+      alert('Résultats non disponibles. Veuillez attendre que les calculs soient terminés.');
+      return;
+    }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -252,15 +261,27 @@ export default function SimulateurTPME() {
     };
   };
 
-  const steps = [
-    'Critères d\'éligibilité',
-    'Type d\'entreprise',
-    'Région',
-    'Province',
-    'Investissement',
-    'Emplois',
-    'Résultats'
-  ];
+  const getSteps = () => {
+    const baseSteps = [
+      'Critères d\'éligibilité',
+      'Secteur d\'activité'
+    ];
+    
+    if (projectData.secteurType === 'manufacturier') {
+      baseSteps.push('Détails investissement');
+    }
+    
+    baseSteps.push(
+      'Répartition CAPEX',
+      'Région',
+      'Province',
+      'Résultats'
+    );
+    
+    return baseSteps;
+  };
+
+  const steps = getSteps();
 
   const handleNextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -275,20 +296,48 @@ export default function SimulateurTPME() {
   };
 
   const canProceed = () => {
-    switch (currentStep) {
-      case -1: return acceptedTerms && acceptedDisclaimer; // Disclaimer - doit être accepté
-      case 0: return true; // Critères d'éligibilité - juste informatif
-      case 1: return projectData.typeEntreprise !== '';
-      case 2: return projectData.region !== '';
-      case 3: return projectData.province !== '';
-      case 4:
-        // Vérifier montant d'investissement et secteur d'activité
-        const montantValid = projectData.montantInvestissement >= 1000000 && projectData.montantInvestissement < 50000000;
+    if (currentStep === -1) {
+      return acceptedTerms && acceptedDisclaimer; // Disclaimer - doit être accepté
+    }
+    
+    const currentStepName = steps[currentStep];
+    
+    switch (currentStepName) {
+      case 'Critères d\'éligibilité':
+        return true; // Juste informatif
+        
+      case 'Secteur d\'activité':
+        // Vérifier secteur, montant, capitaux propres et ratio emploi
+        if (!projectData.secteurType) return false;
+        if (projectData.montantInvestissement < 1000000 || projectData.montantInvestissement >= 50000000) return false;
+        if (projectData.capitauxPropres < (projectData.montantInvestissement * 0.1)) return false;
+        
+        // Vérification d'éligibilité obligatoire
+        const montantInvestissementEnMillions = projectData.montantInvestissement / 1000000;
+        const ratioEmplois = montantInvestissementEnMillions > 0 ? projectData.emploisStablesCreus / montantInvestissementEnMillions : 0;
+        const ratioEligible = ratioEmplois >= projectData.ratioMinRequis;
+        
+        return ratioEligible;
+        
+      case 'Détails investissement':
+        // Seulement pour secteur manufacturier - vérifier secteur d'activité
         const secteurValid = projectData.secteurActivite !== '' && (projectData.secteurActivite !== 'autre' || projectData.secteurActiviteAutre !== '');
-        return montantValid && secteurValid && projectData.fondsPropresPct >= 10;
-      case 5: return true; // Emplois - optionnel pour continuer
-      case 6: return true; // Résultats
-      default: return true;
+        return secteurValid;
+        
+      case 'Répartition CAPEX':
+        return true; // Optionnel pour continuer
+        
+      case 'Région':
+        return projectData.region !== '';
+        
+      case 'Province':
+        return projectData.province !== '';
+        
+      case 'Résultats':
+        return true;
+        
+      default:
+        return true;
     }
   };
 
@@ -300,19 +349,28 @@ export default function SimulateurTPME() {
     return parseInt(str.replace(/\s/g, '')) || 0;
   };
 
+  // Fonction pour calculer le montant primable selon les règles TPME
+  const calculateMontantPrimable = () => {
+    const plafondFraisEtude = Math.min(projectData.montantInvestissement * 0.05, 500000);
+    const fraisEtudeRetenus = Math.min(projectData.fraisEtude, plafondFraisEtude);
+    
+    const secteurEligibleFoncier = projectData.secteurType === 'manufacturier' || projectData.secteurType === 'touristique' || 
+                                   ['industrie', 'tourisme-loisir', 'artisanat'].includes(projectData.secteurActivite);
+    const plafondFoncierPrive = secteurEligibleFoncier ? Math.min(projectData.montantInvestissement * 0.2, 5000000) : 0;
+    const foncierPriveRetenu = Math.min(projectData.foncierPrive, plafondFoncierPrive);
+    
+    return fraisEtudeRetenus + foncierPriveRetenu + projectData.constructions + projectData.equipements;
+  };
+
   const calculateTPMEPrimes = () => {
     // Vérifications d'éligibilité
     let eligible = true;
     let raisonNonEligibilite = '';
 
-    // Vérification du type d'entreprise et CA
-    const caLimit = projectData.typeEntreprise === 'TPE' ?
-      (projectData.chiffreAffairesExport > 0 && projectData.chiffreAffairesExport <= 2000000 ? 2000000 : 1000000) :
-      projectData.typeEntreprise === 'PE' ? 2000000 : 200000000;
-
-    if (projectData.chiffreAffaires > caLimit) {
+    // Vérification secteur sélectionné
+    if (!projectData.secteurType) {
       eligible = false;
-      raisonNonEligibilite = `Chiffre d'affaires dépassé pour ${projectData.typeEntreprise}`;
+      raisonNonEligibilite = 'Secteur d\'activité non sélectionné';
     }
 
     // Vérification montant d'investissement TPME
@@ -331,23 +389,22 @@ export default function SimulateurTPME() {
       raisonNonEligibilite = 'Minimum 10% en fonds propres requis';
     }
 
-    if (!projectData.capitalDetenu || !projectData.personneMorale) {
-      eligible = false;
-      raisonNonEligibilite = 'Critères de structure juridique non respectés';
-    }
+    // Calcul du Montant d'Investissement Primable
+    const montantPrimable = calculateMontantPrimable();
 
-    const montantPrimable = projectData.montantInvestissement;
-
-    // Calcul des primes
+    // Prime emplois basée sur le ratio (Nombre d'emplois / Montant primable en millions DH)
+    const montantPrimableEnMillions = montantPrimable / 1000000;
+    const ratioEmplois = montantPrimableEnMillions > 0 ? projectData.emploisStablesCreus / montantPrimableEnMillions : 0;
+    
     let primeEmplois = 0;
-    if (projectData.emploisStablesCreus >= 10) {
-      primeEmplois = 10;
-    } else if (projectData.emploisStablesCreus >= 5) {
-      primeEmplois = 7;
-    } else if (projectData.emploisStablesCreus >= 2) {
-      primeEmplois = 5;
-    } else if ((projectData.secteurActivite === 'tourisme-loisir' || projectData.secteurActivite === 'tourisme') && projectData.emploisStablesCreus >= 1) {
-      primeEmplois = 5;
+    if (ratioEmplois >= projectData.ratioMinRequis) {
+      if (ratioEmplois > 10) {
+        primeEmplois = 10;
+      } else if (ratioEmplois > 5) {
+        primeEmplois = 7;
+      } else if (ratioEmplois >= 2) {
+        primeEmplois = 5;
+      }
     }
 
     // Prime territoriale (harmonisée avec simulateur principal)
@@ -381,22 +438,24 @@ export default function SimulateurTPME() {
   };
 
   const renderStep = () => {
-    switch (currentStep) {
-      case -1:
-        return renderDisclaimerStep();
-      case 0:
+    if (currentStep === -1) return renderDisclaimerStep();
+    
+    const currentStepName = steps[currentStep];
+    
+    switch (currentStepName) {
+      case 'Critères d\'éligibilité':
         return renderEligibilityStep();
-      case 1:
-        return renderTypeEntrepriseStep();
-      case 2:
+      case 'Secteur d\'activité':
+        return renderSectorStep();
+      case 'Détails investissement':
+        return renderInvestmentDetailsStep();
+      case 'Répartition CAPEX':
+        return renderCapexStep();
+      case 'Région':
         return renderRegionStep();
-      case 3:
+      case 'Province':
         return renderProvinceStep();
-      case 4:
-        return renderInvestmentStep();
-      case 5:
-        return renderEmploymentStep();
-      case 6:
+      case 'Résultats':
         return renderResultsStep();
       default:
         return null;
@@ -500,10 +559,6 @@ export default function SimulateurTPME() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-600"></div>
-                      <span className="text-sm text-green-800">Capital PAS détenu &gt; 25%</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-600"></div>
                       <span className="text-sm text-green-800">Personne morale de droit marocain</span>
                     </div>
                   </div>
@@ -592,18 +647,10 @@ export default function SimulateurTPME() {
                 <div className="w-2 h-2 rounded-full bg-industria-brown-gold"></div>
                 <span className="text-sm">Transformation des déchets</span>
               </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 space-y-2">
-            <h5 className="font-semibold text-orange-700 mb-2">Secteurs non prioritaires :</h5>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-              <span className="text-sm text-gray-600">Artisanat</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-              <span className="text-sm text-gray-600">Autres secteurs (à préciser)</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-industria-brown-gold"></div>
+                <span className="text-sm text-gray-600">Artisanat</span>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -620,16 +667,8 @@ export default function SimulateurTPME() {
               <h4 className="font-semibold text-gray-700 text-sm">Prime emplois</h4>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">2-4 emplois</span>
-                  <Badge variant="secondary" className="text-xs">5%</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">5-9 emplois</span>
-                  <Badge variant="secondary" className="text-xs">7%</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">≥10 emplois</span>
-                  <Badge variant="secondary" className="text-xs">10%</Badge>
+                  <span className="text-sm">Ratio emploi/CAPEX</span>
+                  <Badge variant="secondary" className="text-xs">5-10%</Badge>
                 </div>
               </div>
             </div>
@@ -647,7 +686,7 @@ export default function SimulateurTPME() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Autres</span>
-                  <Badge variant="secondary" className="text-xs">7%</Badge>
+                  <Badge variant="secondary" className="text-xs">0%</Badge>
                 </div>
               </div>
             </div>
@@ -660,8 +699,8 @@ export default function SimulateurTPME() {
                   <Badge variant="secondary" className="text-xs">10%</Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Autres secteurs</span>
-                  <Badge variant="outline" className="text-xs">0%</Badge>
+                  <span className="text-sm">Autres secteurs</span>
+                  <Badge variant="secondary" className="text-xs">0%</Badge>
                 </div>
               </div>
             </div>
@@ -731,7 +770,7 @@ export default function SimulateurTPME() {
               </div>
               <div>
                 <h4 className="font-semibold text-gray-800 mb-1">Décision et versement</h4>
-                <p className="text-sm text-gray-600">Réception de la décision officielle et versement des primes approuvées.</p>
+                <p className="text-sm text-gray-600">Réception de la décision officielle.</p>
               </div>
             </div>
           </div>
@@ -740,99 +779,220 @@ export default function SimulateurTPME() {
     </div>
   );
 
-  const renderTypeEntrepriseStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Type d'entreprise</h3>
-        <p className="text-gray-600">Sélectionnez votre catégorie d'entreprise selon votre chiffre d'affaires</p>
-      </div>
+  const renderSectorStep = () => {
+    const montantInvestissementEnMillions = projectData.montantInvestissement / 1000000;
+    const ratioEmplois = montantInvestissementEnMillions > 0 ? projectData.emploisStablesCreus / montantInvestissementEnMillions : 0;
+    const ratioEligible = projectData.secteurType && ratioEmplois >= projectData.ratioMinRequis;
+    const capitauxPropresEligibles = projectData.capitauxPropres >= (projectData.montantInvestissement * 0.1);
 
-      <div className="grid md:grid-cols-3 gap-4">
-        {[
-          { value: 'TPE', label: 'Très Petite Entreprise', desc: 'CA ≤ 1M DH (ou ≤ 2M DH à l\'export)' },
-          { value: 'PE', label: 'Petite Entreprise', desc: 'CA ≤ 2M DH' },
-          { value: 'ME', label: 'Moyenne Entreprise', desc: 'CA ≤ 200M DH' }
-        ].map((type) => (
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Secteur d'activité</h3>
+          <p className="text-gray-600">Choisissez votre secteur d'activité principal</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
           <Card
-            key={type.value}
-            className={`cursor-pointer transition-all hover:shadow-md ${projectData.typeEntreprise === type.value
+            className={`cursor-pointer transition-all hover:shadow-md ${projectData.secteurType === 'manufacturier'
                 ? 'border-2 border-blue-300 bg-blue-50'
                 : 'border hover:border-blue-200'
               }`}
-            onClick={() => setProjectData({ ...projectData, typeEntreprise: type.value as any })}
+            onClick={() => setProjectData({
+              ...projectData,
+              secteurType: 'manufacturier',
+              ratioMinRequis: 1.5
+            })}
           >
-            <CardContent className="p-4 text-center">
-              <h4 className="font-semibold text-lg mb-2">{type.label}</h4>
-              <p className="text-sm text-gray-600">{type.desc}</p>
-              {projectData.typeEntreprise === type.value && (
-                <Badge className="mt-2 bg-blue-600">Sélectionné</Badge>
-              )}
+            <CardContent className="p-6 text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                  <Factory className="w-8 h-8 text-blue-600" />
+                </div>
+              </div>
+              <h4 className="text-xl font-semibold mb-2">Manufacturier</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Activités de production industrielle et manufacturière
+              </p>
+              <Badge className="bg-blue-100 text-blue-800">
+                Ratio minimum requis: 1,5
+              </Badge>
             </CardContent>
           </Card>
-        ))}
+
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${projectData.secteurType === 'touristique'
+                ? 'border-2 border-green-300 bg-green-50'
+                : 'border hover:border-green-200'
+              }`}
+            onClick={() => setProjectData({
+              ...projectData,
+              secteurType: 'touristique',
+              ratioMinRequis: 1,
+              secteurActivite: 'tourisme-loisir',
+              activitePrioritaire: true
+            })}
+          >
+            <CardContent className="p-6 text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+              <h4 className="text-xl font-semibold mb-2">Touristique</h4>
+              <p className="text-sm text-gray-600 mb-3">
+                Activités liées au tourisme et aux loisirs
+              </p>
+              <div className="space-y-2">
+                <Badge className="bg-green-100 text-green-800">
+                  Ratio minimum requis: 1,0
+                </Badge>
+                <Badge className="bg-yellow-100 text-yellow-800">
+                  Prime sectorielle: 10%
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {projectData.secteurType && (
+          <div className="space-y-4">
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-700">
+                <strong>Ratio d'emplois :</strong> {projectData.ratioMinRequis === 1.5 ? 'Manufacturier' : 'Touristique'} - 
+                Minimum requis {projectData.ratioMinRequis} emploi(s) stable(s) par million de DH d'investissement global.
+              </AlertDescription>
+            </Alert>
+
+            {/* Champs d'investissement et capitaux propres */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card className="border-2 border-blue-200 bg-blue-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm text-blue-700">Montant d'investissement</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div>
+                    <Label htmlFor="montantInvest">Montant d'investissement (MAD)</Label>
+                    <Input
+                      id="montantInvest"
+                      type="text"
+                      value={projectData.montantInvestissement ? formatNumber(projectData.montantInvestissement) : ''}
+                      onChange={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setProjectData({ ...projectData, montantInvestissement: numValue });
+                      }}
+                      placeholder="Entre 1 000 000 et 49 999 999 MAD"
+                      className="text-sm"
+                    />
+                    {projectData.montantInvestissement > 0 && projectData.montantInvestissement < 1000000 && (
+                      <p className="text-red-500 text-xs mt-1">Montant minimum : 1 000 000 MAD</p>
+                    )}
+                    {projectData.montantInvestissement >= 50000000 && (
+                      <p className="text-red-500 text-xs mt-1">Montant maximum : 49 999 999 MAD</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2 border-purple-200 bg-purple-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm text-purple-700">Capitaux propres</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div>
+                    <Label htmlFor="capitaux">Capitaux propres (MAD)</Label>
+                    <Input
+                      id="capitaux"
+                      type="text"
+                      value={projectData.capitauxPropres ? formatNumber(projectData.capitauxPropres) : ''}
+                      onChange={(e) => {
+                        const numValue = parseFormattedNumber(e.target.value);
+                        setProjectData({ ...projectData, capitauxPropres: numValue });
+                      }}
+                      placeholder="Montant des capitaux propres"
+                      className="text-sm"
+                    />
+                    {projectData.montantInvestissement > 0 && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        Minimum requis : {formatNumber(projectData.montantInvestissement * 0.1)} MAD (10%)
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Vérification ratio emploi stable */}
+            <Card className={`border-2 ${ratioEligible ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className={`text-sm flex items-center gap-2 ${ratioEligible ? 'text-green-700' : 'text-red-700'}`}>
+                  <AlertCircle className="w-4 h-4" />
+                  Ratio emploi stable
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label htmlFor="emplois">Emplois stables créés</Label>
+                  <Input
+                    id="emplois"
+                    type="number"
+                    min="0"
+                    value={projectData.emploisStablesCreus === 0 ? '' : projectData.emploisStablesCreus}
+                    onChange={(e) => setProjectData({ ...projectData, emploisStablesCreus: parseInt(e.target.value) || 0 })}
+                    placeholder="Nombre d'emplois"
+                    className="text-sm"
+                  />
+                </div>
+                {projectData.montantInvestissement > 0 && projectData.emploisStablesCreus > 0 && (
+                  <div className="text-xs space-y-2">
+                    <div className="text-gray-600">
+                      Ratio : {projectData.emploisStablesCreus} ÷ {formatNumber(montantInvestissementEnMillions, 2)} = <strong>{formatNumber(ratioEmplois, 2)}</strong>
+                    </div>
+                    <div className={ratioEligible ? 'text-green-600' : 'text-red-600'}>
+                      {ratioEligible ? '✓ Éligible' : `✗ Insuffisant (min: ${projectData.ratioMinRequis})`}
+                    </div>
+                    
+                    {/* Affichage de la tranche de prime */}
+                    {ratioEligible && (
+                      <div className="bg-white p-2 rounded border">
+                        <div className="font-medium text-gray-700 mb-1">Tranche de prime emplois :</div>
+                        {(() => {
+                          if (projectData.emploisStablesCreus >= 10) {
+                            return <div className="text-green-600 font-semibold">≥ 10 emplois → 10% du montant primable</div>;
+                          } else if (projectData.emploisStablesCreus >= 5) {
+                            return <div className="text-blue-600 font-semibold">5 à 9 emplois → 7% du montant primable</div>;
+                          } else if (projectData.emploisStablesCreus >= 2) {
+                            return <div className="text-orange-600 font-semibold">2 à 4 emplois → 5% du montant primable</div>;
+                          } else if (projectData.secteurActivite === 'tourisme-loisir' && projectData.emploisStablesCreus >= 1) {
+                            return <div className="text-purple-600 font-semibold">Tourisme ≥ 1 emploi → 5% du montant primable</div>;
+                          }
+                          return <div className="text-gray-600">Aucune prime emplois</div>;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {projectData.montantInvestissement > 0 && projectData.emploisStablesCreus > 0 && projectData.capitauxPropres > 0 && (
+              <Alert className={(ratioEligible && capitauxPropresEligibles) ? 'bg-green-100 border-green-200' : 'bg-red-100 border-red-200'}>
+                <AlertCircle className={`h-4 w-4 ${(ratioEligible && capitauxPropresEligibles) ? 'text-green-600' : 'text-red-600'}`} />
+                <AlertDescription className={(ratioEligible && capitauxPropresEligibles) ? 'text-green-700' : 'text-red-700'}>
+                  {(ratioEligible && capitauxPropresEligibles) ? (
+                    <><strong>✓ Projet éligible :</strong> Tous les critères sont respectés.</>
+                  ) : (
+                    <><strong>✗ Projet non éligible :</strong> {!ratioEligible && 'Ratio emploi insuffisant'}{!ratioEligible && !capitauxPropresEligibles && ' et '}{!capitauxPropresEligibles && 'Capitaux propres insuffisants'}.</>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
       </div>
-
-      <Card className="border-2 border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="text-lg text-blue-700">Informations sur votre entreprise</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="ca">Chiffre d'affaires (DH)</Label>
-              <Input
-                id="ca"
-                type="text"
-                value={projectData.chiffreAffaires ? formatNumber(projectData.chiffreAffaires) : ''}
-                onChange={(e) => {
-                  const numValue = parseFormattedNumber(e.target.value);
-                  setProjectData({ ...projectData, chiffreAffaires: numValue });
-                }}
-                placeholder="Ex: 500 000"
-              />
-            </div>
-            <div>
-              <Label htmlFor="caExport">Chiffre d'affaires export (DH) - Optionnel</Label>
-              <Input
-                id="caExport"
-                type="text"
-                value={projectData.chiffreAffairesExport ? formatNumber(projectData.chiffreAffairesExport) : ''}
-                onChange={(e) => {
-                  const numValue = parseFormattedNumber(e.target.value);
-                  setProjectData({ ...projectData, chiffreAffairesExport: numValue });
-                }}
-                placeholder="Ex: 1 500 000"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="capitalDetenu"
-                checked={projectData.capitalDetenu}
-                onCheckedChange={(checked) => setProjectData({ ...projectData, capitalDetenu: !!checked })}
-              />
-              <Label htmlFor="capitalDetenu" className="text-sm">
-                Capital détenu à moins de 25% par une société ≥ 200M DH
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="personneMorale"
-                checked={projectData.personneMorale}
-                onCheckedChange={(checked) => setProjectData({ ...projectData, personneMorale: !!checked })}
-              />
-              <Label htmlFor="personneMorale" className="text-sm">
-                Personne morale de droit marocain soumise à l'IS
-              </Label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    );
+  };
 
   const renderRegionStep = () => (
     <div className="space-y-6">
@@ -879,7 +1039,7 @@ export default function SimulateurTPME() {
       {projectData.region && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {REGIONS_PROVINCES_TPME[projectData.region as keyof typeof REGIONS_PROVINCES_TPME].map((province) => {
-            let category = 'Autres (7%)';
+            let category = 'Autres (0%)';
             let categoryColor = 'bg-gray-100 text-gray-700';
 
             if (PROVINCES_CATEGORIE_A.includes(province)) {
@@ -998,13 +1158,6 @@ export default function SimulateurTPME() {
                     </Badge>
                   )}
                 </div>
-                <p className={`text-xs ${secteur.prioritaire ? 'text-green-600' : 'text-orange-600'
-                  }`}>
-                  {secteur.prioritaire
-                    ? 'Secteur prioritaire éligible à la prime sectorielle'
-                    : 'Secteur non prioritaire - pas de prime sectorielle'
-                  }
-                </p>
               </CardContent>
             </Card>
           ))}
@@ -1033,65 +1186,364 @@ export default function SimulateurTPME() {
     </div>
   );
 
-  const renderEmploymentStep = () => (
+  const renderInvestmentDetailsStep = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Création d'emplois stables</h3>
-        <p className="text-gray-600">Nombre d'emplois stables que vous prévoyez de créer</p>
+        <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Détails de l'investissement</h3>
+        <p className="text-gray-600">Secteur d'activité manufacturier</p>
       </div>
 
-      <Card className="border-2 border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="text-lg text-blue-700">Prime création d'emplois</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="emplois">Nombre d'emplois stables créés</Label>
-            <Input
-              id="emplois"
-              type="number"
-              min="0"
-              value={projectData.emploisStablesCreus}
-              onChange={(e) => setProjectData({ ...projectData, emploisStablesCreus: parseInt(e.target.value) || 0 })}
-              placeholder="0"
-            />
-          </div>
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-4 text-industria-brown-gold">Secteur d'activité</h3>
+          <p className="text-gray-600">Sélectionnez votre secteur d'activité principal</p>
+        </div>
 
-          <div className="space-y-3">
-            <h4 className="font-medium text-blue-700">Barème des primes :</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className={`p-3 rounded ${projectData.emploisStablesCreus >= 10 ? 'bg-green-100 border-2 border-green-300' : 'bg-gray-50'}`}>
-                <div className="font-medium">≥ 10 emplois</div>
-                <div className="text-green-600">10% du montant primable</div>
-              </div>
-              <div className={`p-3 rounded ${projectData.emploisStablesCreus >= 5 && projectData.emploisStablesCreus < 10 ? 'bg-blue-100 border-2 border-blue-300' : 'bg-gray-50'}`}>
-                <div className="font-medium">5 à 9 emplois</div>
-                <div className="text-blue-600">7% du montant primable</div>
-              </div>
-              <div className={`p-3 rounded ${projectData.emploisStablesCreus >= 2 && projectData.emploisStablesCreus < 5 ? 'bg-orange-100 border-2 border-orange-300' : 'bg-gray-50'}`}>
-                <div className="font-medium">2 à 4 emplois</div>
-                <div className="text-orange-600">5% du montant primable</div>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {SECTEURS_TPME.filter((secteur) => {
+            // Pour le secteur manufacturier, exclure tourisme-loisir
+            if (projectData.secteurType === 'manufacturier') {
+              return secteur.value !== 'tourisme-loisir';
+            }
+            return true;
+          }).map((secteur) => (
+            <Card
+              key={secteur.value}
+              className={`cursor-pointer transition-all hover:shadow-md ${projectData.secteurActivite === secteur.value
+                  ? secteur.prioritaire
+                    ? 'border-2 border-green-300 bg-green-50'
+                    : 'border-2 border-orange-300 bg-orange-50'
+                  : 'border hover:border-blue-200'
+                }`}
+              onClick={() => {
+                setProjectData({
+                  ...projectData,
+                  secteurActivite: secteur.value,
+                  activitePrioritaire: secteur.prioritaire,
+                  secteurActiviteAutre: secteur.value === 'autre' ? projectData.secteurActiviteAutre : ''
+                });
+              }}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="font-medium text-sm">{secteur.label}</h4>
+                  {secteur.prioritaire && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                      Prime 10%
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-            {projectData.secteurActivite === 'tourisme' && (
-              <Alert className="bg-purple-50 border-purple-200">
-                <AlertCircle className="h-4 w-4 text-purple-600" />
-                <AlertDescription className="text-purple-700">
-                  <strong>Secteur tourisme :</strong> Prime de 5% dès 1 emploi stable créé
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {projectData.secteurActivite === 'autre' && (
+          <Card className="border-2 border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-700">Précisez votre secteur</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label htmlFor="secteurAutre">Secteur d'activité</Label>
+                <Input
+                  id="secteurAutre"
+                  type="text"
+                  value={projectData.secteurActiviteAutre || ''}
+                  onChange={(e) => setProjectData({ ...projectData, secteurActiviteAutre: e.target.value })}
+                  placeholder="Décrivez votre secteur d'activité"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 
+  const renderCapexStep = () => {
+    // Calculer la somme de la ventilation CAPEX
+    const sommeCAPEX = projectData.fraisEtude + projectData.foncierPrive + 
+                       projectData.foncierPublic + projectData.constructions + 
+                       projectData.equipements;
+    
+    const ecartMontant = Math.abs(sommeCAPEX - projectData.montantInvestissement);
+    const pourcentageEcart = projectData.montantInvestissement > 0 ? 
+      (ecartMontant / projectData.montantInvestissement) * 100 : 0;
+    
+    const isCoherent = ecartMontant <= (projectData.montantInvestissement * 0.01); // Tolérance de 1%
+
+    // Calcul du Montant d'Investissement Primable selon les règles TPME
+    let montantPrimable = projectData.montantInvestissement;
+    
+    // 1. Plafonnement frais d'études à 5% du montant primable, max 500 000 DH
+    const plafondFraisEtude = Math.min(montantPrimable * 0.05, 500000);
+    const fraisEtudeRetenus = Math.min(projectData.fraisEtude, plafondFraisEtude);
+    
+    // 2. Foncier privé plafonné à 20% du montant primable, max 5 000 000 DH (seulement pour industrie, tourisme, artisanat)
+    const secteurEligibleFoncier = projectData.secteurType === 'manufacturier' || projectData.secteurType === 'touristique' || 
+                                   ['industrie', 'tourisme-loisir', 'artisanat'].includes(projectData.secteurActivite);
+    const plafondFoncierPrive = secteurEligibleFoncier ? Math.min(montantPrimable * 0.2, 5000000) : 0;
+    const foncierPriveRetenu = Math.min(projectData.foncierPrive, plafondFoncierPrive);
+    
+    // 3. Foncier public exclu complètement
+    // 4. Véhicules exclus (pas de champ spécifique ici)
+    
+    // Calcul final du montant primable
+    montantPrimable = fraisEtudeRetenus + foncierPriveRetenu + projectData.constructions + projectData.equipements;
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-4 text-industria-brown-gold">Répartition de votre CAPEX</h3>
+          <p className="text-gray-600">Détaillez la répartition de votre investissement (optionnel)</p>
+        </div>
+
+        {/* Information sur le montant d'investissement primable */}
+        <Alert className="bg-indigo-50 border-indigo-200">
+          <AlertCircle className="h-4 w-4 text-indigo-600" />
+          <AlertDescription className="text-indigo-800">
+            <strong>Montant d'Investissement Primable (MIP) :</strong> Il s'agit du montant sur lequel seront calculées les primes d'investissement selon les règles TPME :
+            <br/>• Frais d'études plafonnés à 5% (max 500 000 DH)
+            <br/>• Foncier privé plafonné à 20% (max 5 000 000 DH) pour industrie/tourisme/artisanat
+            <br/>• Foncier public exclu
+            <br/>• Véhicules exclus
+          </AlertDescription>
+        </Alert>
+
+        {/* Récapitulatif montant total */}
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Montant total à ventiler :</strong> {formatNumber(projectData.montantInvestissement)} MAD
+          </AlertDescription>
+        </Alert>
+
+        {/* Ventilation CAPEX */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card className="border-2 border-blue-200 bg-blue-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-700">Ventilation détaillée</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="fraisEtude">Frais d'études, marques et procédés</Label>
+                <Input
+                  id="fraisEtude"
+                  type="text"
+                  value={projectData.fraisEtude ? formatNumber(projectData.fraisEtude) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({ ...projectData, fraisEtude: numValue });
+                  }}
+                  placeholder="0 MAD"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Max retenu: {formatNumber(plafondFraisEtude)} MAD (5% plafonné à 500 000 DH)
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="foncierPrive">Foncier privé</Label>
+                <Input
+                  id="foncierPrive"
+                  type="text"
+                  value={projectData.foncierPrive ? formatNumber(projectData.foncierPrive) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({ ...projectData, foncierPrive: numValue });
+                  }}
+                  placeholder="0 MAD"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {secteurEligibleFoncier 
+                    ? `Max retenu: ${formatNumber(plafondFoncierPrive)} MAD (20% plafonné à 5 000 000 DH)`
+                    : 'Non éligible pour ce secteur (exclu du calcul)'
+                  }
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="foncierPublic">Foncier public</Label>
+                <Input
+                  id="foncierPublic"
+                  type="text"
+                  value={projectData.foncierPublic ? formatNumber(projectData.foncierPublic) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({ ...projectData, foncierPublic: numValue });
+                  }}
+                  placeholder="0 MAD"
+                />
+                <p className="text-xs text-red-500 mt-1">
+                  Exclu du calcul du montant primable
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="constructions">Constructions et aménagements</Label>
+                <Input
+                  id="constructions"
+                  type="text"
+                  value={projectData.constructions ? formatNumber(projectData.constructions) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({ ...projectData, constructions: numValue });
+                  }}
+                  placeholder="0 MAD"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="equipements">Équipements et matériels</Label>
+                <Input
+                  id="equipements"
+                  type="text"
+                  value={projectData.equipements ? formatNumber(projectData.equipements) : ''}
+                  onChange={(e) => {
+                    const numValue = parseFormattedNumber(e.target.value);
+                    setProjectData({ ...projectData, equipements: numValue });
+                  }}
+                  placeholder="0 MAD"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Calcul du montant primable */}
+          <Card className="border-2 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-700">Calcul du Montant Primable</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Frais d'études (retenus)</span>
+                  <span className="font-medium">{formatNumber(fraisEtudeRetenus)} MAD</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Foncier privé (retenu)</span>
+                  <span className="font-medium">{formatNumber(foncierPriveRetenu)} MAD</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Foncier public</span>
+                  <span className="text-red-600 line-through">{formatNumber(projectData.foncierPublic)} MAD</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Constructions</span>
+                  <span className="font-medium">{formatNumber(projectData.constructions)} MAD</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Équipements</span>
+                  <span className="font-medium">{formatNumber(projectData.equipements)} MAD</span>
+                </div>
+              </div>
+
+              <div className="border-t pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-green-800">Montant Primable Total</span>
+                  <span className="font-bold text-xl text-green-800">{formatNumber(Math.round(montantPrimable))} MAD</span>
+                </div>
+                {montantPrimable !== projectData.montantInvestissement && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Différence: {formatNumber(Math.round(projectData.montantInvestissement - montantPrimable))} MAD exclus
+                  </p>
+                )}
+              </div>
+
+              {/* Exclusions appliquées */}
+              {(projectData.fraisEtude > plafondFraisEtude || projectData.foncierPrive > plafondFoncierPrive || projectData.foncierPublic > 0) && (
+                <Alert className="bg-orange-50 border-orange-200">
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-orange-700 text-xs">
+                    <strong>Plafonds appliqués :</strong>
+                    {projectData.fraisEtude > plafondFraisEtude && (
+                      <div>• Frais d'études : {formatNumber(projectData.fraisEtude - plafondFraisEtude)} MAD exclus</div>
+                    )}
+                    {projectData.foncierPrive > plafondFoncierPrive && (
+                      <div>• Foncier privé : {formatNumber(projectData.foncierPrive - plafondFoncierPrive)} MAD exclus</div>
+                    )}
+                    {projectData.foncierPublic > 0 && (
+                      <div>• Foncier public : {formatNumber(projectData.foncierPublic)} MAD exclu</div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Vérification de cohérence */}
+        {sommeCAPEX > 0 && (
+          <Card className={`border-2 ${
+            isCoherent 
+              ? 'border-green-200 bg-green-50' 
+              : 'border-orange-200 bg-orange-50'
+          }`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className={`font-semibold ${
+                  isCoherent ? 'text-green-800' : 'text-orange-800'
+                }`}>
+                  Vérification de cohérence
+                </h4>
+                <Badge variant={isCoherent ? 'default' : 'destructive'} className="text-xs">
+                  {isCoherent ? '✓ Cohérent' : '⚠ Incohérence'}
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Montant total déclaré</p>
+                  <p className="font-medium">{formatNumber(projectData.montantInvestissement)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Somme des rubriques</p>
+                  <p className="font-medium">{formatNumber(sommeCAPEX)} MAD</p>
+                </div>
+              </div>
+
+              {!isCoherent && (
+                <div className="mt-3 pt-3 border-t border-orange-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Répartition automatique suggérée
+                      setProjectData({
+                        ...projectData,
+                        fraisEtude: Math.round(projectData.montantInvestissement * 0.05), // 5%
+                        foncierPrive: Math.round(projectData.montantInvestissement * 0.15), // 15%
+                        foncierPublic: 0,
+                        constructions: Math.round(projectData.montantInvestissement * 0.30), // 30%
+                        equipements: Math.round(projectData.montantInvestissement * 0.50) // 50%
+                      });
+                    }}
+                    className="text-xs"
+                  >
+                    Répartition suggérée (5% étude + 15% foncier + 30% construction + 50% équipements)
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
+
 
   const renderResultsStep = () => {
+    // Force le calcul si les résultats n'existent pas
+    useEffect(() => {
+      if (!result) {
+        calculateTPMEPrimes();
+      }
+    }, [result]);
+    
+    // Si les résultats ne sont toujours pas disponibles, afficher le message de chargement
     if (!result) {
-      calculateTPMEPrimes();
       return <div className="text-center py-8">Calcul en cours...</div>;
     }
 
