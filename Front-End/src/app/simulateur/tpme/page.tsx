@@ -133,6 +133,7 @@ export default function SimulateurTPME() {
     setResult(null);
   }, [projectData]);
 
+
   // Generate PDF export
   const exportToPDF = () => {
     if (!result) {
@@ -182,10 +183,6 @@ export default function SimulateurTPME() {
         <div class="section">
           <div class="section-title">📊 Récapitulatif du Projet</div>
           <div class="info-grid">
-            <div class="info-item">
-              <div class="info-label">Type d'entreprise</div>
-              <div>${projectData.typeEntreprise} (CA: ${montantFormate(projectData.chiffreAffaires)} MAD)</div>
-            </div>
             <div class="info-item">
               <div class="info-label">Secteur d'activité</div>
               <div>${SECTEURS_TPME.find(s => s.value === projectData.secteurActivite)?.label}</div>
@@ -408,7 +405,7 @@ export default function SimulateurTPME() {
     }
 
     // Prime territoriale (harmonisée avec simulateur principal)
-    let primeTerritoriale = 7; // Défaut autres régions (spécifique TPME)
+    let primeTerritoriale = 0; // Défaut autres régions (spécifique TPME)
     if (PROVINCES_CATEGORIE_A.includes(projectData.province)) {
       primeTerritoriale = 10;
     } else if (PROVINCES_CATEGORIE_B.includes(projectData.province)) {
@@ -1535,15 +1532,9 @@ export default function SimulateurTPME() {
 
 
   const renderResultsStep = () => {
-    // Force le calcul si les résultats n'existent pas
-    useEffect(() => {
-      if (!result) {
-        calculateTPMEPrimes();
-      }
-    }, [result]);
-    
-    // Si les résultats ne sont toujours pas disponibles, afficher le message de chargement
+    // Si les résultats ne sont pas encore disponibles, les calculer
     if (!result) {
+      calculateTPMEPrimes();
       return <div className="text-center py-8">Calcul en cours...</div>;
     }
 
@@ -1653,10 +1644,6 @@ export default function SimulateurTPME() {
             <CardTitle className="text-lg">Récapitulatif projet</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Type d'entreprise:</span>
-              <span className="font-medium">{projectData.typeEntreprise}</span>
-            </div>
             <div className="flex justify-between">
               <span>Secteur:</span>
               <span className="font-medium">{SECTEURS_TPME.find(s => s.value === projectData.secteurActivite)?.label}</span>
