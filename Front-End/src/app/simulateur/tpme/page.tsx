@@ -154,23 +154,23 @@ export default function SimulateurTPME() {
         <meta charset="utf-8">
         <title>Simulateur TPME - Résultats</title>
         <style>
-          body { font-family: 'Arial', sans-serif; margin: 40px; line-height: 1.6; color: #333; }
-          .header { text-align: center; border-bottom: 3px solid #8B4513; padding-bottom: 20px; margin-bottom: 30px; }
-          .header h1 { color: #8B4513; font-size: 24px; margin: 0; }
-          .header p { color: #666; font-size: 14px; margin: 5px 0; }
-          .section { margin-bottom: 25px; page-break-inside: avoid; }
-          .section-title { background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 10px 15px; font-size: 16px; font-weight: bold; margin-bottom: 15px; }
-          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-          .info-item { padding: 8px; border-left: 4px solid #8B4513; background: #f9f9f9; }
-          .info-label { font-weight: bold; color: #8B4513; }
-          .primes-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          .primes-table th, .primes-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-          .primes-table th { background: #8B4513; color: white; font-weight: bold; }
+          body { font-family: 'Arial', sans-serif; margin: 15px; line-height: 1.3; color: #333; font-size: 12px; }
+          .header { text-align: center; border-bottom: 2px solid #8B4513; padding-bottom: 10px; margin-bottom: 15px; }
+          .header h1 { color: #8B4513; font-size: 18px; margin: 0; }
+          .header p { color: #666; font-size: 11px; margin: 2px 0; }
+          .section { margin-bottom: 15px; page-break-inside: avoid; }
+          .section-title { background: linear-gradient(135deg, #8B4513, #A0522D); color: white; padding: 6px 10px; font-size: 13px; font-weight: bold; margin-bottom: 10px; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+          .info-item { padding: 4px 6px; border-left: 3px solid #8B4513; background: #f9f9f9; font-size: 11px; }
+          .info-label { font-weight: bold; color: #8B4513; font-size: 11px; }
+          .primes-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+          .primes-table th, .primes-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+          .primes-table th { background: #8B4513; color: white; font-weight: bold; font-size: 11px; }
           .prime-eligible { background: #e8f5e8; color: #2d5a2d; }
           .prime-non-eligible { background: #ffeaea; color: #8b4513; }
           .total-row { font-weight: bold; background: #f0f0f0; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 20px; }
-          @media print { body { margin: 20px; } }
+          .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }
+          @media print { body { margin: 10px; font-size: 11px; } }
         </style>
       </head>
       <body>
@@ -389,9 +389,9 @@ export default function SimulateurTPME() {
     // Calcul du Montant d'Investissement Primable
     const montantPrimable = calculateMontantPrimable();
 
-    // Prime emplois basée sur le ratio (Nombre d'emplois / Montant primable en millions DH)
-    const montantPrimableEnMillions = montantPrimable / 1000000;
-    const ratioEmplois = montantPrimableEnMillions > 0 ? projectData.emploisStablesCreus / montantPrimableEnMillions : 0;
+    // Prime emplois basée sur le ratio (Nombre d'emplois / Montant global d'investissement en millions DH)
+    const montantInvestissementEnMillions = projectData.montantInvestissement / 1000000;
+    const ratioEmplois = montantInvestissementEnMillions > 0 ? projectData.emploisStablesCreus / montantInvestissementEnMillions : 0;
     
     let primeEmplois = 0;
     if (ratioEmplois >= projectData.ratioMinRequis) {
@@ -400,6 +400,9 @@ export default function SimulateurTPME() {
       } else if (ratioEmplois > 5) {
         primeEmplois = 7;
       } else if (ratioEmplois >= 2) {
+        primeEmplois = 5;
+      } else if (projectData.secteurActivite === 'tourisme-loisir' && ratioEmplois >= 1) {
+        // Règle spéciale pour le secteur touristique : 5% dès ratio ≥ 1
         primeEmplois = 5;
       }
     }
@@ -955,16 +958,17 @@ export default function SimulateurTPME() {
                       <div className="bg-white p-2 rounded border">
                         <div className="font-medium text-gray-700 mb-1">Tranche de prime emplois :</div>
                         {(() => {
-                          if (projectData.emploisStablesCreus >= 10) {
-                            return <div className="text-green-600 font-semibold">≥ 10 emplois → 10% du montant primable</div>;
-                          } else if (projectData.emploisStablesCreus >= 5) {
-                            return <div className="text-blue-600 font-semibold">5 à 9 emplois → 7% du montant primable</div>;
-                          } else if (projectData.emploisStablesCreus >= 2) {
-                            return <div className="text-orange-600 font-semibold">2 à 4 emplois → 5% du montant primable</div>;
-                          } else if (projectData.secteurActivite === 'tourisme-loisir' && projectData.emploisStablesCreus >= 1) {
-                            return <div className="text-purple-600 font-semibold">Tourisme ≥ 1 emploi → 5% du montant primable</div>;
+                          // Utiliser le ratio pour déterminer la tranche, pas le nombre d'emplois brut
+                          if (ratioEmplois >= 10) {
+                            return <div className="text-green-600 font-semibold">Ratio &gt; 10 → 10% du montant primable</div>;
+                          } else if (ratioEmplois > 5) {
+                            return <div className="text-blue-600 font-semibold">Ratio 5-10 → 7% du montant primable</div>;
+                          } else if (ratioEmplois >= 2) {
+                            return <div className="text-orange-600 font-semibold">Ratio 2-5 → 5% du montant primable</div>;
+                          } else if (projectData.secteurActivite === 'tourisme-loisir' && ratioEmplois >= 1) {
+                            return <div className="text-purple-600 font-semibold">Ratio insuffisant - Aucune prime emplois</div>;
                           }
-                          return <div className="text-gray-600">Aucune prime emplois</div>;
+                          return <div className="text-gray-600">Ratio insuffisant - Aucune prime emplois</div>;
                         })()}
                       </div>
                     )}
