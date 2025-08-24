@@ -38,10 +38,10 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       # Proxy mode configuration - makes Keycloak respect the frontend URL
-      KC_PROXY: edge
+      KC_PROXY: none
       KC_PROXY_ADDRESS_FORWARDING: "true"
-      KC_HOSTNAME: keycloak
-      KC_HOSTNAME_PORT: 8080 
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8081 
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
       - ./keycloak/import-users-and-roles.sh:/opt/keycloak/data/import/import-users-and-roles.sh:ro

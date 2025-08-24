@@ -2,6 +2,7 @@ package com.industria.platform.repository;
 
 import com.industria.platform.entity.Zone;
 import com.industria.platform.entity.ZoneStatus;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -89,7 +90,7 @@ public interface ZoneRepository extends JpaRepository<Zone, String> {
      */
     boolean existsByNameIgnoreCase(String name);
 
-    long countByCreatedBy_Id(String creatorId);
+    Integer countByCreatedBy_Id(String creatorId);
 
 
 
