@@ -11,15 +11,16 @@ import Link from 'next/link';
 import { fetchApi } from '@/lib/utils';
 
 interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  tokenType: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  tokenType?: string;
   userInfo: {
     id: string;
     email: string;
     name: string;
-    roles: string[];
+    roles?: string[];
+    role?: string;
   };
 }
 
@@ -43,13 +44,8 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      // Store tokens and user info
-      localStorage.setItem('token', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
+      // Store user info only
       localStorage.setItem('userInfo', JSON.stringify(response.userInfo));
-      
-      // Set cookie for SSR support
-      document.cookie = `token=${response.accessToken}; path=/; max-age=${response.expiresIn}; secure=${window.location.protocol === 'https:'}; samesite=lax`;
       
       router.push('/admin');
     } catch (error) {

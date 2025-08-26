@@ -3,7 +3,6 @@ package com.industria.platform.service;
 import com.industria.platform.config.OidcProperties;
 import com.industria.platform.dto.LoginRequest;
 import com.industria.platform.dto.LoginResponse;
-import com.industria.platform.dto.RefreshTokenRequest;
 import com.industria.platform.dto.UserDto;
 import com.industria.platform.entity.User;
 import com.industria.platform.exception.AuthenticationException;
@@ -63,9 +62,9 @@ public class AuthService {
         }
     }
 
-    public LoginResponse refreshToken(RefreshTokenRequest request) {
+    public LoginResponse refreshToken(String refreshToken) {
         try {
-            TokenResponse tr = oidc.refresh(request.refreshToken());
+            TokenResponse tr = oidc.refresh(refreshToken);
 
             // IMPORTANT: Always use access token for authorization, never ID token
             if (tr.accessToken() == null) {

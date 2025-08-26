@@ -159,40 +159,32 @@ if (typeof window !== 'undefined') {
 
 // Flag pour éviter les refresh en boucle
 let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+let refreshSubscribers: (() => void)[] = [];
 
 /**
  * Ajoute un callback à exécuter après le refresh du token
  */
-function subscribeTokenRefresh(cb: (token: string) => void) {
+function subscribeTokenRefresh(cb: () => void) {
   refreshSubscribers.push(cb);
 }
 
 /**
  * Notifie tous les subscribers après un refresh réussi
  */
-function onTokenRefreshed(token: string) {
-  refreshSubscribers.forEach(cb => cb(token));
+function onTokenRefreshed() {
+  refreshSubscribers.forEach(cb => cb());
   refreshSubscribers = [];
 }
 
 /**
  * Rafraîchit le token d'accès
  */
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(): Promise<boolean> {
   try {
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}/api/auth/refresh`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -200,21 +192,15 @@ async function refreshAccessToken(): Promise<string | null> {
     }
 
     const data = await response.json();
-    
-    // Mettre à jour les tokens
-    localStorage.setItem('token', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
+
     if (data.userInfo) {
       localStorage.setItem('userInfo', JSON.stringify(data.userInfo));
     }
-    
-    // Mettre à jour le cookie
-    document.cookie = `token=${data.accessToken}; path=/; max-age=${data.expiresIn}; secure=${window.location.protocol === 'https:'}; samesite=lax`;
-    
-    return data.accessToken;
+
+    return true;
   } catch (error) {
     console.error('Token refresh failed:', error);
-    return null;
+    return false;
   }
 }
 
@@ -238,70 +224,51 @@ async function refreshAccessToken(): Promise<string | null> {
  */
 export async function fetchApi<T>(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
-  // Get the token from localStorage
-  let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  
-  // Prepare headers
   const headers: HeadersInit = {
     ...options.headers,
   };
-  
-  // Add Authorization header if token exists and not uploading files
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  // Add Content-Type if not a FormData request
+
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
-  
-  // Make the request with the full URL
+
   const baseUrl = getBaseUrl();
   let response = await fetch(`${baseUrl}${url}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
-  
-  // Handle 401 Unauthorized - try to refresh token
+
   if (response.status === 401 && !url.includes('/auth/')) {
-    // If not already refreshing, start the refresh process
     if (!isRefreshing) {
       isRefreshing = true;
-      
-      const newToken = await refreshAccessToken();
+
+      const refreshed = await refreshAccessToken();
       isRefreshing = false;
-      
-      if (newToken) {
-        onTokenRefreshed(newToken);
-        
-        // Retry the original request with new token
-        headers['Authorization'] = `Bearer ${newToken}`;
+
+      if (refreshed) {
+        onTokenRefreshed();
         response = await fetch(`${baseUrl}${url}`, {
           ...options,
           headers,
+          credentials: 'include',
         });
       } else {
-        // Refresh failed, redirect to login
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
           localStorage.removeItem('userInfo');
           window.location.href = '/auth/login';
         }
         throw new Error('Unauthorized');
       }
     } else {
-      // Wait for the ongoing refresh to complete
       return new Promise((resolve, reject) => {
-        subscribeTokenRefresh((newToken: string) => {
-          // Retry the original request with new token
-          headers['Authorization'] = `Bearer ${newToken}`;
+        subscribeTokenRefresh(() => {
           fetch(`${baseUrl}${url}`, {
             ...options,
             headers,
+            credentials: 'include',
           })
             .then(async (retryResponse) => {
               if (!retryResponse.ok) {
@@ -321,17 +288,15 @@ export async function fetchApi<T>(
       });
     }
   }
-  
-  // Handle other errors
+
   if (!response.ok) {
     const error = await response.text().catch(() => 'Request failed');
     throw new Error(error);
   }
-  
-  // Parse response
+
   const text = await response.text();
   if (!text) return {} as T;
-  
+
   try {
     return JSON.parse(text);
   } catch {
@@ -360,18 +325,10 @@ export async function downloadFile(
   defaultFilename: string = 'export.csv'
 ): Promise<void> {
   try {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      throw new Error('Token d\'authentification manquant')
-    }
-
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}${endpoint}?${params.toString()}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      credentials: 'include',
     })
 
     if (!response.ok) {
@@ -435,25 +392,15 @@ export function hasRole(role: string): boolean {
  */
 export async function logout() {
   try {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Appeler l'endpoint de logout backend
-      await fetchApi('/api/auth/logout', {
-        method: 'POST',
-      }).catch(() => {
-        // Ignorer les erreurs de logout
-      });
-    }
+    const baseUrl = getBaseUrl();
+    await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {
+      // Ignorer les erreurs de logout
+    });
   } finally {
-    // Nettoyer le stockage local
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('userInfo');
-    
-    // Nettoyer les cookies
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    
-    // Rediriger vers la page de login
     window.location.href = '/auth/login';
   }
 }

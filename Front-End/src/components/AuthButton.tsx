@@ -25,65 +25,37 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { User, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { logout } from '@/lib/utils'
 
 /**
  * Structure du payload JWT décodé de Keycloak
  */
-interface Payload { 
-  /** Nom complet de l'utilisateur */
-  name?: string; 
-  /** Nom d'utilisateur préféré */
-  preferred_username?: string; 
-  /** Accès aux rôles du realm Keycloak */
-  realm_access?: { roles?: string[] }; 
-  /** Identifiant unique de l'utilisateur */
-  sub?: string 
-}
-
-/**
- * Décode un token JWT sans vérification de signature
- * 
- * Extrait le payload d'un token JWT en décodant la partie base64.
- * Utilisé uniquement côté client pour l'affichage, la vérification
- * de sécurité étant assurée côté serveur.
- * 
- * @param token Token JWT à décoder
- * @returns Payload décodé ou null si erreur
- */
-function parseJwt(token: string): Payload | null {
-  try {
-    const base = token.split('.')[1]
-    const json = atob(base)
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
+interface UserInfo {
+  name?: string
+  email?: string
+  roles?: string[]
+  role?: string
 }
 
 export default function AuthButton() {
-  const [token, setToken] = useState<string | null>(null)
-  const [payload, setPayload] = useState<Payload | null>(null)
+  const [user, setUser] = useState<UserInfo | null>(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const t = localStorage.getItem('token')
-      setToken(t)
-      if (t) setPayload(parseJwt(t))
+      const info = localStorage.getItem('userInfo')
+      if (info) setUser(JSON.parse(info))
     }
   }, [])
 
-  const logout = () => {
-    localStorage.removeItem('token')
-    setToken(null)
-    setPayload(null)
-    window.location.href = '/'
+  const handleLogout = () => {
+    logout()
   }
 
-  if (token && payload) {
-    const roles = payload.realm_access?.roles || []
+  if (user) {
+    const roles = user.roles || (user.role ? [user.role] : [])
     const role = roles.find(r => r !== 'default-roles-industria') || roles[0]
     const hasAdmin = roles.includes('ADMIN') || roles.includes('ZONE_MANAGER') || roles.includes('CONTENT_MANAGER')
-    const name = payload.name || payload.preferred_username
+    const name = user.name || user.email
     return (
       <div className="flex items-center gap-2">
         {name && <span className="text-sm">{name}</span>}
@@ -96,7 +68,7 @@ export default function AuthButton() {
             <Button variant="outline" size="sm">Dashboard</Button>
           </Link>
         )}
-        <Button variant="outline" size="sm" onClick={logout}>
+        <Button variant="outline" size="sm" onClick={handleLogout}>
           <LogOut className="w-4 h-4 mr-2" />
           Déconnexion
         </Button>
