@@ -39,7 +39,6 @@ public class JwtConfig {
         // Create a custom JWT processor with caching
         ConfigurableJWTProcessor<SecurityContext> jwtProcessor = createJwtProcessor(jwkSetUri);
 
-        // Create decoder with the custom processor
         NimbusJwtDecoder decoder = new NimbusJwtDecoder(jwtProcessor);
 
         // Configure validators
