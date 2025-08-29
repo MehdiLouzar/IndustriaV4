@@ -81,7 +81,9 @@ export async function login(email: string, password: string) {
 
     return { success: true, user: data.userInfo };
   } catch (error) {
-    return { success: false, error: error };
+    const message =
+    error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
+    return { success: false, error: message };
   }
 }
 
