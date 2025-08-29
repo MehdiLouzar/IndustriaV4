@@ -4,8 +4,6 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getBaseUrl } from './utils';
 
-const API_URL = getBaseUrl();
-
 /**
  * Stockage sécurisé des tokens dans des cookies httpOnly
  */
@@ -46,8 +44,33 @@ export async function getTokens() {
  * Connexion utilisateur avec stockage sécurisé des tokens
  */
 export async function login(email: string, password: string) {
+  console.log('[Auth-Actions] Login function called:', {
+    email,
+    timestamp: new Date().toISOString(),
+    nodeEnv: process.env.NODE_ENV
+  });
+
   try {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const API_URL = getBaseUrl();
+    const loginUrl = `${API_URL}/api/auth/login`;
+    
+    console.log('[Auth-Actions] Login details:', {
+      apiUrl: API_URL,
+      loginUrl,
+      hasApiUrl: !!API_URL,
+      urlLength: API_URL?.length || 0
+    });
+    
+    if (!API_URL) {
+      console.error('[Auth-Actions] API_URL is empty!');
+      return { 
+        success: false, 
+        error: 'Configuration error: API URL not set' 
+      };
+    }
+    
+    console.log('[Auth-Actions] Making fetch request...');
+    const response = await fetch(loginUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -55,24 +78,51 @@ export async function login(email: string, password: string) {
       body: JSON.stringify({ email, password }),
     });
 
+    console.log('[Auth-Actions] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
     if (!response.ok) {
-      const error = await response.text();
-      return { success: false, error };
+      const errorText = await response.text().catch(() => 'Login failed');
+      console.error('[Auth-Actions] Login failed - full details:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        loginUrl
+      });
+      return { 
+        success: false, 
+        error: `Login failed: ${response.status} ${errorText}` 
+      };
     }
 
+    console.log('[Auth-Actions] Parsing response JSON...');
     const data = await response.json();
+    console.log('[Auth-Actions] Response data structure:', {
+      hasAccessToken: !!data.accessToken,
+      hasRefreshToken: !!data.refreshToken,
+      hasUserInfo: !!data.userInfo,
+      expiresIn: data.expiresIn
+    });
     
     // Stocker les tokens dans des cookies httpOnly
+    console.log('[Auth-Actions] Setting secure tokens...');
     await setSecureTokens(data.accessToken, data.refreshToken, data.expiresIn);
     
     // Stocker uniquement les infos utilisateur non sensibles dans un cookie lisible côté client
+    console.log('[Auth-Actions] Setting user info cookie...');
     const cookieStore = await cookies();
-    cookieStore.set('user_info', JSON.stringify({
+    const userInfoCookie = {
       id: data.userInfo.id,
       email: data.userInfo.email,
       name: data.userInfo.name,
       roles: data.userInfo.roles
-    }), {
+    };
+    
+    cookieStore.set('user_info', JSON.stringify(userInfoCookie), {
       httpOnly: false, // Accessible côté client pour l'UI
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -80,11 +130,24 @@ export async function login(email: string, password: string) {
       path: '/'
     });
 
+    console.log('[Auth-Actions] Login successful!', {
+      userId: data.userInfo.id,
+      userEmail: data.userInfo.email
+    });
+
     return { success: true, user: data.userInfo };
   } catch (error) {
-    const message =
-    error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
-    return { success: false, error: message+`${API_URL}/api/auth/login` };
+    console.error('[Auth-Actions] Login exception:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      type: error instanceof Error ? error.constructor.name : typeof error
+    });
+    const message = error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
+    return { 
+      success: false, 
+      error: message 
+    };
   }
 }
 
@@ -99,6 +162,7 @@ export async function refreshToken() {
       throw new Error('No refresh token');
     }
 
+    const API_URL = getBaseUrl();
     const response = await fetch(`${API_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
@@ -130,6 +194,7 @@ export async function refreshToken() {
     
     return { success: true };
   } catch (error) {
+    console.error('[Auth] Refresh token error:', error);
     return { success: false };
   }
 }
@@ -140,6 +205,7 @@ export async function refreshToken() {
 export async function logout() {
   try {
     const { accessToken } = await getTokens();
+    const API_URL = getBaseUrl();
     
     if (accessToken) {
       // Appeler l'endpoint de logout backend
@@ -172,6 +238,7 @@ export async function secureApiRequest<T>(
   options: RequestInit = {}
 ): Promise<{ data?: T; error?: string }> {
   let { accessToken } = await getTokens();
+  const API_URL = getBaseUrl();
   
   if (!accessToken) {
     return { error: 'Not authenticated' };
@@ -241,6 +308,7 @@ export async function checkAuth() {
   
   // Optionnel : vérifier la validité du token auprès de l'API
   try {
+    const API_URL = getBaseUrl();
     const response = await fetch(`${API_URL}/api/auth/verify`, {
       method: 'GET',
       headers: {
