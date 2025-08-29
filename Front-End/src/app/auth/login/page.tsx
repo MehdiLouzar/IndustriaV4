@@ -31,55 +31,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // Debug: Log environment info on mount
-  useState(() => {
-    console.log('[LoginPage] Environment:', {
-      nodeEnv: process.env.NODE_ENV,
-      apiUrl: process.env.NEXT_PUBLIC_API_URL,
-      windowLocation: typeof window !== 'undefined' ? window.location.href : 'SSR',
-      cookieEnabled: typeof navigator !== 'undefined' ? navigator.cookieEnabled : 'Unknown'
-    });
-  });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[LoginPage] Submit started:', {
-      email,
-      passwordLength: password.length,
-      timestamp: new Date().toISOString()
-    });
-    
     setIsLoading(true);
     setError('');
 
     try {
-      console.log('[LoginPage] Calling login function...');
       const result = await login(email, password);
       
-      console.log('[LoginPage] Login result:', {
-        success: result.success,
-        hasUser: !!result.user,
-        error: result.error,
-        timestamp: new Date().toISOString()
-      });
-      
       if (result.success) {
-        console.log('[LoginPage] Login successful, redirecting to /admin...');
         router.push('/admin');
       } else {
-        console.error('[LoginPage] Login failed:', result.error);
         setError(result.error || 'Une erreur est survenue lors de la connexion');
       }
     } catch (error) {
-      console.error('[LoginPage] Unexpected error:', {
-        error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
       setError('Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
-      console.log('[LoginPage] Submit completed');
     }
   };
 
@@ -90,7 +58,6 @@ export default function LoginPage() {
   ];
 
   const fillDemoAccount = (email: string, password: string) => {
-    console.log('[LoginPage] Filling demo account:', email);
     setEmail(email);
     setPassword(password);
   };

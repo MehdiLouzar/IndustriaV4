@@ -23,44 +23,11 @@ export function cn(...inputs: ClassValue[]) {
  * Récupère l'URL de base de l'API selon l'environnement
  */
 export function getBaseUrl() {
-  // Server-side (Node.js/Container environment)
   if (typeof window === 'undefined') {
-    // Use internal Docker network URL for server-side requests
-    const envVars = {
-      API_INTERNAL_URL: process.env.API_INTERNAL_URL,
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-      NODE_ENV: process.env.NODE_ENV
-    };
-    
-    console.log('[getBaseUrl Server-Side] Environment variables:', envVars);
-    
-    const apiUrl = process.env.API_INTERNAL_URL || 'http://backend:8080';
-    
-    console.log('[getBaseUrl Server-Side] Selected URL:', apiUrl);
-    return apiUrl;
+    return process.env.API_INTERNAL_URL || '';
   }
 
-  // Client-side (Browser environment)
-  // Browser needs public URL to reach the backend
-  const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-  
-  console.log('[getBaseUrl Client-Side] Environment:', {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    hasValue: !!publicApiUrl,
-    length: publicApiUrl.length,
-    windowLocation: window.location.origin
-  });
-  
-  if (!publicApiUrl) {
-    console.error('[getBaseUrl Client-Side] NEXT_PUBLIC_API_URL is not set!');
-    // Try to use relative path if behind same proxy
-    const fallback = '';  // Empty string will make URLs relative
-    console.log('[getBaseUrl Client-Side] Using fallback (relative URLs)');
-    return fallback;
-  }
-  
-  console.log('[getBaseUrl Client-Side] Final URL:', publicApiUrl);
-  return publicApiUrl;
+  return process.env.NEXT_PUBLIC_API_URL || '';
 }
 
 /**
