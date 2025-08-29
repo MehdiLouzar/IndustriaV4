@@ -9,10 +9,14 @@ RUN bun install
 # Copy source
 COPY . .
 
-ENV NODE_ENV=development
+# Build the Next.js app
+RUN bun run build
+
+ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["bun", "run", "dev"]
+# Use bun to run the production server
+CMD ["bun", "run", "start"]
