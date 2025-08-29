@@ -81,8 +81,7 @@ export async function login(email: string, password: string) {
 
     return { success: true, user: data.userInfo };
   } catch (error) {
-    console.log(error);
-    return { success: false, error: 'Login failed' };
+    return { success: false, error: error };
   }
 }
 
