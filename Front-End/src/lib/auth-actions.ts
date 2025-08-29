@@ -2,8 +2,9 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getBaseUrl } from './utils';
 
-const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = getBaseUrl();
 
 /**
  * Stockage sécurisé des tokens dans des cookies httpOnly
