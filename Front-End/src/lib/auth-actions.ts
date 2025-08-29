@@ -84,7 +84,7 @@ export async function login(email: string, password: string) {
   } catch (error) {
     const message =
     error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
-    return { success: false, error: message };
+    return { success: false, error: message+`${API_URL}/api/auth/login` };
   }
 }
 
