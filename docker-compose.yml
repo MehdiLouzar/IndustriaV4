@@ -67,11 +67,7 @@ services:
       SPRING_JPA_SHOW_SQL: true
       SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: true
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
-      # JWT configuration - issuer matches what frontend receives
       KEYCLOAK_BASE_URL: http://keycloak:8080
-      #FRONT_BASE_URL: http://frontend:3000
-      # JWK set URI uses internal network for fetching keys
-
       LOGGING_LEVEL_ROOT: INFO
       LOGGING_LEVEL_COM_INDUSTRIA: DEBUG
       LOGGING_LEVEL_ORG_HIBERNATE_SQL: INFO
@@ -111,6 +107,18 @@ services:
         echo 'Database initialization completed!'
       "
     restart: "no"
+  nginx:
+    build:
+      context: ./nginx
+    container_name: industria-nginx-dev
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+      - keycloak
+    networks:
+      - industria-network
 
   frontend:
     build:
