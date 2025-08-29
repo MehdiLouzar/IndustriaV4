@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ArrowLeft, Mail, Phone, Building, MapPin, TrendingUp, Users } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 
 interface Region {
   value: string
@@ -100,7 +100,7 @@ function ContactForm() {
   
   const loadRegions = async () => {
     try {
-      const data = await fetchApi<Region[]>('/api/contact-requests/regions')
+      const data = await fetchPublicApi<Region[]>('/api/contact-requests/regions')
       setRegions(data || [])
     } catch (error) {
       console.error('Erreur lors du chargement des régions:', error)
@@ -109,7 +109,7 @@ function ContactForm() {
   
   const loadPrefectures = async (region: string) => {
     try {
-      const data = await fetchApi<Prefecture[]>(`/api/contact-requests/prefectures?region=${region}`)
+      const data = await fetchPublicApi<Prefecture[]>(`/api/contact-requests/prefectures?region=${region}`)
       setPrefectures(data || [])
     } catch (error) {
       console.error('Erreur lors du chargement des préfectures:', error)
@@ -204,7 +204,7 @@ function ContactForm() {
     // Vérification d'unicité de l'email
     if (formData.contactEmail && !newErrors.contactEmail) {
       try {
-        const response = await fetchApi(`/api/contact-requests/check-email?email=${encodeURIComponent(formData.contactEmail)}`)
+        const response = await fetchPublicApi(`/api/contact-requests/check-email?email=${encodeURIComponent(formData.contactEmail)}`)
         if (response && response.exists) {
           newErrors.contactEmail = 'Une demande avec cette adresse email existe déjà'
         }
@@ -243,7 +243,7 @@ function ContactForm() {
         descriptionActivite: formData.descriptionActivite?.trim() || undefined,
       }
       
-      await fetchApi('/api/contact-requests', {
+      await fetchPublicApi('/api/contact-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanedData)

@@ -28,7 +28,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 
 /**
  * Représentation d'une parcelle
@@ -68,7 +68,7 @@ export default function AppointmentForm({ parcel, onClose }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      await fetchApi('/api/public/appointments', {
+      await fetchPublicApi('/api/public/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

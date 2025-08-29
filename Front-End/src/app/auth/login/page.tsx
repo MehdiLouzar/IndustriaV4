@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import { fetchApi } from '@/lib/utils';
+import { login } from '@/lib/auth-actions';
 
 interface LoginResponse {
   accessToken: string;
@@ -37,27 +37,15 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Call backend auth endpoint instead of Keycloak directly
-      const response = await fetchApi<LoginResponse>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-
-      // Store tokens and user info
-      localStorage.setItem('token', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      localStorage.setItem('userInfo', JSON.stringify(response.userInfo));
+      const result = await login(email, password);
       
-      // Set cookie for SSR support
-      document.cookie = `token=${response.accessToken}; path=/; max-age=${response.expiresIn}; secure=${window.location.protocol === 'https:'}; samesite=lax`;
-      
-      router.push('/admin');
+      if (result.success) {
+        router.push('/admin');
+      } else {
+        setError(result.error || 'Une erreur est survenue lors de la connexion');
+      }
     } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : 'Une erreur est survenue lors de la connexion'
-      );
+      setError('Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
     }

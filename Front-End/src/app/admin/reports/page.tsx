@@ -13,7 +13,8 @@ import {
   BarChart3, Calendar, Download, Filter, TrendingUp, Users, 
   Building2, MapPin, Eye, FileText, PieChart, Activity
 } from 'lucide-react'
-import { fetchApi, downloadFile } from '@/lib/utils'
+import { secureDownloadFile } from '@/lib/download-actions'
+import { secureApiRequest } from '@/lib/auth-actions'
 
 interface ReportStats {
   totalZones: number
@@ -61,11 +62,13 @@ export default function ReportsPage() {
   const loadStats = async () => {
     setLoading(true)
     try {
-      const response = await fetchApi<ReportStats>('/api/admin/reports/stats')
-      setStats(response)
-    } catch (error) {
-      console.error('Erreur lors du chargement des statistiques:', error)
-      setError('Erreur lors du chargement des données')
+      const { data: response, error } = await secureApiRequest<ReportStats>('/api/admin/reports/stats')
+      if (error) {
+        console.error('Erreur lors du chargement des statistiques:', error)
+        setError('Erreur lors du chargement des données')
+      } else {
+        setStats(response)
+      }
     } finally {
       setLoading(false)
     }
@@ -80,7 +83,21 @@ export default function ReportsPage() {
       })
       
       const defaultFilename = `rapport_${format}.${format === 'excel' ? 'xlsx' : format}`
-      await downloadFile('/api/admin/reports/export', params, defaultFilename)
+      const result = await secureDownloadFile('/api/admin/reports/export', Object.fromEntries(params))
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      if (result.blob) {
+        const blob = new Blob([result.blob], { type: result.contentType })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = result.filename || defaultFilename
+        document.body.appendChild(link)
+        link.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(link)
+      }
       
     } catch (error) {
       console.error('Erreur lors de l\'export:', error)

@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Factory, Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane } from 'lucide-react'
-import { fetchPublicApi, type PublicZonesResponse } from '@/lib/publicApi'
+import { fetchPublicApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import ZoneCard from './ZoneCard'
 import LoadingSpinner from './LoadingSpinner'
@@ -232,7 +232,7 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
       if (searchFilters?.minPrice) params.append('minPrice', searchFilters.minPrice)
       if (searchFilters?.maxPrice) params.append('maxPrice', searchFilters.maxPrice)
       
-      const response = await fetchPublicApi<PublicZonesResponse>(
+      const response = await fetchPublicApi<ListResponse<Zone>>(
         `/api/zones?${params.toString()}`
       )
 

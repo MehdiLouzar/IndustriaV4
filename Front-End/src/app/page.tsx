@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamic from 'next/dynamic';
 import React, { useEffect, useState, Suspense } from 'react';
-import { fetchPublicApi } from '@/lib/publicApi';
+import { fetchPublicApi } from '@/lib/utils';
 import Footer from '@/components/Footer';
 import ViewToggle from '@/components/ViewToggle';
 

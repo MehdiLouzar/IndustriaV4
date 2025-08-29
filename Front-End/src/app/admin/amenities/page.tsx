@@ -1,16 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
+
+import { useSecureApi, useSecureMutation } from '@/hooks/use-api'
+import { secureApiRequest } from '@/lib/auth-actions'
 
 interface Amenity {
   id: string
@@ -22,12 +24,11 @@ interface Amenity {
 
 export default function AmenitiesAdmin() {
   const router = useRouter()
-  const [items, setItems] = useState<Amenity[]>([])
-  const [allAmenities, setAllAmenities] = useState<Amenity[]>([])
   const [selectedAmenityId, setSelectedAmenityId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<Amenity>({
@@ -40,73 +41,57 @@ export default function AmenitiesAdmin() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchTerm])
 
-  const load = useCallback(async (page = currentPage, search = searchTerm) => {
+  // Build URL for list
+  const listUrl = (() => {
     const params = new URLSearchParams({
-      page: page.toString(),
-      limit: itemsPerPage.toString()
+      page: String(currentPage),
+      limit: String(itemsPerPage),
     })
-    
-    if (search.trim()) {
-      params.append('search', search.trim())
-    }
-    
-    const res = await fetchApi<ListResponse<Amenity>>(
-      `/api/amenities?${params.toString()}`
-    ).catch(() => null)
-    if (res) {
-      const arr = Array.isArray(res.items) ? res.items : []
-      setItems(arr)
-      setTotalPages(res.totalPages || 1)
-      setCurrentPage(res.page || 1)
-    } else {
-      setItems([])
-    }
-  }, [currentPage, itemsPerPage, searchTerm])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(currentPage) }, [currentPage])
+    if (debouncedSearch) params.append('search', debouncedSearch)
+    return `/api/amenities?${params.toString()}`
+  })()
 
-  // Effet pour la recherche
+  // Main list (protected)
+  const {
+    data: listRes,
+    loading: listLoading,
+    error: listError,
+    refetch: refetchList,
+  } = useSecureApi<ListResponse<Amenity>>(listUrl)
+
+  const items = Array.isArray(listRes?.items) ? listRes!.items : []
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
-      load(1, searchTerm)
-    }, 300) // Debounce de 300ms
+    if (listRes?.totalPages) setTotalPages(listRes.totalPages)
+  }, [listRes?.totalPages])
 
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, load])
+  // All amenities for select (protected)
+  const { data: allData } = useSecureApi<ListResponse<Amenity>>('/api/amenities/all')
+  const allAmenities = Array.isArray(allData?.items)
+    ? allData!.items
+    : Array.isArray(allData)
+      ? (allData as unknown as Amenity[])
+      : []
 
-  useEffect(() => {
-    fetchApi<ListResponse<Amenity>>("/api/amenities/all")
-      .then((data) => {
-        const arr = data && Array.isArray(data.items)
-          ? data.items
-          : Array.isArray(data)
-            ? data
-            : []
-        if (data && !Array.isArray((data as any).items) && !Array.isArray(data)) {
-          console.warn('⚠️ Format de données inattendu:', data)
-        }
-        setAllAmenities(arr)
-      })
-      .catch(() => setAllAmenities([]))
-  }, [])
+  // Mutations
+  const { mutate, loading: mutLoading } = useSecureMutation()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setForm({ ...form, [name]: value })
-    
-    // Effacer l'erreur pour ce champ lors de la saisie
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }))
-    }
+
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
   }
 
-  // Fonction de validation
+  // Validation with uniqueness check via secureApiRequest
   const validateForm = async () => {
     const newErrors: Record<string, string> = {}
-    
-    // Validation du nom (obligatoire)
+
     if (!form.name.trim()) {
       newErrors.name = 'Le nom de l\'équipement est obligatoire'
     } else if (form.name.length < 2) {
@@ -114,80 +99,64 @@ export default function AmenitiesAdmin() {
     } else if (form.name.length > 100) {
       newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
     }
-    
-    // Validation de la description (longueur si renseignée)
+
     if (form.description && form.description.length < 5) {
       newErrors.description = 'La description doit contenir au moins 5 caractères'
     } else if (form.description && form.description.length > 500) {
       newErrors.description = 'La description ne peut pas dépasser 500 caractères'
     }
-    
-    // Validation de l'icône (format si renseignée)
+
     if (form.icon && form.icon.length > 50) {
       newErrors.icon = 'L\'icône ne peut pas dépasser 50 caractères'
     }
-    
-    // Validation de la catégorie (longueur si renseignée)
+
     if (form.category && form.category.length < 2) {
       newErrors.category = 'La catégorie doit contenir au moins 2 caractères'
     } else if (form.category && form.category.length > 50) {
       newErrors.category = 'La catégorie ne peut pas dépasser 50 caractères'
     }
-    
-    // Vérification d'unicité du nom (si nouvel équipement)
+
     if (!form.id && form.name.trim()) {
-      try {
-        const response = await fetchApi(`/api/amenities/check-name?name=${encodeURIComponent(form.name.trim())}`)
-        if (response && response.exists) {
-          newErrors.name = 'Un équipement avec ce nom existe déjà'
-        }
-      } catch (error) {
-        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      const { data, error } = await secureApiRequest<{ exists: boolean }>(
+        `/api/amenities/check-name?name=${encodeURIComponent(form.name.trim())}`
+      )
+      if (!error && data?.exists) {
+        newErrors.name = 'Un équipement avec ce nom existe déjà'
       }
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    
     setIsSubmitting(true)
-    
+
     try {
-      // Validation du formulaire
       const isValid = await validateForm()
       if (!isValid) {
         setIsSubmitting(false)
         return
       }
-      
+
       const body = {
         name: form.name.trim(),
         description: form.description?.trim() || undefined,
         icon: form.icon?.trim() || undefined,
         category: form.category?.trim() || undefined,
       }
-      
+
       if (form.id) {
-        await fetchApi(`/api/amenities/${form.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
+        await mutate(`/api/amenities/${form.id}`, body, { method: 'PUT' })
       } else {
-        await fetchApi('/api/amenities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
+        await mutate('/api/amenities', body, { method: 'POST' })
       }
-      
+
       setForm({ id: '', name: '', description: '', icon: '', category: '' })
       setErrors({})
       setOpen(false)
-      load(currentPage)
+      await refetchList()
     } catch (error) {
       console.error('Erreur lors de la soumission:', error)
       setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
@@ -206,9 +175,10 @@ export default function AmenitiesAdmin() {
     })
     setOpen(true)
   }
+
   async function del(id: string) {
-    await fetchApi(`/api/amenities/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    await mutate(`/api/amenities/${id}`, undefined, { method: 'DELETE' })
+    await refetchList()
   }
 
   function addNew() {
@@ -216,6 +186,11 @@ export default function AmenitiesAdmin() {
     setErrors({})
     setOpen(true)
   }
+
+  // Reset page on search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch])
 
   return (
     <div className="p-4 space-y-6">
@@ -263,29 +238,14 @@ export default function AmenitiesAdmin() {
         </CardContent>
       </Card>
 
-      <select
-        className="border p-2"
-        value={selectedAmenityId}
-        onChange={e => setSelectedAmenityId(e.target.value)}
-      >
-        {(Array.isArray(allAmenities) ? allAmenities.length : 0) === 0 ? (
-          <option value="">Aucun équipement trouvé</option>
-        ) : (
-          <>
-            <option value="">-- Sélectionnez un équipement --</option>
-            {(Array.isArray(allAmenities) ? allAmenities : []).map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </>
-        )}
-      </select>
-
-      <Pagination
-        totalItems={totalPages * itemsPerPage}
-        itemsPerPage={itemsPerPage}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          totalItems={totalPages * itemsPerPage}
+          itemsPerPage={itemsPerPage}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -298,15 +258,15 @@ export default function AmenitiesAdmin() {
                 {errors.submit}
               </div>
             )}
-            
+
             <div>
               <Label htmlFor="name">Nom de l'équipement *</Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={form.name} 
-                onChange={handleChange} 
-                required 
+              <Input
+                id="name"
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                required
                 className={errors.name ? 'border-red-500' : ''}
                 placeholder="Ex: Parking, Station électrique, Wi-Fi, Restaurant"
                 maxLength={100}
@@ -316,13 +276,13 @@ export default function AmenitiesAdmin() {
                 {form.name.length}/100 caractères
               </p>
             </div>
-            
+
             <div>
               <Label htmlFor="description">Description</Label>
-              <Input 
-                id="description" 
-                name="description" 
-                value={form.description || ''} 
+              <Input
+                id="description"
+                name="description"
+                value={form.description || ''}
                 onChange={handleChange}
                 className={errors.description ? 'border-red-500' : ''}
                 placeholder="Description détaillée de l'équipement (optionnel)"
@@ -333,13 +293,13 @@ export default function AmenitiesAdmin() {
                 {(form.description || '').length}/500 caractères
               </p>
             </div>
-            
+
             <div>
               <Label htmlFor="category">Catégorie</Label>
-              <Input 
-                id="category" 
-                name="category" 
-                value={form.category || ''} 
+              <Input
+                id="category"
+                name="category"
+                value={form.category || ''}
                 onChange={handleChange}
                 className={errors.category ? 'border-red-500' : ''}
                 placeholder="Ex: Transport, Énergie, Communication, Restauration"
@@ -350,13 +310,13 @@ export default function AmenitiesAdmin() {
                 Catégorie pour regrouper les équipements similaires
               </p>
             </div>
-            
+
             <div>
               <Label htmlFor="icon">Icône</Label>
-              <Input 
-                id="icon" 
-                name="icon" 
-                value={form.icon || ''} 
+              <Input
+                id="icon"
+                name="icon"
+                value={form.icon || ''}
                 onChange={handleChange}
                 className={errors.icon ? 'border-red-500' : ''}
                 placeholder="Ex: 🚗, ⚡, 📶, 🍽️ ou nom d'icône CSS"
@@ -367,25 +327,25 @@ export default function AmenitiesAdmin() {
                 Emoji ou nom d'icône pour représenter l'équipement
               </p>
             </div>
-            
+
             <div className="flex gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => {
                   setOpen(false)
                   setErrors({})
                 }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || mutLoading}
               >
                 Annuler
               </Button>
-              <Button 
+              <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || mutLoading}
                 className="flex-1"
               >
-                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+                {isSubmitting || mutLoading ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
               </Button>
             </div>
           </form>

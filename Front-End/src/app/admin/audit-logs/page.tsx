@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi, downloadFile } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
 import {
@@ -18,7 +16,10 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { AUDIT_ACTIONS, getEnumLabel, getEnumBadge } from '@/lib/translations'
+import { AUDIT_ACTIONS, getEnumBadge } from '@/lib/translations'
+import { secureDownloadFile } from '@/lib/download-actions'
+
+import { useSecureApi } from '@/hooks/use-api'
 
 interface User {
   id: string
@@ -29,7 +30,17 @@ interface User {
 
 interface AuditLog {
   id: string
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'SOFT_DELETE' | 'RESTORE' | 'APPOINTMENT_CONFIRMED' | 'APPOINTMENT_CANCELLED' | 'APPOINTMENT_RESCHEDULED'
+  action:
+    | 'CREATE'
+    | 'UPDATE'
+    | 'DELETE'
+    | 'LOGIN'
+    | 'LOGOUT'
+    | 'SOFT_DELETE'
+    | 'RESTORE'
+    | 'APPOINTMENT_CONFIRMED'
+    | 'APPOINTMENT_CANCELLED'
+    | 'APPOINTMENT_RESCHEDULED'
   entity: string
   entityId?: string
   oldValues?: string
@@ -43,74 +54,58 @@ interface AuditLog {
   user?: User
 }
 
-// Les actions sont maintenant importées de translations.ts
-
 export default function AuditLogsAdmin() {
-  const router = useRouter()
-  const [items, setItems] = useState<AuditLog[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 20
   const [open, setOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
-  
-  // Filtres
+
   const [filters, setFilters] = useState({
     action: 'ALL',
     entity: '',
     userId: '',
     dateFrom: '',
     dateTo: '',
-    search: ''
+    search: '',
   })
 
-  async function loadLogs(page = currentPage) {
+  // Build URL for secure fetch
+  const listUrl = useMemo(() => {
     const params = new URLSearchParams({
-      page: (page - 1).toString(),
-      size: itemsPerPage.toString()
+      page: String(currentPage - 1),
+      size: String(itemsPerPage),
     })
-    
-    // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
     if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
     if (filters.entity) params.append('entity', filters.entity)
     if (filters.userId) params.append('userId', filters.userId)
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
     if (filters.dateTo) params.append('dateTo', filters.dateTo)
     if (filters.search) params.append('search', filters.search)
-    
-    const response = await fetchApi<any>(
-      `/api/audit-logs?${params}`
-    ).catch(() => null)
-    
-    if (response && Array.isArray(response.content)) {
-      setItems(response.content)
-      setTotalPages(response.totalPages ?? 1)
-      setCurrentPage((response.number ?? 0) + 1)
-    } else {
-      setItems([])
-    }
-  }
+    return `/api/audit-logs?${params.toString()}`
+  }, [currentPage, itemsPerPage, filters])
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
-    }
-    loadLogs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, router])
+  const {
+    data: pageData,
+    loading,
+    error,
+    refetch,
+  } = useSecureApi<any>(listUrl)
 
-  // Recharger quand les filtres changent
+  const items: AuditLog[] = Array.isArray(pageData?.content) ? pageData.content : []
+  const totalPages: number = pageData?.totalPages ?? 1
+  const serverPageIndex: number | undefined = pageData?.number
+
+  // Keep client page in sync with server response
   useEffect(() => {
-    if (currentPage === 1) {
-      loadLogs(1)
-    } else {
-      setCurrentPage(1)
+    if (typeof serverPageIndex === 'number') {
+      const serverPage1 = serverPageIndex + 1
+      if (serverPage1 !== currentPage) setCurrentPage(serverPage1)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPageIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1)
   }, [filters])
 
   function openDetails(log: AuditLog) {
@@ -120,27 +115,23 @@ export default function AuditLogsAdmin() {
 
   function getActionBadge(action: string) {
     const badge = getEnumBadge(AUDIT_ACTIONS, action)
-    return (
-      <Badge className={badge.color}>
-        {badge.label}
-      </Badge>
-    )
+    return <Badge className={badge.color}>{badge.label}</Badge>
   }
 
   function formatJsonDiff(oldValues?: string, newValues?: string) {
     if (!oldValues && !newValues) return null
-    
+
     try {
-      const old = oldValues ? JSON.parse(oldValues) : {}
-      const new_ = newValues ? JSON.parse(newValues) : {}
-      
+      const oldObj = oldValues ? JSON.parse(oldValues) : {}
+      const newObj = newValues ? JSON.parse(newValues) : {}
+
       return (
         <div className="space-y-2">
           {oldValues && (
             <div>
               <h4 className="font-medium text-sm text-red-600">Anciennes valeurs:</h4>
               <pre className="text-xs bg-red-50 p-2 rounded overflow-x-auto">
-                {JSON.stringify(old, null, 2)}
+                {JSON.stringify(oldObj, null, 2)}
               </pre>
             </div>
           )}
@@ -148,13 +139,13 @@ export default function AuditLogsAdmin() {
             <div>
               <h4 className="font-medium text-sm text-green-600">Nouvelles valeurs:</h4>
               <pre className="text-xs bg-green-50 p-2 rounded overflow-x-auto">
-                {JSON.stringify(new_, null, 2)}
+                {JSON.stringify(newObj, null, 2)}
               </pre>
             </div>
           )}
         </div>
       )
-    } catch (e) {
+    } catch {
       return (
         <div className="space-y-2">
           {oldValues && (
@@ -181,35 +172,43 @@ export default function AuditLogsAdmin() {
       userId: '',
       dateFrom: '',
       dateTo: '',
-      search: ''
+      search: '',
     })
   }
 
   async function exportLogs() {
+    const params = new URLSearchParams({ format: 'csv' })
+    if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
+    if (filters.entity) params.append('entity', filters.entity)
+    if (filters.userId) params.append('userId', filters.userId)
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
+    if (filters.dateTo) params.append('dateTo', filters.dateTo)
+    if (filters.search) params.append('search', filters.search)
+
     try {
-      const params = new URLSearchParams({
-        format: 'csv'
-      })
-      
-      // Ajouter les filtres seulement s'ils ne sont pas vides ou 'ALL'
-      if (filters.action && filters.action !== 'ALL') params.append('action', filters.action)
-      if (filters.entity) params.append('entity', filters.entity)
-      if (filters.userId) params.append('userId', filters.userId)
-      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
-      if (filters.dateTo) params.append('dateTo', filters.dateTo)
-      if (filters.search) params.append('search', filters.search)
-      
-      await downloadFile('/api/admin/audit-logs/export', params, 'audit_logs_export.csv')
-      
-    } catch (error) {
-      console.error('Erreur lors de l\'export des logs d\'audit:', error)
-      alert('Erreur lors de l\'export. Veuillez réessayer.')
+      const result = await secureDownloadFile('/api/admin/audit-logs/export', Object.fromEntries(params))
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      if (result.blob) {
+        const blob = new Blob([result.blob], { type: result.contentType })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = result.filename || 'audit_logs_export.csv'
+        document.body.appendChild(link)
+        link.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(link)
+      }
+    } catch (e) {
+      console.error("Erreur lors de l'export:", e)
+      alert("Erreur lors de l'export. Veuillez réessayer.")
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -230,7 +229,6 @@ export default function AuditLogsAdmin() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filtres */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Filtres</CardTitle>
@@ -239,7 +237,10 @@ export default function AuditLogsAdmin() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label>Action</Label>
-                <Select value={filters.action} onValueChange={(value) => setFilters({...filters, action: value})}>
+                <Select
+                  value={filters.action}
+                  onValueChange={(value) => setFilters({ ...filters, action: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Toutes les actions" />
                   </SelectTrigger>
@@ -258,7 +259,7 @@ export default function AuditLogsAdmin() {
                 <Label>Entité</Label>
                 <Input
                   value={filters.entity}
-                  onChange={(e) => setFilters({...filters, entity: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, entity: e.target.value })}
                   placeholder="Ex: Zone, User, Parcel..."
                 />
               </div>
@@ -268,7 +269,7 @@ export default function AuditLogsAdmin() {
                 <Input
                   type="date"
                   value={filters.dateFrom}
-                  onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
                 />
               </div>
 
@@ -277,7 +278,7 @@ export default function AuditLogsAdmin() {
                 <Input
                   type="date"
                   value={filters.dateTo}
-                  onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
                 />
               </div>
             </div>
@@ -286,14 +287,13 @@ export default function AuditLogsAdmin() {
               <Label>Recherche libre</Label>
               <Input
                 value={filters.search}
-                onChange={(e) => setFilters({...filters, search: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 placeholder="Rechercher dans la description, IP, utilisateur..."
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Liste des logs */}
         <Card>
           <CardHeader>
             <CardTitle>Logs d'audit ({items.length})</CardTitle>
@@ -301,7 +301,10 @@ export default function AuditLogsAdmin() {
           <CardContent>
             <div className="space-y-4">
               {items.map((log) => (
-                <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div
+                  key={log.id}
+                  className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50"
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       {getActionBadge(log.action)}
@@ -310,11 +313,14 @@ export default function AuditLogsAdmin() {
                         <span className="text-sm text-gray-500">#{log.entityId.substring(0, 8)}</span>
                       )}
                     </div>
-                    
+
                     <div className="text-sm text-gray-600 space-y-1">
                       <p>
                         <span className="font-medium">Utilisateur:</span>{' '}
-                        {log.userEmail || (log.user ? `${log.user.email} (${log.user.firstName || ''} ${log.user.lastName || ''})`.trim() : 'Système')}
+                        {log.userEmail ||
+                          (log.user
+                            ? `${log.user.email} (${log.user.firstName || ''} ${log.user.lastName || ''})`.trim()
+                            : 'Système')}
                       </p>
                       <p>
                         <span className="font-medium">Date:</span>{' '}
@@ -332,27 +338,23 @@ export default function AuditLogsAdmin() {
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openDetails(log)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => openDetails(log)}>
                       Détails
                     </Button>
                   </div>
                 </div>
               ))}
 
-              {items.length === 0 && (
+              {items.length === 0 && !loading && (
                 <div className="text-center py-8 text-gray-500">
                   Aucun log trouvé avec les filtres actuels
                 </div>
               )}
             </div>
 
-            <Pagination 
+            <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
@@ -361,7 +363,6 @@ export default function AuditLogsAdmin() {
         </Card>
       </div>
 
-      {/* Dialog détails */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -391,15 +392,17 @@ export default function AuditLogsAdmin() {
                 <div>
                   <Label>Utilisateur</Label>
                   <p className="text-sm">
-                    {selectedLog.userEmail || (selectedLog.user 
-                      ? `${selectedLog.user.email} (${selectedLog.user.firstName || ''} ${selectedLog.user.lastName || ''})`.trim()
-                      : 'Système'
-                    )}
+                    {selectedLog.userEmail ||
+                      (selectedLog.user
+                        ? `${selectedLog.user.email} (${selectedLog.user.firstName || ''} ${selectedLog.user.lastName || ''})`.trim()
+                        : 'Système')}
                   </p>
                 </div>
                 <div>
                   <Label>Date</Label>
-                  <p className="text-sm">{new Date(selectedLog.createdAt).toLocaleString('fr-FR')}</p>
+                  <p className="text-sm">
+                    {new Date(selectedLog.createdAt).toLocaleString('fr-FR')}
+                  </p>
                 </div>
               </div>
 

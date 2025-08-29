@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchApi } from '@/lib/utils';
+import { fetchPublicApi } from '@/lib/utils';
 import { Building2, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -51,7 +51,7 @@ export default function RegisterPage() {
     }
 
     try {
-      const response = await fetchApi('/api/auth/register', {
+      const response = await fetchPublicApi('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

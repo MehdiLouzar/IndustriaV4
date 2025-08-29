@@ -11,7 +11,7 @@ import {
   User, Building, TrendingUp, Mail, Phone, MapPin, Calendar, 
   Search, Filter, ChevronLeft, ChevronRight, Eye, Trash2, Clock
 } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 
 interface ContactRequest {
@@ -68,50 +68,50 @@ export default function ContactRequestsPage() {
       if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter)
       if (typeFilter && typeFilter !== 'ALL') params.append('contactType', typeFilter)
       
-      const response = await fetchApi<ListResponse<ContactRequest>>(`/api/contact-requests?${params}`)
+      const { data: response, error } = await secureApiRequest<ListResponse<ContactRequest>>(`/api/contact-requests?${params}`)
       
-      if (response) {
+      if (error) {
+        console.error('Erreur lors du chargement des demandes:', error)
+        setError('Erreur lors du chargement des demandes')
+      } else if (response) {
         setRequests(response.items || [])
         setTotalPages(response.totalPages || 1)
       }
-    } catch (error) {
-      console.error('Erreur lors du chargement des demandes:', error)
-      setError('Erreur lors du chargement des demandes')
     } finally {
       setLoading(false)
     }
   }
 
   const updateStatus = async (id: string, newStatus: ContactRequestStatus, notes?: string) => {
-    try {
-      await fetchApi(`/api/contact-requests/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, notes })
-      })
-      
+    const { error } = await secureApiRequest(`/api/contact-requests/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, notes })
+    })
+    
+    if (error) {
+      console.error('Erreur lors de la mise à jour:', error)
+      setError('Erreur lors de la mise à jour du statut')
+    } else {
       // Recharger la liste
       loadRequests()
       setSelectedRequest(null)
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error)
-      setError('Erreur lors de la mise à jour du statut')
     }
   }
 
   const deleteRequest = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette demande ?')) return
     
-    try {
-      await fetchApi(`/api/contact-requests/${id}`, {
-        method: 'DELETE'
-      })
-      
-      loadRequests()
-      setSelectedRequest(null)
-    } catch (error) {
+    const { error } = await secureApiRequest(`/api/contact-requests/${id}`, {
+      method: 'DELETE'
+    })
+    
+    if (error) {
       console.error('Erreur lors de la suppression:', error)
       setError('Erreur lors de la suppression')
+    } else {
+      loadRequests()
+      setSelectedRequest(null)
     }
   }
 

@@ -11,8 +11,9 @@ import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
 
-// Use both helpers: public reads via fetchPublicApi, writes via fetchApi
-import { fetchApi, fetchPublicApi } from '@/lib/utils'
+// Use both helpers: public reads via fetchPublicApi, writes via secureApiRequest
+import { fetchPublicApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 
 interface ZoneType {
   id: string
@@ -100,17 +101,15 @@ export default function ZoneTypesAdmin() {
       newErrors.name = 'Le nom ne peut pas dépasser 100 caractères'
     }
 
-    // PUBLIC CHECK (if your /check-name endpoint is public)
+    // Check name uniqueness with secure API
     if (!form.id && form.name.trim()) {
-      try {
-        const response = await fetchPublicApi<{ exists: boolean }>(
-          `/api/zone-types/check-name?name=${encodeURIComponent(form.name.trim())}`
-        )
-        if (response && (response as any).exists) {
-          newErrors.name = 'Un type de zone avec ce nom existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest<{ exists: boolean }>(
+        `/api/zone-types/check-name?name=${encodeURIComponent(form.name.trim())}`
+      )
+      if (error) {
         console.warn("Erreur lors de la vérification d'unicité du nom:", error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Un type de zone avec ce nom existe déjà'
       }
     }
 
@@ -133,17 +132,23 @@ export default function ZoneTypesAdmin() {
 
       // AUTHENTICATED WRITES
       if (form.id) {
-        await fetchApi(`/api/zone-types/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/zone-types/${form.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error updating zone type')
+        }
       } else {
-        await fetchApi('/api/zone-types', {
+        const { error } = await secureApiRequest('/api/zone-types', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error creating zone type')
+        }
       }
 
       setForm({ id: '', name: '' })
@@ -165,8 +170,12 @@ export default function ZoneTypesAdmin() {
 
   async function del(id: string) {
     // AUTHENTICATED DELETE
-    await fetchApi(`/api/zone-types/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    const { error } = await secureApiRequest(`/api/zone-types/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting zone type:', error)
+    } else {
+      load(currentPage)
+    }
   }
 
   function addNew() {

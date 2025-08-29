@@ -13,8 +13,7 @@ import AppointmentForm from "@/components/AppointmentForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DynamicIcon from "@/components/DynamicIcon";
-import { fetchApi } from "@/lib/utils";
-import { fetchPublicApi } from "@/lib/publicApi";
+import { fetchPublicApi } from "@/lib/utils";
 import { Zap, Wifi, Car, Wrench, Factory, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill } from "lucide-react";
 import type { ListResponse } from "@/types";
 

@@ -53,7 +53,7 @@ import type { FeatureCollection } from 'geojson'
 
 import DynamicIcon from '@/components/DynamicIcon'
 import { Button } from '@/components/ui/button'
-import { fetchPublicApi } from '@/lib/publicApi'
+import { fetchPublicApi } from '@/lib/utils'
 import { useOverpassPOI, type OverpassPOI } from '@/hooks/useOverpassPOI'
 
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })

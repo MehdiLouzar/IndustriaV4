@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Factory } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import ZoneCard from './ZoneCard'
 import LoadingSpinner from './LoadingSpinner'
@@ -78,7 +78,7 @@ export default function ZoneGridInfinite() {
     setError(null)
     
     try {
-      const response = await fetchApi<ListResponse<IndustrialZone>>(
+      const response = await fetchPublicApi<ListResponse<IndustrialZone>>(
         `/api/zones?page=${page}&limit=${ZONES_PER_PAGE}`
       )
 

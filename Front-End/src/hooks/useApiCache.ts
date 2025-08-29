@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 
 /**
  * Entrée dans le cache avec données et timestamp
@@ -69,7 +69,7 @@ export function useApiCache<T>(
     }
 
     try {
-      const result = await fetchApi<T>(url)
+      const result = await fetchPublicApi<T>(url)
       
       // Sauvegarder dans le cache
       cache.set(key, {

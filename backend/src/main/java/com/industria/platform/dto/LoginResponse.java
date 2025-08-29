@@ -5,7 +5,7 @@ import com.industria.platform.dto.UserDto;
 public record LoginResponse(
         String accessToken,
         String refreshToken,
-        int expiresIn,
+        Long expiresIn,
         String tokenType,
         UserDto userInfo
 ) {}

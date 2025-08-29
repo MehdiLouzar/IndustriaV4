@@ -27,7 +27,7 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 import DynamicIcon from '@/components/DynamicIcon'
 // Imports MapLibre supprimés pour éviter les conflits
 import { TrainFront, Ship, Plane } from 'lucide-react'
@@ -178,7 +178,7 @@ export default function MapView() {
   // Suppression de toute la logique Overpass qui causait les conflits
 
   useEffect(() => {
-    fetchApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
+    fetchPublicApi<{ features: ZoneFeatureResp[] }>("/api/map/zones")
       .then((d) => {
         if (!d) return
         const conv: ZoneFeature[] = d.features.map((f) => ({

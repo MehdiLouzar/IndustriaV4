@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
 import {
@@ -91,9 +91,17 @@ export default function NotificationsAdmin() {
       params.append('search', search.trim())
     }
     
-    const response = await fetchApi<ListResponse<Notification>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<Notification>>(
       `/api/admin/notifications?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading notifications:', error)
+      setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
+      return
+    }
     
     if (response && Array.isArray(response.items)) {
       setItems(response.items)
@@ -107,8 +115,11 @@ export default function NotificationsAdmin() {
   }, [currentPage, itemsPerPage, searchTerm])
 
   async function loadTemplates() {
-    const templates = await fetchApi<NotificationTemplate[]>('/api/admin/notification-templates').catch(() => [])
-    if (Array.isArray(templates)) {
+    const { data: templates, error } = await secureApiRequest<NotificationTemplate[]>('/api/admin/notification-templates')
+    if (error) {
+      console.error('Error loading templates:', error)
+      setTemplates([])
+    } else if (Array.isArray(templates)) {
       setTemplates(templates)
     }
   }
@@ -174,13 +185,11 @@ export default function NotificationsAdmin() {
     
     // Vérification d'unicité de l'email (pour éviter les doublons récents)
     if (!form.id && form.recipientEmail && form.subject && !newErrors.recipientEmail) {
-      try {
-        const response = await fetchApi(`/api/admin/notifications/check-duplicate?email=${encodeURIComponent(form.recipientEmail.trim())}&subject=${encodeURIComponent(form.subject.trim())}`)
-        if (response && response.exists) {
-          newErrors.recipientEmail = 'Une notification avec ce destinataire et ce sujet existe déjà récemment'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/admin/notifications/check-duplicate?email=${encodeURIComponent(form.recipientEmail.trim())}&subject=${encodeURIComponent(form.subject.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification de doublon:', error)
+      } else if (response && response.exists) {
+        newErrors.recipientEmail = 'Une notification avec ce destinataire et ce sujet existe déjà récemment'
       }
     }
     
@@ -213,10 +222,15 @@ export default function NotificationsAdmin() {
       const method = form.id ? 'PUT' : 'POST'
       const url = form.id ? `/api/admin/notifications/${form.id}` : '/api/admin/notifications'
       
-      await fetchApi(url, {
+      const { error } = await secureApiRequest(url, {
         method,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
+      
+      if (error) {
+        throw new Error('Error saving notification')
+      }
       
       setOpen(false)
       resetForm()
@@ -232,19 +246,27 @@ export default function NotificationsAdmin() {
   async function deleteItem(id: string) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette notification ?')) return
     
-    await fetchApi(`/api/admin/notifications/${id}`, {
+    const { error } = await secureApiRequest(`/api/admin/notifications/${id}`, {
       method: 'DELETE'
-    }).catch(console.error)
+    })
     
-    loadNotifications(currentPage)
+    if (error) {
+      console.error('Error deleting notification:', error)
+    } else {
+      loadNotifications(currentPage)
+    }
   }
 
   async function retryNotification(id: string) {
-    await fetchApi(`/api/admin/notifications/${id}/retry`, {
+    const { error } = await secureApiRequest(`/api/admin/notifications/${id}/retry`, {
       method: 'POST'
-    }).catch(console.error)
+    })
     
-    loadNotifications(currentPage)
+    if (error) {
+      console.error('Error retrying notification:', error)
+    } else {
+      loadNotifications(currentPage)
+    }
   }
 
   function resetForm() {

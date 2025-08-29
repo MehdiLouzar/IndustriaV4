@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
@@ -44,9 +44,17 @@ export default function RegionsAdmin() {
       params.append('search', search.trim())
     }
     
-    const response = await fetchApi<ListResponse<Region>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<Region>>(
       `/api/regions?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading regions:', error)
+      setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
+      return
+    }
     
     if (response && Array.isArray(response.items)) {
       setItems(response.items)
@@ -86,10 +94,16 @@ export default function RegionsAdmin() {
   }, [searchTerm, load])
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>(
-      '/api/countries/all',
-      { credentials: 'include' }
-    ).then(setAllCountries)
+    const loadCountries = async () => {
+      const { data, error } = await secureApiRequest<{ id: string; name: string }[]>('/api/countries/all')
+      if (error) {
+        console.error('Error loading countries:', error)
+        setAllCountries([])
+      } else {
+        setAllCountries(data || [])
+      }
+    }
+    loadCountries()
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,25 +156,21 @@ export default function RegionsAdmin() {
     
     // Vérification d'unicité du nom (si nouvelle région)
     if (!form.id && form.name.trim()) {
-      try {
-        const response = await fetchApi(`/api/regions/check-name?name=${encodeURIComponent(form.name.trim())}`)
-        if (response && response.exists) {
-          newErrors.name = 'Une région avec ce nom existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/regions/check-name?name=${encodeURIComponent(form.name.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Une région avec ce nom existe déjà'
       }
     }
     
     // Vérification d'unicité du code (si nouvelle région)
     if (!form.id && form.code.trim()) {
-      try {
-        const response = await fetchApi(`/api/regions/check-code?code=${encodeURIComponent(form.code.trim())}`)
-        if (response && response.exists) {
-          newErrors.code = 'Une région avec ce code existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/regions/check-code?code=${encodeURIComponent(form.code.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du code:', error)
+      } else if (response && response.exists) {
+        newErrors.code = 'Une région avec ce code existe déjà'
       }
     }
     
@@ -188,17 +198,23 @@ export default function RegionsAdmin() {
       }
       
       if (form.id) {
-        await fetchApi(`/api/regions/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/regions/${form.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error updating region')
+        }
       } else {
-        await fetchApi('/api/regions', {
+        const { error } = await secureApiRequest('/api/regions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error creating region')
+        }
       }
       
       setForm({ id: '', name: '', code: '', countryId: '' })
@@ -219,8 +235,12 @@ export default function RegionsAdmin() {
   }
 
   async function del(id: string) {
-    await fetchApi(`/api/regions/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    const { error } = await secureApiRequest(`/api/regions/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting region:', error)
+    } else {
+      load(currentPage)
+    }
   }
 
   function addNew() {

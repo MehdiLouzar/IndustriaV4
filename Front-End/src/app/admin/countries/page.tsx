@@ -16,7 +16,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
@@ -87,9 +87,15 @@ export default function CountriesAdmin() {
       params.append('search', search.trim())
     }
     
-    const res = await fetchApi<ListResponse<Country>>(
+    const { data: res, error } = await secureApiRequest<ListResponse<Country>>(
       `/api/countries?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading countries:', error)
+      setItems([])
+      return
+    }
     if (res) {
       const arr = Array.isArray(res.items) ? res.items : []
       setItems(arr)
@@ -111,9 +117,15 @@ export default function CountriesAdmin() {
       params.append('search', search.trim())
     }
     
-    const res = await fetchApi<ListResponse<SpatialReferenceSystem>>(
+    const { data: res, error } = await secureApiRequest<ListResponse<SpatialReferenceSystem>>(
       `/api/spatial-reference-systems?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading spatial reference systems:', error)
+      setSrsItems([])
+      return
+    }
     if (res) {
       const arr = Array.isArray(res.items) ? res.items : []
       setSrsItems(arr)
@@ -126,12 +138,12 @@ export default function CountriesAdmin() {
 
   // Charger tous les SRS disponibles pour le dropdown
   const loadAvailableSrs = useCallback(async () => {
-    try {
-      const res = await fetchApi<SpatialReferenceSystem[]>('/api/spatial-reference-systems/all')
-      setAvailableSrs(Array.isArray(res) ? res : [])
-    } catch (error) {
+    const { data: res, error } = await secureApiRequest<SpatialReferenceSystem[]>('/api/spatial-reference-systems/all')
+    if (error) {
       console.error('Erreur chargement SRS:', error)
       setAvailableSrs([])
+    } else {
+      setAvailableSrs(Array.isArray(res) ? res : [])
     }
   }, [])
   
@@ -202,25 +214,21 @@ export default function CountriesAdmin() {
     
     // Vérification d'unicité du nom (si nouveau pays)
     if (!form.id && form.name.trim()) {
-      try {
-        const response = await fetchApi(`/api/countries/check-name?name=${encodeURIComponent(form.name.trim())}`)
-        if (response && response.exists) {
-          newErrors.name = 'Un pays avec ce nom existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/countries/check-name?name=${encodeURIComponent(form.name.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Un pays avec ce nom existe déjà'
       }
     }
     
     // Vérification d'unicité du code (si nouveau pays)
     if (!form.id && form.code.trim()) {
-      try {
-        const response = await fetchApi(`/api/countries/check-code?code=${encodeURIComponent(form.code.trim().toUpperCase())}`)
-        if (response && response.exists) {
-          newErrors.code = 'Un pays avec ce code existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/countries/check-code?code=${encodeURIComponent(form.code.trim().toUpperCase())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du code:', error)
+      } else if (response && response.exists) {
+        newErrors.code = 'Un pays avec ce code existe déjà'
       }
     }
     
@@ -250,17 +258,23 @@ export default function CountriesAdmin() {
       }
       
       if (form.id) {
-        await fetchApi(`/api/countries/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/countries/${form.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error updating country')
+        }
       } else {
-        await fetchApi('/api/countries', {
+        const { error } = await secureApiRequest('/api/countries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error creating country')
+        }
       }
       
       setForm({ 
@@ -288,8 +302,12 @@ export default function CountriesAdmin() {
   }
 
   async function del(id: string) {
-    await fetchApi(`/api/countries/${id}`, { method: 'DELETE' })
-    load()
+    const { error } = await secureApiRequest(`/api/countries/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting country:', error)
+    } else {
+      load()
+    }
   }
 
   function addNew() {
@@ -343,25 +361,21 @@ export default function CountriesAdmin() {
     
     // Vérification d'unicité du nom (si nouveau SRS)
     if (!srsForm.id && srsForm.name.trim()) {
-      try {
-        const response = await fetchApi(`/api/spatial-reference-systems/check-name?name=${encodeURIComponent(srsForm.name.trim())}`)
-        if (response && response.exists) {
-          newErrors.name = 'Un système avec ce nom existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/spatial-reference-systems/check-name?name=${encodeURIComponent(srsForm.name.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Un système avec ce nom existe déjà'
       }
     }
     
     // Vérification d'unicité du SRID (si nouveau SRS)
     if (!srsForm.id && srsForm.srid) {
-      try {
-        const response = await fetchApi(`/api/spatial-reference-systems/check-srid?srid=${srsForm.srid}`)
-        if (response && response.exists) {
-          newErrors.srid = 'Un système avec ce SRID existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/spatial-reference-systems/check-srid?srid=${srsForm.srid}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du SRID:', error)
+      } else if (response && response.exists) {
+        newErrors.srid = 'Un système avec ce SRID existe déjà'
       }
     }
     
@@ -390,17 +404,23 @@ export default function CountriesAdmin() {
       }
       
       if (srsForm.id) {
-        await fetchApi(`/api/spatial-reference-systems/${srsForm.id}`, {
+        const { error } = await secureApiRequest(`/api/spatial-reference-systems/${srsForm.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error updating spatial reference system')
+        }
       } else {
-        await fetchApi('/api/spatial-reference-systems', {
+        const { error } = await secureApiRequest('/api/spatial-reference-systems', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error creating spatial reference system')
+        }
       }
       
       setSrsForm({ 
@@ -428,9 +448,13 @@ export default function CountriesAdmin() {
   }
 
   async function deleteSrs(id: string) {
-    await fetchApi(`/api/spatial-reference-systems/${id}`, { method: 'DELETE' })
-    loadSrs()
-    loadAvailableSrs() // Recharger pour les dropdowns
+    const { error } = await secureApiRequest(`/api/spatial-reference-systems/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting spatial reference system:', error)
+    } else {
+      loadSrs()
+      loadAvailableSrs() // Recharger pour les dropdowns
+    }
   }
 
   function addNewSrs() {

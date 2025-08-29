@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
@@ -185,9 +185,15 @@ export default function ParcelsAdmin() {
       params.append('search', search.trim())
     }
     
-    const p = await fetchApi<ListResponse<Parcel>>(
+    const { data: p, error } = await secureApiRequest<ListResponse<Parcel>>(
       `/api/parcels?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading parcels:', error)
+      setItems([])
+      return
+    }
     if (p) {
       const arr = Array.isArray(p.items) ? p.items : []
       setItems(arr)
@@ -216,16 +222,18 @@ export default function ParcelsAdmin() {
 
 
   useEffect(() => {
-    fetchApi<ZoneDto[]>("/api/zones/all")
-      .then((data) => {
+    const loadZones = async () => {
+      const { data, error } = await secureApiRequest<ZoneDto[]>("/api/zones/all")
+      if (error) {
+        console.error('Erreur lors du chargement des zones:', error)
+        setZones([])
+      } else {
         const arr = Array.isArray(data) ? data : []
         setZones(arr)
         console.log('Zones chargées:', arr.length)
-      })
-      .catch((error) => {
-        console.error('Erreur lors du chargement des zones:', error)
-        setZones([])
-      })
+      }
+    }
+    loadZones()
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -354,13 +362,11 @@ export default function ParcelsAdmin() {
     
     // Vérification d'unicité de la référence (si nouvelle parcelle)
     if (!form.id && form.reference.trim()) {
-      try {
-        const response = await fetchApi(`/api/parcels/check-reference?reference=${encodeURIComponent(form.reference.trim())}`)
-        if (response && response.exists) {
-          newErrors.reference = 'Une parcelle avec cette référence existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/parcels/check-reference?reference=${encodeURIComponent(form.reference.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité de la référence:', error)
+      } else if (response && response.exists) {
+        newErrors.reference = 'Une parcelle avec cette référence existe déjà'
       }
     }
     
@@ -399,17 +405,23 @@ export default function ParcelsAdmin() {
     }
 
       if (form.id) {
-        await fetchApi(`/api/parcels/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/parcels/${form.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error updating parcel')
+        }
       } else {
-        await fetchApi('/api/parcels', {
+        const { error } = await secureApiRequest('/api/parcels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error creating parcel')
+        }
       }
 
       setForm({
@@ -459,9 +471,13 @@ export default function ParcelsAdmin() {
   }, [])
 
   const handleDelete = useCallback(async (id: string) => {
-    await fetchApi(`/api/parcels/${id}`, { method: 'DELETE' })
-    load(currentPage)
-  }, [load, currentPage])
+    const { error } = await secureApiRequest(`/api/parcels/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting parcel:', error)
+    } else {
+      load(currentPage, searchTerm)
+    }
+  }, [load, currentPage, searchTerm])
 
   function addNew() {
     setForm({

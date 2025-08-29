@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { useSecureApi, useSecureMutation } from '@/hooks/use-api'
+import { secureApiRequest } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
 import type { ListResponse } from '@/types'
@@ -65,9 +66,14 @@ export default function UsersAdmin() {
       params.append('search', search.trim())
     }
     
-    const response = await fetchApi<ListResponse<User>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<User>>(
       `/api/users?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading users:', error)
+      return
+    }
     
     if (response && Array.isArray(response.items)) {
       setItems(response.items)
@@ -142,13 +148,11 @@ export default function UsersAdmin() {
     
     // Vérification d'unicité de l'email
     if (form.email && !newErrors.email && !form.id) {
-      try {
-        const response = await fetchApi(`/api/users/check-email?email=${encodeURIComponent(form.email)}`)
-        if (response && response.exists) {
-          newErrors.email = 'Un utilisateur avec cette adresse email existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/users/check-email?email=${encodeURIComponent(form.email)}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité de l\'email:', error)
+      } else if (response && response.exists) {
+        newErrors.email = 'Un utilisateur avec cette adresse email existe déjà'
       }
     }
     
@@ -194,13 +198,19 @@ export default function UsersAdmin() {
       }
       
       if (form.id) {
-        await fetchApi(`/api/users/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/users/${form.id}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error updating user')
+        }
       } else {
-        await fetchApi('/api/users', {
+        const { error } = await secureApiRequest('/api/users', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         })
+        if (error) {
+          throw new Error('Error creating user')
+        }
       }
       
       setForm({
@@ -240,8 +250,12 @@ export default function UsersAdmin() {
   }, [])
   
   const del = useCallback(async (id: string) => {
-    await fetchApi(`/api/users/${id}`, { method: 'DELETE' })
-    load(currentPage)
+    const { error } = await secureApiRequest(`/api/users/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting user:', error)
+    } else {
+      load(currentPage)
+    }
   }, [load, currentPage])
 
   const addNew = useCallback(() => {

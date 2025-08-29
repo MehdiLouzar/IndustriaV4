@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { useSecureApi, useSecureMutation } from '@/hooks/use-api'
+import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
@@ -234,9 +235,15 @@ export default function ZonesAdmin() {
       params.append('search', targetSearch.trim())
     }
     
-    const response = await fetchApi<ListResponse<Zone>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<Zone>>(
       `/api/zones?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading zones:', error)
+      return
+    }
+    
     let zonesData: Zone[] = []
     if (response && Array.isArray(response.items)) {
       zonesData = response.items
@@ -279,82 +286,85 @@ export default function ZonesAdmin() {
 
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>('/api/zone-types/all')
-      .then((data) => {
-        setAllZoneTypes(Array.isArray(data) ? data : [])
-      })
-      .catch((error) => {
+    const loadZoneTypes = async () => {
+      const { data, error } = await secureApiRequest<{ id: string; name: string }[]>('/api/zone-types/all')
+      if (error) {
         console.error('Erreur chargement zone types:', error)
         setAllZoneTypes([])
-      })
+      } else {
+        setAllZoneTypes(Array.isArray(data) ? data : [])
+      }
+    }
+    loadZoneTypes()
   }, [])
 
   // Charger les pays
   useEffect(() => {
-    fetchApi<{ id: string; name: string; code: string }[]>('/api/countries/all')
-      .then((data) => {
-        setAllCountries(Array.isArray(data) ? data : [])
-      })
-      .catch((error) => {
+    const loadCountries = async () => {
+      const { data, error } = await secureApiRequest<{ id: string; name: string; code: string }[]>('/api/countries/all')
+      if (error) {
         console.error('Erreur chargement countries:', error)
         setAllCountries([])
-      })
+      } else {
+        setAllCountries(Array.isArray(data) ? data : [])
+      }
+    }
+    loadCountries()
   }, [])
 
   // Charger les régions selon le pays sélectionné
   useEffect(() => {
-    if (selectedCountryId) {
-      fetchApi<{ id: string; name: string }[]>(`/api/regions/by-country/${selectedCountryId}`)
-        .then((data) => {
-          setAllRegions(Array.isArray(data) ? data : [])
-        })
-        .catch((error) => {
-          console.error('Erreur chargement regions:', error)
-          setAllRegions([])
-        })
-    } else {
-      // Si aucun pays sélectionné, charger toutes les régions
-      fetchApi<{ id: string; name: string }[]>('/api/regions/all')
-        .then((data) => {
-          setAllRegions(Array.isArray(data) ? data : [])
-        })
-        .catch((error) => {
-          console.error('Erreur chargement regions:', error)
-          setAllRegions([])
-        })
+    const loadRegions = async () => {
+      const endpoint = selectedCountryId ? `/api/regions/by-country/${selectedCountryId}` : '/api/regions/all'
+      const { data, error } = await secureApiRequest<{ id: string; name: string }[]>(endpoint)
+      if (error) {
+        console.error('Erreur chargement regions:', error)
+        setAllRegions([])
+      } else {
+        setAllRegions(Array.isArray(data) ? data : [])
+      }
     }
+    loadRegions()
   }, [selectedCountryId])
 
   useEffect(() => {
-    fetchApi<ListResponse<ActivityDto>>("/api/activities")
-      .then((response) => {
-        let arr: ActivityDto[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as ActivityDto[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setActivities(arr)
-      })
-      .catch(() => setActivities([]))
+    const loadActivities = async () => {
+      const { data: response, error } = await secureApiRequest<ListResponse<ActivityDto>>("/api/activities")
+      if (error) {
+        setActivities([])
+        return
+      }
+      let arr: ActivityDto[] = []
+      if (response && Array.isArray(response.items)) {
+        arr = response.items
+      } else if (Array.isArray(response)) {
+        arr = response as unknown as ActivityDto[]
+      } else if (response) {
+        console.warn('⚠️ Format de données inattendu:', response)
+      }
+      setActivities(arr)
+    }
+    loadActivities()
   }, [])
 
   useEffect(() => {
-    fetchApi<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
-      .then((response) => {
-        let arr: { id: string; name: string }[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as { id: string; name: string }[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setAllAmenities(arr)
-      })
-      .catch(() => setAllAmenities([]))
+    const loadAmenities = async () => {
+      const { data: response, error } = await secureApiRequest<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
+      if (error) {
+        setAllAmenities([])
+        return
+      }
+      let arr: { id: string; name: string }[] = []
+      if (response && Array.isArray(response.items)) {
+        arr = response.items
+      } else if (Array.isArray(response)) {
+        arr = response as unknown as { id: string; name: string }[]
+      } else if (response) {
+        console.warn('⚠️ Format de données inattendu:', response)
+      }
+      setAllAmenities(arr)
+    }
+    loadAmenities()
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -465,19 +475,19 @@ export default function ZonesAdmin() {
       setExistingImages([])
       return
     }
-    try {
-      const images = await fetchApi<Array<{
-        id: string;
-        filename: string;
-        originalFilename: string;
-        description?: string;
-        isPrimary: boolean;
-        displayOrder: number;
-      }>>(`/api/zones/${zoneId}/images`)
-      setExistingImages(Array.isArray(images) ? images : [])
-    } catch (error) {
+    const { data: images, error } = await secureApiRequest<Array<{
+      id: string;
+      filename: string;
+      originalFilename: string;
+      description?: string;
+      isPrimary: boolean;
+      displayOrder: number;
+    }>>(`/api/zones/${zoneId}/images`)
+    if (error) {
       console.error(`Erreur lors du chargement des images pour zone ${zoneId}:`, error)
       setExistingImages([])
+    } else {
+      setExistingImages(Array.isArray(images) ? images : [])
     }
   }, [])
 
@@ -494,25 +504,24 @@ export default function ZonesAdmin() {
         formData.append('isPrimary', 'true')
       }
 
-      try {
-        await fetchApi(`/api/zones/${zoneId}/images`, {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (error) {
+      const { error } = await secureApiRequest(`/api/zones/${zoneId}/images`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (error) {
         console.error('Erreur upload image:', error)
       }
     }
   }, [images])
 
   const deleteExistingImage = useCallback(async (zoneId: string, imageId: string) => {
-    try {
-      await fetchApi(`/api/zones/${zoneId}/images/${imageId}`, {
-        method: 'DELETE'
-      })
-      await loadExistingImages(zoneId)
-    } catch (error) {
+    const { error } = await secureApiRequest(`/api/zones/${zoneId}/images/${imageId}`, {
+      method: 'DELETE'
+    })
+    if (error) {
       console.error('Erreur suppression image:', error)
+    } else {
+      await loadExistingImages(zoneId)
     }
   }, [loadExistingImages])
 
@@ -558,13 +567,11 @@ export default function ZonesAdmin() {
     
     // Vérification d'unicité du nom (si nouvelle zone)
     if (!form.id && form.name.trim()) {
-      try {
-        const response = await fetchApi(`/api/zones/check-name?name=${encodeURIComponent(form.name.trim())}`)
-        if (response && response.exists) {
-          newErrors.name = 'Une zone avec ce nom existe déjà'
-        }
-      } catch (error) {
+      const { data: response, error } = await secureApiRequest(`/api/zones/check-name?name=${encodeURIComponent(form.name.trim())}`)
+      if (error) {
         console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Une zone avec ce nom existe déjà'
       }
     }
     
@@ -610,15 +617,23 @@ export default function ZonesAdmin() {
       let zoneId = form.id
       
       if (form.id) {
-        await fetchApi(`/api/zones/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/zones/${form.id}`, {
           method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error updating zone')
+        }
       } else {
-        const newZone = await fetchApi('/api/zones', {
+        const { data: newZone, error } = await secureApiRequest('/api/zones', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error creating zone')
+        }
         zoneId = newZone.id
       }
 
@@ -684,8 +699,12 @@ export default function ZonesAdmin() {
   }, [loadExistingImages])
 
   const handleDelete = useCallback(async (id: string) => {
-    await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    loadZones(currentPage)
+    const { error } = await secureApiRequest(`/api/zones/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting zone:', error)
+    } else {
+      loadZones(currentPage)
+    }
   }, [loadZones, currentPage])
 
   function addNew() {

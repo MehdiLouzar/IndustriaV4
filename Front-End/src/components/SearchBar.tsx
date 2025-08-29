@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Search, MapPin, Factory, Shield, DollarSign, Ruler } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 
 /**
@@ -88,8 +88,8 @@ export default function SearchBar({ onSearch }: { onSearch?: (f: Filters) => voi
   useEffect(() => {
     async function load() {
       const [r, t] = await Promise.all([
-        fetchApi<ListResponse<{ id: string; name: string }>>('/api/regions'),
-        fetchApi<ListResponse<{ id: string; name: string }>>('/api/zone-types'),
+        fetchPublicApi<ListResponse<{ id: string; name: string }>>('/api/regions'),
+        fetchPublicApi<ListResponse<{ id: string; name: string }>>('/api/zone-types'),
       ])
       if (r) {
         const arr = Array.isArray(r.items) ? r.items : []

@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { fetchApi } from '@/lib/utils'
+import { useSecureApi } from '@/hooks/use-api'
 
 /**
  * Structure des données de permissions retournées par l'API
@@ -40,27 +40,7 @@ interface PermissionData {
  * @returns Objet avec permissions, loading, error et fonctions utilitaires
  */
 export function usePermissions() {
-  const [permissions, setPermissions] = useState<PermissionData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    checkPermissions()
-  }, [])
-
-  const checkPermissions = async () => {
-    try {
-      setLoading(true)
-      const response = await fetchApi<PermissionData>('/api/admin/access')
-      setPermissions(response)
-      setError(null)
-    } catch (err) {
-      setError('Erreur lors de la vérification des permissions')
-      setPermissions({ hasAccess: false })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: permissions, loading, error, refetch } = useSecureApi<PermissionData>('/api/admin/access')
 
   const canAccessFunction = (functionName: string): boolean => {
     if (!permissions?.hasAccess) return false
@@ -87,6 +67,6 @@ export function usePermissions() {
     isAdmin,
     isManager,
     hasAnyAdminRole,
-    refetch: checkPermissions
+    refetch
   }
 }
