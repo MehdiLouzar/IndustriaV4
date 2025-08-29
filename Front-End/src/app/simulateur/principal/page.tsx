@@ -307,67 +307,72 @@ export default function SimulateurPrincipal() {
         <style>
           body { 
             font-family: 'Arial', sans-serif; 
-            margin: 40px; 
-            line-height: 1.6; 
+            margin: 15px; 
+            line-height: 1.3; 
             color: #333;
+            font-size: 12px;
           }
           .header { 
             text-align: center; 
-            border-bottom: 3px solid #8B4513; 
-            padding-bottom: 20px; 
-            margin-bottom: 30px; 
+            border-bottom: 2px solid #8B4513; 
+            padding-bottom: 10px; 
+            margin-bottom: 15px; 
           }
           .header h1 { 
             color: #8B4513; 
-            font-size: 24px; 
+            font-size: 18px; 
             margin: 0; 
           }
           .header p { 
             color: #666; 
-            font-size: 14px; 
-            margin: 5px 0; 
+            font-size: 11px; 
+            margin: 2px 0; 
           }
           .section { 
-            margin-bottom: 25px; 
+            margin-bottom: 15px; 
             page-break-inside: avoid; 
           }
           .section-title { 
             background: linear-gradient(135deg, #8B4513, #A0522D); 
             color: white; 
-            padding: 10px 15px; 
-            font-size: 16px; 
+            padding: 6px 10px; 
+            font-size: 13px; 
             font-weight: bold; 
-            margin-bottom: 15px; 
+            margin-bottom: 10px; 
           }
           .info-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            margin-bottom: 15px; 
+            gap: 8px; 
+            margin-bottom: 10px; 
           }
           .info-item { 
-            padding: 8px; 
-            border-left: 4px solid #8B4513; 
+            padding: 4px 6px; 
+            border-left: 3px solid #8B4513; 
             background: #f9f9f9; 
+            font-size: 11px;
           }
           .info-label { 
             font-weight: bold; 
             color: #8B4513; 
+            font-size: 11px;
           }
           .primes-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 15px; 
+            margin-top: 8px; 
+            font-size: 11px;
           }
           .primes-table th, .primes-table td { 
             border: 1px solid #ddd; 
-            padding: 12px; 
+            padding: 6px 8px; 
             text-align: left; 
           }
           .primes-table th { 
             background: #8B4513; 
             color: white; 
             font-weight: bold; 
+            font-size: 11px;
           }
           .prime-eligible { 
             background: #e8f5e8; 
@@ -382,15 +387,15 @@ export default function SimulateurPrincipal() {
             background: #f0f0f0; 
           }
           .footer { 
-            margin-top: 40px; 
+            margin-top: 20px; 
             text-align: center; 
-            font-size: 12px; 
+            font-size: 10px; 
             color: #666; 
             border-top: 1px solid #ddd; 
-            padding-top: 20px; 
+            padding-top: 10px; 
           }
           @media print { 
-            body { margin: 20px; } 
+            body { margin: 10px; font-size: 11px; } 
           }
         </style>
       </head>

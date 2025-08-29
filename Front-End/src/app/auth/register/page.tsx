@@ -68,12 +68,23 @@ export default function RegisterPage() {
       if (!response) {
         throw new Error('Erreur lors de l\'inscription');
       }
-      const data = response;
-
+      
       setSuccess(true);
+      
+      // Rediriger vers la page de connexion après 3 secondes
+      setTimeout(() => {
+        router.push('/auth/login');
+      }, 3000);
 
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Une erreur est survenue');
+      // Si l'API n'existe pas ou retourne une erreur, afficher un message approprié
+      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
+      
+      if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+        setError('Fonctionnalité d\'inscription en cours de développement. Veuillez réessayer ultérieurement.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +100,7 @@ export default function RegisterPage() {
               Inscription réussie !
             </h2>
             <p className="text-gray-600 mb-4">
-              Votre compte a été créé avec succès. Vous allez être connecté automatiquement...
+              Votre compte a été créé avec succès. Redirection vers la page de connexion...
             </p>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-industria-brown-gold mx-auto"></div>
           </CardContent>

@@ -51,7 +51,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
 
   const investmentLinks = [
     { title: 'Simulateur de dispositif principal', href: '/simulateur/principal' },
-    { title: 'Simulateur de dispositif TPME', href: '/simulateur/secondaire' },
+    { title: 'Simulateur TPME', href: '/simulateur/tpme' },
   ];
 
   const discoursLinks = [
@@ -78,7 +78,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
   ];
 
   return (
-    <header className="w-full">
+  <header className="w-full bg-white relative z-50 isolation-isolate">
       {/* Top contact bar */}
       <div className="header-brown text-white py-2 px-4">
         <div className="container mx-auto flex justify-between items-center">
@@ -106,25 +106,27 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Industria</h1>
-                  <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Industria</h1>
+                    <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Desktop Navigation */}
-            <NavigationMenu className="hidden lg:flex">
+            <NavigationMenu className="hidden lg:flex relative z-50">
               <NavigationMenuList>
                 {navItems.map((item, index) => (
                   <NavigationMenuItem key={index}>
                     <NavigationMenuTrigger className="text-gray-700 hover:text-industria-brown-gold">
                       {item.title}
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent>
+                    <NavigationMenuContent className="z-50 bg-white ring-1 ring-black/5 shadow-lg">
                       <div className="grid gap-2 p-4 w-[400px]">
                         {item.items.map((subItem, subIndex) => (
                           <NavigationMenuLink

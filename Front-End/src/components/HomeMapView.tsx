@@ -582,7 +582,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
     return {
       station: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-orange-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-orange-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
             <TrainFront width={12} height={12} stroke="white" />
           </div>,
         ),
@@ -592,7 +592,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
       }),
       port: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-blue-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-blue-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
             <Ship width={12} height={12} stroke="white" />
           </div>,
         ),
@@ -602,7 +602,7 @@ export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMap
       }),
       airport: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-green-500 p-1 rounded-full border-2 border-white shadow-md opacity-80">
+          <div className="bg-green-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
             <Plane width={12} height={12} stroke="white" />
           </div>,
         ),

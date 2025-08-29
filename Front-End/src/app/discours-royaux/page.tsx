@@ -35,7 +35,7 @@ Ce dispositif vise à mobiliser 550 milliards de dirhams d'investissements et à
       
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-red-900 to-red-700 py-16 text-white">
-        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-black/20 z-0"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center max-w-4xl mx-auto">
             <div className="flex justify-center mb-6">
@@ -59,7 +59,13 @@ Ce dispositif vise à mobiliser 550 milliards de dirhams d'investissements et à
                 <div className="w-64 h-80 mx-auto relative overflow-hidden rounded-lg shadow-lg border-4 border-yellow-600">
                   {/* Placeholder pour la photo officielle de Sa Majesté */}
                   <div className="w-full h-full bg-gradient-to-b from-red-50 to-red-100 flex items-center justify-center">
-                    <Image src="/Photo-officiel-Sa-Majeste-le-Roi-Mohammed-VI.webp" alt="Photo officiel de Sa Majesté Le Roi Mohammed VI" />
+                    <Image
+                      src="/Photo-officiel-Sa-Majeste-le-Roi-Mohammed-VI.webp"
+                      alt="Photo officiel de Sa Majesté Le Roi Mohammed VI"
+                      width={256}
+                      height={320}
+                      style={{ objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               </div>
