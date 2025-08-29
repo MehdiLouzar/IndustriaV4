@@ -4,6 +4,16 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Entité représentant un rendez-vous d'investisseur.
+ * 
+ * Stocke les demandes de rendez-vous pour visiter des parcelles industrielles
+ * avec informations de contact et détails du projet d'investissement.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter
@@ -20,6 +30,15 @@ public class Appointment {
     private String contactPhone;
     private String companyName;
     private String message;
+    
+    // Nouveaux champs ajoutés pour le formulaire amélioré
+    private String activityType;
+    private String projectDescription;
+    private String investmentBudget;
+    private String preferredDate;
+    private String preferredTime;
+    private String urgency;
+    
     private LocalDateTime requestedDate;
     private LocalDateTime confirmedDate;
 

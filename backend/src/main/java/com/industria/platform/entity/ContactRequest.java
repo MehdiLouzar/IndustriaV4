@@ -5,6 +5,20 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 
+/**
+ * Entité représentant une demande de contact d'investisseur ou d'aménageur.
+ * 
+ * Cette entité stocke les informations saisies via le formulaire de contact
+ * du site web, avec des champs spécialisés selon le type de demandeur.
+ * 
+ * Types de demandeurs :
+ * - INVESTISSEUR : cherche à acquérir des parcelles
+ * - AMENAGEUR : propose des zones à référencer sur la plateforme
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Table(name = "contact_requests")
 @Getter

@@ -9,33 +9,44 @@ import com.industria.platform.entity.User;
 import com.industria.platform.exception.BusinessRuleException;
 import com.industria.platform.repository.AppointmentRepository;
 import com.industria.platform.repository.ParcelRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/**
+ * Service de gestion des rendez-vous.
+ * 
+ * Gère la création, la mise à jour et les notifications pour les rendez-vous
+ * entre investisseurs et gestionnaires de zones industrielles.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AppointmentService {
-
-    private static final Logger logger = LoggerFactory.getLogger(AppointmentService.class);
 
     private final AppointmentRepository appointmentRepository;
     private final ParcelRepository parcelRepository;
     private final EmailService emailService;
     private final AuditService auditService;
 
-    public AppointmentService(AppointmentRepository appointmentRepository, 
-                            ParcelRepository parcelRepository,
-                            EmailService emailService,
-                            AuditService auditService) {
-        this.appointmentRepository = appointmentRepository;
-        this.parcelRepository = parcelRepository;
-        this.emailService = emailService;
-        this.auditService = auditService;
-    }
-
+    /**
+     * Crée un nouveau rendez-vous pour une parcelle donnée.
+     * 
+     * Vérifie la disponibilité de la parcelle, envoie les notifications email
+     * automatiques et enregistre l'action dans l'audit.
+     * 
+     * @param appointment données du rendez-vous
+     * @param parcelId identifiant de la parcelle concernée
+     * @return le rendez-vous créé
+     * @throws BusinessRuleException si la parcelle n'est pas disponible
+     */
     @Transactional
     public Appointment createAppointment(Appointment appointment, String parcelId) {
         Parcel parcel = parcelRepository.findById(parcelId).orElseThrow();
@@ -54,7 +65,7 @@ public class AppointmentService {
         try {
             emailService.sendAppointmentConfirmationEmail(savedAppointment);
         } catch (Exception e) {
-            logger.error("Erreur lors de l'envoi de l'email de confirmation pour RDV {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de confirmation pour RDV {}: {}", 
                         savedAppointment.getId(), e.getMessage());
         }
         
@@ -65,7 +76,7 @@ public class AppointmentService {
                 emailService.sendAppointmentNotificationToZoneManager(savedAppointment, zoneManager);
             }
         } catch (Exception e) {
-            logger.error("Erreur lors de l'envoi de l'email de notification au responsable pour RDV {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de notification au responsable pour RDV {}: {}", 
                         savedAppointment.getId(), e.getMessage());
         }
         
@@ -77,6 +88,17 @@ public class AppointmentService {
         return savedAppointment;
     }
 
+    /**
+     * Met à jour le statut d'un rendez-vous.
+     * 
+     * Envoie automatiquement les notifications email de changement de statut
+     * et enregistre la modification dans l'audit.
+     * 
+     * @param appointmentId identifiant du rendez-vous
+     * @param newStatus nouveau statut
+     * @param notes notes optionnelles
+     * @return le rendez-vous mis à jour
+     */
     @Transactional
     public Appointment updateAppointmentStatus(String appointmentId, AppointmentStatus newStatus, String notes) {
         Appointment appointment = appointmentRepository.findById(appointmentId).orElseThrow();
@@ -101,7 +123,7 @@ public class AppointmentService {
             try {
                 emailService.sendAppointmentStatusUpdateEmail(updatedAppointment, oldStatus);
             } catch (Exception e) {
-                logger.error("Erreur lors de l'envoi de l'email de mise à jour de statut pour RDV {}: {}", 
+                log.error("Erreur lors de l'envoi de l'email de mise à jour de statut pour RDV {}: {}", 
                             appointmentId, e.getMessage());
             }
             
@@ -132,7 +154,7 @@ public class AppointmentService {
         }
         
         // Pas de responsable spécifique trouvé
-        logger.warn("Aucun responsable spécifique trouvé pour la parcelle {} dans la zone {}", 
+        log.warn("Aucun responsable spécifique trouvé pour la parcelle {} dans la zone {}", 
                    parcel.getId(), 
                    parcel.getZone() != null ? parcel.getZone().getName() : "inconnue");
         

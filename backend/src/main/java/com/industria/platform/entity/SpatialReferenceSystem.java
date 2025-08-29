@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant un système de référence spatiale (SRS).
+ * 
+ * Définit les systèmes de coordonnées utilisés pour les données géospatiales,
+ * notamment Lambert Maroc (EPSG:26191) et WGS84 (EPSG:4326).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

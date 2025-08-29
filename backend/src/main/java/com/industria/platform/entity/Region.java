@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant une région.
+ * 
+ * Référentiel géographique des régions du Maroc pour la localisation
+ * des zones industrielles et l'organisation territoriale.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

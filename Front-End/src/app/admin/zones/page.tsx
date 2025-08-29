@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, memo } from 'react'
+import { useEffect, useState, useMemo, useCallback, memo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { useSecureApi, useSecureMutation } from '@/hooks/use-api'
+import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog'
@@ -147,11 +148,26 @@ export default function ZonesAdmin() {
   const [zones, setZones] = useState<Zone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // Refs pour éviter les problèmes de closures
+  const currentPageRef = useRef(currentPage)
+  const searchTermRef = useRef(searchTerm)
+  
+  useEffect(() => {
+    currentPageRef.current = currentPage
+  }, [currentPage])
+  
+  useEffect(() => {
+    searchTermRef.current = searchTerm
+  }, [searchTerm])
   const itemsPerPage = 10
   const [open, setOpen] = useState(false)
   const [allZoneTypes, setAllZoneTypes] = useState<{ id: string; name: string }[]>([])
+  const [allCountries, setAllCountries] = useState<{ id: string; name: string; code: string }[]>([])
   const [allRegions, setAllRegions] = useState<{ id: string; name: string }[]>([])
+  const [selectedCountryId, setSelectedCountryId] = useState<string>('')
   const [activities, setActivities] = useState<ActivityDto[]>([])
   const [allAmenities, setAllAmenities] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<ZoneForm>({
@@ -171,6 +187,9 @@ export default function ZonesAdmin() {
     vertices: [],
     verticesModified: false,
   })
+  
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [images, setImages] = useState<{ file: File; url: string; description?: string; isPrimary?: boolean }[]>([])
   const [existingImages, setExistingImages] = useState<Array<{
     id: string;
@@ -203,19 +222,28 @@ export default function ZonesAdmin() {
     }
   }, [])
 
-  const loadZones = useCallback(async (page = currentPage, search = searchTerm) => {
+  const loadZones = useCallback(async (page?: number, search?: string) => {
+    const targetPage = page ?? currentPageRef.current
+    const targetSearch = search ?? searchTermRef.current
+    
     const params = new URLSearchParams({
-      page: page.toString(),
+      page: targetPage.toString(),
       limit: itemsPerPage.toString()
     })
     
-    if (search.trim()) {
-      params.append('search', search.trim())
+    if (targetSearch.trim()) {
+      params.append('search', targetSearch.trim())
     }
     
-    const response = await fetchApi<ListResponse<Zone>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<Zone>>(
       `/api/zones?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading zones:', error)
+      return
+    }
+    
     let zonesData: Zone[] = []
     if (response && Array.isArray(response.items)) {
       zonesData = response.items
@@ -226,8 +254,9 @@ export default function ZonesAdmin() {
     }
     setZones(zonesData)
     setTotalPages(response?.totalPages ?? 1)
+    setTotalItems(response?.totalItems ?? 0)
     setCurrentPage(response?.page ?? 1)
-  }, [currentPage, itemsPerPage, searchTerm])
+  }, [itemsPerPage]) // Seule dépendance stable
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -241,74 +270,112 @@ export default function ZonesAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, router])
 
-  // Effet pour la recherche
+  // Effet pour la recherche  
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
-      loadZones(1, searchTerm)
+      if (currentPage !== 1) {
+        setCurrentPage(1) // Retour à la page 1 lors d'une recherche
+      } else {
+        // Si on est déjà à la page 1, charger directement
+        loadZones(1, searchTerm)
+      }
     }, 300) // Debounce de 300ms
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, loadZones])
+  }, [searchTerm, loadZones]) // Maintenant loadZones est stable
 
 
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>('/api/zone-types/all')
-      .then((data) => {
-        setAllZoneTypes(Array.isArray(data) ? data : [])
-      })
-      .catch((error) => {
+    const loadZoneTypes = async () => {
+      const { data, error } = await secureApiRequest<{ id: string; name: string }[]>('/api/zone-types/all')
+      if (error) {
         console.error('Erreur chargement zone types:', error)
         setAllZoneTypes([])
-      })
+      } else {
+        setAllZoneTypes(Array.isArray(data) ? data : [])
+      }
+    }
+    loadZoneTypes()
   }, [])
 
+  // Charger les pays
   useEffect(() => {
-    fetchApi<{ id: string; name: string }[]>('/api/regions/all')
-      .then((data) => {
-        setAllRegions(Array.isArray(data) ? data : [])
-      })
-      .catch((error) => {
+    const loadCountries = async () => {
+      const { data, error } = await secureApiRequest<{ id: string; name: string; code: string }[]>('/api/countries/all')
+      if (error) {
+        console.error('Erreur chargement countries:', error)
+        setAllCountries([])
+      } else {
+        setAllCountries(Array.isArray(data) ? data : [])
+      }
+    }
+    loadCountries()
+  }, [])
+
+  // Charger les régions selon le pays sélectionné
+  useEffect(() => {
+    const loadRegions = async () => {
+      const endpoint = selectedCountryId ? `/api/regions/by-country/${selectedCountryId}` : '/api/regions/all'
+      const { data, error } = await secureApiRequest<{ id: string; name: string }[]>(endpoint)
+      if (error) {
         console.error('Erreur chargement regions:', error)
         setAllRegions([])
-      })
+      } else {
+        setAllRegions(Array.isArray(data) ? data : [])
+      }
+    }
+    loadRegions()
+  }, [selectedCountryId])
+
+  useEffect(() => {
+    const loadActivities = async () => {
+      const { data: response, error } = await secureApiRequest<ListResponse<ActivityDto>>("/api/activities")
+      if (error) {
+        setActivities([])
+        return
+      }
+      let arr: ActivityDto[] = []
+      if (response && Array.isArray(response.items)) {
+        arr = response.items
+      } else if (Array.isArray(response)) {
+        arr = response as unknown as ActivityDto[]
+      } else if (response) {
+        console.warn('⚠️ Format de données inattendu:', response)
+      }
+      setActivities(arr)
+    }
+    loadActivities()
   }, [])
 
   useEffect(() => {
-    fetchApi<ListResponse<ActivityDto>>("/api/activities")
-      .then((response) => {
-        let arr: ActivityDto[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as ActivityDto[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setActivities(arr)
-      })
-      .catch(() => setActivities([]))
-  }, [])
-
-  useEffect(() => {
-    fetchApi<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
-      .then((response) => {
-        let arr: { id: string; name: string }[] = []
-        if (response && Array.isArray(response.items)) {
-          arr = response.items
-        } else if (Array.isArray(response)) {
-          arr = response as unknown as { id: string; name: string }[]
-        } else if (response) {
-          console.warn('⚠️ Format de données inattendu:', response)
-        }
-        setAllAmenities(arr)
-      })
-      .catch(() => setAllAmenities([]))
+    const loadAmenities = async () => {
+      const { data: response, error } = await secureApiRequest<ListResponse<{ id: string; name: string }>>("/api/amenities/all")
+      if (error) {
+        setAllAmenities([])
+        return
+      }
+      let arr: { id: string; name: string }[] = []
+      if (response && Array.isArray(response.items)) {
+        arr = response.items
+      } else if (Array.isArray(response)) {
+        arr = response as unknown as { id: string; name: string }[]
+      } else if (response) {
+        console.warn('⚠️ Format de données inattendu:', response)
+      }
+      setAllAmenities(arr)
+    }
+    loadAmenities()
   }, [])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
-  }, [])
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }, [errors])
 
   const handleStatus = useCallback((value: string) => {
     setForm(prev => ({ ...prev, status: value }))
@@ -321,6 +388,15 @@ export default function ZonesAdmin() {
   const handleRegion = useCallback((value: string) => {
     setForm(prev => ({ ...prev, regionId: value }))
   }, [])
+  
+  const handleCountryFilter = useCallback((countryId: string) => {
+    const actualCountryId = countryId === 'all' ? '' : countryId
+    setSelectedCountryId(actualCountryId)
+    // Réinitialiser la région sélectionnée quand on change de pays
+    if (actualCountryId !== selectedCountryId) {
+      setForm(prev => ({ ...prev, regionId: '' }))
+    }
+  }, [selectedCountryId])
 
   const handlePriceType = useCallback((value: string) => {
     setForm(prev => ({ ...prev, priceType: value }))
@@ -366,7 +442,13 @@ export default function ZonesAdmin() {
       verts[index] = { ...verts[index], [field]: value }
       return { ...f, vertices: verts, verticesModified: true }
     })
-  }, [])
+    
+    // Effacer l'erreur pour ce vertex lors de la saisie
+    const errorKey = `vertex_${index}_${field === 'lambertX' ? 'x' : 'y'}`
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: '' }))
+    }
+  }, [errors])
 
   const removeVertex = useCallback((index: number) => {
     setForm((f) => {
@@ -393,19 +475,19 @@ export default function ZonesAdmin() {
       setExistingImages([])
       return
     }
-    try {
-      const images = await fetchApi<Array<{
-        id: string;
-        filename: string;
-        originalFilename: string;
-        description?: string;
-        isPrimary: boolean;
-        displayOrder: number;
-      }>>(`/api/zones/${zoneId}/images`)
-      setExistingImages(images || [])
-    } catch (error) {
-      console.error('Erreur lors du chargement des images:', error)
+    const { data: images, error } = await secureApiRequest<Array<{
+      id: string;
+      filename: string;
+      originalFilename: string;
+      description?: string;
+      isPrimary: boolean;
+      displayOrder: number;
+    }>>(`/api/zones/${zoneId}/images`)
+    if (error) {
+      console.error(`Erreur lors du chargement des images pour zone ${zoneId}:`, error)
       setExistingImages([])
+    } else {
+      setExistingImages(Array.isArray(images) ? images : [])
     }
   }, [])
 
@@ -422,25 +504,24 @@ export default function ZonesAdmin() {
         formData.append('isPrimary', 'true')
       }
 
-      try {
-        await fetchApi(`/api/zones/${zoneId}/images`, {
-          method: 'POST',
-          body: formData,
-        })
-      } catch (error) {
+      const { error } = await secureApiRequest(`/api/zones/${zoneId}/images`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (error) {
         console.error('Erreur upload image:', error)
       }
     }
   }, [images])
 
   const deleteExistingImage = useCallback(async (zoneId: string, imageId: string) => {
-    try {
-      await fetchApi(`/api/zones/${zoneId}/images/${imageId}`, {
-        method: 'DELETE'
-      })
-      await loadExistingImages(zoneId)
-    } catch (error) {
+    const { error } = await secureApiRequest(`/api/zones/${zoneId}/images/${imageId}`, {
+      method: 'DELETE'
+    })
+    if (error) {
       console.error('Erreur suppression image:', error)
+    } else {
+      await loadExistingImages(zoneId)
     }
   }, [loadExistingImages])
 
@@ -453,14 +534,67 @@ export default function ZonesAdmin() {
     })
   }, [])
 
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Validation du nom (obligatoire)
+    if (!form.name.trim()) {
+      newErrors.name = 'Le nom de la zone est obligatoire'
+    } else if (form.name.length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères'
+    }
+    
+    // Validation de la superficie (doit être positive si renseignée)
+    if (form.totalArea && (isNaN(parseFloat(form.totalArea)) || parseFloat(form.totalArea) <= 0)) {
+      newErrors.totalArea = 'La superficie doit être un nombre positif'
+    }
+    
+    // Validation du prix (doit être positif si renseigné)
+    if (form.price && (isNaN(parseFloat(form.price)) || parseFloat(form.price) <= 0)) {
+      newErrors.price = 'Le prix doit être un nombre positif'
+    }
+    
+    // Validation des coordonnées Lambert (si renseignées)
+    form.vertices.forEach((vertex, index) => {
+      if (vertex.lambertX && isNaN(parseFloat(vertex.lambertX))) {
+        newErrors[`vertex_${index}_x`] = `Coordonnée X du point ${index + 1} invalide`
+      }
+      if (vertex.lambertY && isNaN(parseFloat(vertex.lambertY))) {
+        newErrors[`vertex_${index}_y`] = `Coordonnée Y du point ${index + 1} invalide`
+      }
+    })
+    
+    // Vérification d'unicité du nom (si nouvelle zone)
+    if (!form.id && form.name.trim()) {
+      const { data: response, error } = await secureApiRequest(`/api/zones/check-name?name=${encodeURIComponent(form.name.trim())}`)
+      if (error) {
+        console.warn('Erreur lors de la vérification d\'unicité du nom:', error)
+      } else if (response && response.exists) {
+        newErrors.name = 'Une zone avec ce nom existe déjà'
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     
+    setIsSubmitting(true)
+    
     try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
       const body = {
-        name: form.name,
-        description: form.description || undefined,
-        address: form.address || undefined,
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+        address: form.address?.trim() || undefined,
         totalArea: form.totalArea ? parseFloat(form.totalArea) : undefined,
         price: form.price ? parseFloat(form.price) : undefined,
         priceType: form.priceType || undefined,
@@ -483,15 +617,23 @@ export default function ZonesAdmin() {
       let zoneId = form.id
       
       if (form.id) {
-        await fetchApi(`/api/zones/${form.id}`, {
+        const { error } = await secureApiRequest(`/api/zones/${form.id}`, {
           method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error updating zone')
+        }
       } else {
-        const newZone = await fetchApi('/api/zones', {
+        const { data: newZone, error } = await secureApiRequest('/api/zones', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
+        if (error) {
+          throw new Error('Error creating zone')
+        }
         zoneId = newZone.id
       }
 
@@ -519,11 +661,14 @@ export default function ZonesAdmin() {
       })
       setImages([])
       setExistingImages([])
+      setErrors({})
       setOpen(false)
       loadZones(currentPage)
     } catch (error) {
       console.error('Erreur lors de la soumission:', error)
-      alert('Erreur lors de la sauvegarde: ' + (error instanceof Error ? error.message : 'Erreur inconnue'))
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -554,8 +699,12 @@ export default function ZonesAdmin() {
   }, [loadExistingImages])
 
   const handleDelete = useCallback(async (id: string) => {
-    await fetchApi(`/api/zones/${id}`, { method: 'DELETE' })
-    loadZones(currentPage)
+    const { error } = await secureApiRequest(`/api/zones/${id}`, { method: 'DELETE' })
+    if (error) {
+      console.error('Error deleting zone:', error)
+    } else {
+      loadZones(currentPage)
+    }
   }, [loadZones, currentPage])
 
   function addNew() {
@@ -577,6 +726,7 @@ export default function ZonesAdmin() {
       verticesModified: false,
     })
     setImages([])
+    setErrors({})
     setOpen(true)
   }
 
@@ -623,7 +773,7 @@ export default function ZonesAdmin() {
 
       {totalPages > 1 && (
         <Pagination
-          totalItems={totalPages * itemsPerPage}
+          totalItems={totalItems}
           itemsPerPage={itemsPerPage}
           currentPage={currentPage}
           onPageChange={setCurrentPage}
@@ -636,26 +786,75 @@ export default function ZonesAdmin() {
             <DialogTitle>{form.id ? 'Modifier une zone' : 'Nouvelle zone'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div>
-              <Label htmlFor="name">Nom</Label>
-              <Input id="name" name="name" value={form.name} onChange={handleChange} required />
+              <Label htmlFor="name">Nom de la zone *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={form.name} 
+                onChange={handleChange} 
+                required 
+                className={errors.name ? 'border-red-500' : ''}
+                placeholder="Nom de la zone industrielle"
+              />
+              {errors.name && <span className="text-red-500 text-sm mt-1">{errors.name}</span>}
             </div>
             <div>
               <Label htmlFor="description">Description</Label>
-              <Input id="description" name="description" value={form.description} onChange={handleChange} />
+              <Input 
+                id="description" 
+                name="description" 
+                value={form.description} 
+                onChange={handleChange}
+                placeholder="Description de la zone (optionnel)"
+              />
             </div>
             <div>
               <Label htmlFor="address">Adresse</Label>
-              <Input id="address" name="address" value={form.address} onChange={handleChange} />
+              <Input 
+                id="address" 
+                name="address" 
+                value={form.address} 
+                onChange={handleChange}
+                placeholder="Adresse complète de la zone"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="totalArea">Superficie m²</Label>
-                <Input id="totalArea" name="totalArea" value={form.totalArea} onChange={handleChange} />
+                <Label htmlFor="totalArea">Superficie (m²)</Label>
+                <Input 
+                  id="totalArea" 
+                  name="totalArea" 
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.totalArea} 
+                  onChange={handleChange}
+                  className={errors.totalArea ? 'border-red-500' : ''}
+                  placeholder="Ex: 50000"
+                />
+                {errors.totalArea && <span className="text-red-500 text-sm mt-1">{errors.totalArea}</span>}
               </div>
               <div>
-                <Label htmlFor="price">Prix</Label>
-                <Input id="price" name="price" value={form.price} onChange={handleChange} />
+                <Label htmlFor="price">Prix (DH)</Label>
+                <Input 
+                  id="price" 
+                  name="price" 
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.price} 
+                  onChange={handleChange}
+                  className={errors.price ? 'border-red-500' : ''}
+                  placeholder="Ex: 1500000"
+                />
+                {errors.price && <span className="text-red-500 text-sm mt-1">{errors.price}</span>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -696,18 +895,30 @@ export default function ZonesAdmin() {
                 Les coordonnées GPS seront calculées automatiquement après sauvegarde
               </div>
               {(form.vertices ?? []).map((v, idx) => (
-                <div key={idx} className="grid grid-cols-2 gap-2 items-center mb-2">
-                  <Input
-                    placeholder="X (Lambert)"
-                    value={v.lambertX}
-                    onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
-                  />
-                  <div className="flex gap-2">
+                <div key={idx} className="grid grid-cols-2 gap-2 items-start mb-2">
+                  <div>
                     <Input
-                      placeholder="Y (Lambert)"
-                      value={v.lambertY}
-                      onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                      type="number"
+                      step="0.01"
+                      placeholder="X (Lambert)"
+                      value={v.lambertX}
+                      onChange={(e) => updateVertex(idx, 'lambertX', e.target.value)}
+                      className={errors[`vertex_${idx}_x`] ? 'border-red-500' : ''}
                     />
+                    {errors[`vertex_${idx}_x`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_x`]}</span>}
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Y (Lambert)"
+                        value={v.lambertY}
+                        onChange={(e) => updateVertex(idx, 'lambertY', e.target.value)}
+                        className={errors[`vertex_${idx}_y`] ? 'border-red-500' : ''}
+                      />
+                      {errors[`vertex_${idx}_y`] && <span className="text-red-500 text-sm">{errors[`vertex_${idx}_y`]}</span>}
+                    </div>
                     <Button type="button" size="sm" variant="destructive" onClick={() => removeVertex(idx)}>
                       ×
                     </Button>
@@ -747,6 +958,22 @@ export default function ZonesAdmin() {
               </Select>
             </div>
             <div>
+              <Label htmlFor="countryFilter">Pays (pour filtrer les régions)</Label>
+              <Select value={selectedCountryId || undefined} onValueChange={handleCountryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-- Tous les pays --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les pays</SelectItem>
+                  {(Array.isArray(allCountries) ? allCountries : []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="regionId">Région</Label>
               <Select value={form.regionId || undefined} onValueChange={handleRegion}>
                 <SelectTrigger>
@@ -760,6 +987,11 @@ export default function ZonesAdmin() {
                   ))}
                 </SelectContent>
               </Select>
+              {selectedCountryId && allRegions.length === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Aucune région trouvée pour ce pays
+                </p>
+              )}
             </div>
             <div>
               <Label>Activités</Label>
@@ -804,11 +1036,11 @@ export default function ZonesAdmin() {
               <Input type="file" multiple onChange={handleFiles} accept="image/*" />
               
               {/* Images existantes */}
-              {existingImages.length > 0 && (
+              {Array.isArray(existingImages) && existingImages.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">Images existantes:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {existingImages.map((img) => (
+                    {(Array.isArray(existingImages) ? existingImages : []).map((img) => (
                       <div key={img.id} className="relative">
                         <img 
                           src={`/api/zones/${form.id}/images/${img.id}/file`} 
@@ -836,11 +1068,11 @@ export default function ZonesAdmin() {
               )}
 
               {/* Nouvelles images à uploader */}
-              {images.length > 0 && (
+              {Array.isArray(images) && images.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">Nouvelles images à ajouter:</h4>
                   <div className="flex flex-wrap gap-2">
-                    {images.map((img, idx) => (
+                    {(Array.isArray(images) ? images : []).map((img, idx) => (
                       <div key={idx} className="relative">
                         <img src={img.url} className="w-24 h-24 object-cover rounded" alt={`Nouvelle image ${idx + 1}`} />
                         <button
@@ -857,11 +1089,30 @@ export default function ZonesAdmin() {
                 </div>
               )}
 
-              {images.length === 0 && existingImages.length === 0 && (
+              {(!Array.isArray(images) || images.length === 0) && (!Array.isArray(existingImages) || existingImages.length === 0) && (
                 <p className="text-gray-500 text-xs mt-1">Aucune image. Vous pouvez ajouter des images pour illustrer cette zone.</p>
               )}
             </div>
-            <Button type="submit">{form.id ? 'Mettre à jour' : 'Créer'}</Button>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Enregistrement...' : (form.id ? 'Mettre à jour' : 'Créer')}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

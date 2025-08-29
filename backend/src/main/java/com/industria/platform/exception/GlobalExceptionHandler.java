@@ -24,11 +24,22 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Gestionnaire global des exceptions pour l'API REST.
+ * 
+ * Intercepte et traite toutes les exceptions non gérées dans l'application
+ * pour retourner des réponses d'erreur uniformes avec traçabilité.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -51,6 +62,20 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    // Add to your existing GlobalExceptionHandler
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(
+            AuthenticationException ex, HttpServletRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(String.valueOf(LocalDateTime.now()))
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Authentication Failed")
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
 
     @ExceptionHandler(ValidationException.class)
@@ -195,22 +220,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
 
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthentication(
-            AuthenticationException ex, HttpServletRequest request) {
-        String traceId = getOrCreateTraceId();
-        log.warn("Authentication failed: {} - TraceId: {}", ex.getMessage(), traceId);
-
-        ErrorResponse error = ErrorResponse.builder()
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .error("Authentication Failed")
-                .message("Invalid credentials")
-                .path(request.getRequestURI())
-                .traceId(traceId)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-    }
 
     // Database Exceptions
 

@@ -1,3 +1,28 @@
+/**
+ * Composant AdminGuard - Garde d'authentification pour l'administration
+ * 
+ * Contrôle l'accès aux pages d'administration en vérifiant :
+ * - Les permissions utilisateur via le hook usePermissions
+ * - L'accès à des fonctions spécifiques (optionnel)
+ * - Redirection automatique si accès non autorisé
+ * 
+ * États gérés :
+ * - Chargement : Affichage d'un spinner pendant la vérification
+ * - Erreur : Message d'erreur en cas de problème de permissions
+ * - Accès refusé : Interface de refus avec explication
+ * - Fonction non autorisée : Blocage spécifique par fonction
+ * 
+ * Intègre parfaitement avec le système de rôles Keycloak.
+ * 
+ * @param children Composants enfants à protéger
+ * @param requiredFunction Fonction spécifique requise (optionnel)
+ * @param fallback Composant de remplacement en cas d'accès refusé
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client'
 
 import { useEffect } from 'react'
@@ -6,9 +31,15 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, Lock, Loader } from 'lucide-react'
 
+/**
+ * Props du composant AdminGuard
+ */
 interface AdminGuardProps {
+  /** Composants enfants à protéger */
   children: React.ReactNode
+  /** Fonction spécifique requise pour l'accès */
   requiredFunction?: string
+  /** Composant de remplacement si accès refusé */
   fallback?: React.ReactNode
 }
 

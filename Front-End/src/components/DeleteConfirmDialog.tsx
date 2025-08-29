@@ -1,3 +1,31 @@
+/**
+ * Composant DeleteConfirmDialog - Modal de confirmation de suppression
+ * 
+ * Fournit une interface sécurisée pour confirmer les suppressions
+ * avec double vérification utilisateur et messages contextualiss.
+ * 
+ * Caractéristiques :
+ * - Modal d'alerte avec boutons Annuler/Confirmer
+ * - Messages personnalisables avec nom d'élément
+ * - Bouton de déclenchement par défaut ou personnalisable
+ * - Couleurs d'alerte (rouge) pour les actions destructives
+ * - Prévention des suppressions accidentelles
+ * 
+ * Utilisé dans l'interface d'administration pour supprimer
+ * zones, utilisateurs, et autres éléments critiques.
+ * 
+ * @param title Titre de la boîte de dialogue
+ * @param description Description personnalisée (optionnel)
+ * @param itemName Nom de l'élément à supprimer pour le message
+ * @param onConfirm Callback exécuté lors de la confirmation
+ * @param disabled Indique si la suppression est désactivée
+ * @param trigger Élément déclencheur personnalisé (optionnel)
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 "use client"
 
 import React from 'react'
@@ -15,12 +43,21 @@ import {
 import { Button } from "@/components/ui/button"
 import { Trash2 } from "lucide-react"
 
+/**
+ * Props du composant DeleteConfirmDialog
+ */
 interface DeleteConfirmDialogProps {
+  /** Titre de la boîte de dialogue */
   title?: string
+  /** Description personnalisée */
   description?: string
+  /** Nom de l'élément à supprimer */
   itemName?: string
+  /** Callback de confirmation */
   onConfirm: () => void
+  /** Indique si la suppression est désactivée */
   disabled?: boolean
+  /** Élément déclencheur personnalisé */
   trigger?: React.ReactNode
 }
 

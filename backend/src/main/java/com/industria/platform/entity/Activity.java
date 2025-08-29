@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant une activité industrielle.
+ * 
+ * Définit les types d'activités économiques autorisées
+ * dans les zones industrielles (textile, automobile, agro-alimentaire, etc.).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

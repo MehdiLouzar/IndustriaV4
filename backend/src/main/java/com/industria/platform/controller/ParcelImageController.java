@@ -5,7 +5,8 @@ import com.industria.platform.entity.ParcelImage;
 import com.industria.platform.repository.ParcelImageRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.service.FileStorageService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -21,25 +22,46 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Contrôleur REST pour la gestion des images de parcelles.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/parcels/{parcelId}/images")
+@RequiredArgsConstructor
+@Slf4j
 public class ParcelImageController {
 
-    @Autowired
-    private ParcelImageRepository parcelImageRepository;
-    
-    @Autowired
-    private ParcelRepository parcelRepository;
-    
-    @Autowired
-    private FileStorageService fileStorageService;
+    private final ParcelImageRepository parcelImageRepository;
+    private final ParcelRepository parcelRepository;
+    private final FileStorageService fileStorageService;
 
+    /**
+     * Récupère toutes les images d'une parcelle.
+     *
+     * @param parcelId identifiant de la parcelle
+     * @return liste des images triées par priorité (principale en premier)
+     */
     @GetMapping
     public ResponseEntity<List<ParcelImage>> getParcelImages(@PathVariable String parcelId) {
         List<ParcelImage> images = parcelImageRepository.findByParcelIdOrderByIsPrimaryDescDisplayOrderAsc(parcelId);
         return ResponseEntity.ok(images);
     }
 
+    /**
+     * Télécharge une nouvelle image pour une parcelle.
+     * Nécessite les droits d'administration.
+     *
+     * @param parcelId identifiant de la parcelle
+     * @param file fichier image à télécharger
+     * @param description description optionnelle de l'image
+     * @param isPrimary indique si l'image est principale
+     * @param displayOrder ordre d'affichage
+     * @return l'image créée ou erreur
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ParcelImage> uploadParcelImage(
@@ -94,6 +116,13 @@ public class ParcelImageController {
         }
     }
 
+    /**
+     * Récupère le fichier d'une image de parcelle.
+     *
+     * @param parcelId identifiant de la parcelle
+     * @param imageId identifiant de l'image
+     * @return le fichier image ou erreur 404
+     */
     @GetMapping("/{imageId}/file")
     public ResponseEntity<Resource> getImageFile(@PathVariable String parcelId, @PathVariable String imageId) {
         try {
@@ -122,6 +151,17 @@ public class ParcelImageController {
         }
     }
 
+    /**
+     * Met à jour les métadonnées d'une image de parcelle.
+     * Nécessite les droits d'administration.
+     *
+     * @param parcelId identifiant de la parcelle
+     * @param imageId identifiant de l'image
+     * @param description nouvelle description
+     * @param isPrimary nouveau statut principal
+     * @param displayOrder nouvel ordre d'affichage
+     * @return l'image mise à jour ou erreur
+     */
     @PutMapping("/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ParcelImage> updateParcelImage(
@@ -155,6 +195,14 @@ public class ParcelImageController {
         return ResponseEntity.ok(savedImage);
     }
 
+    /**
+     * Supprime une image de parcelle et son fichier associé.
+     * Nécessite les droits d'administration.
+     *
+     * @param parcelId identifiant de la parcelle
+     * @param imageId identifiant de l'image à supprimer
+     * @return réponse vide ou erreur
+     */
     @DeleteMapping("/{imageId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteParcelImage(@PathVariable String parcelId, @PathVariable String imageId) {

@@ -11,7 +11,7 @@ import {
   User, Building, TrendingUp, Mail, Phone, MapPin, Calendar, 
   Search, Filter, ChevronLeft, ChevronRight, Eye, Trash2, Clock
 } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 
 interface ContactRequest {
@@ -51,8 +51,8 @@ export default function ContactRequestsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<ContactRequestStatus | ''>('')
-  const [typeFilter, setTypeFilter] = useState<ContactType | ''>('')
+  const [statusFilter, setStatusFilter] = useState<ContactRequestStatus | 'ALL'>('ALL')
+  const [typeFilter, setTypeFilter] = useState<ContactType | 'ALL'>('ALL')
   const [selectedRequest, setSelectedRequest] = useState<ContactRequest | null>(null)
   const [error, setError] = useState('')
 
@@ -65,53 +65,53 @@ export default function ContactRequestsPage() {
       })
       
       if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter) params.append('status', statusFilter)
-      if (typeFilter) params.append('contactType', typeFilter)
+      if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter)
+      if (typeFilter && typeFilter !== 'ALL') params.append('contactType', typeFilter)
       
-      const response = await fetchApi<ListResponse<ContactRequest>>(`/api/contact-requests?${params}`)
+      const { data: response, error } = await secureApiRequest<ListResponse<ContactRequest>>(`/api/contact-requests?${params}`)
       
-      if (response) {
+      if (error) {
+        console.error('Erreur lors du chargement des demandes:', error)
+        setError('Erreur lors du chargement des demandes')
+      } else if (response) {
         setRequests(response.items || [])
         setTotalPages(response.totalPages || 1)
       }
-    } catch (error) {
-      console.error('Erreur lors du chargement des demandes:', error)
-      setError('Erreur lors du chargement des demandes')
     } finally {
       setLoading(false)
     }
   }
 
   const updateStatus = async (id: string, newStatus: ContactRequestStatus, notes?: string) => {
-    try {
-      await fetchApi(`/api/contact-requests/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, notes })
-      })
-      
+    const { error } = await secureApiRequest(`/api/contact-requests/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus, notes })
+    })
+    
+    if (error) {
+      console.error('Erreur lors de la mise à jour:', error)
+      setError('Erreur lors de la mise à jour du statut')
+    } else {
       // Recharger la liste
       loadRequests()
       setSelectedRequest(null)
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error)
-      setError('Erreur lors de la mise à jour du statut')
     }
   }
 
   const deleteRequest = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette demande ?')) return
     
-    try {
-      await fetchApi(`/api/contact-requests/${id}`, {
-        method: 'DELETE'
-      })
-      
-      loadRequests()
-      setSelectedRequest(null)
-    } catch (error) {
+    const { error } = await secureApiRequest(`/api/contact-requests/${id}`, {
+      method: 'DELETE'
+    })
+    
+    if (error) {
       console.error('Erreur lors de la suppression:', error)
       setError('Erreur lors de la suppression')
+    } else {
+      loadRequests()
+      setSelectedRequest(null)
     }
   }
 
@@ -174,12 +174,12 @@ export default function ContactRequestsPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Statut</label>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ContactRequestStatus | '')}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ContactRequestStatus | 'ALL')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous les statuts</SelectItem>
+                  <SelectItem value="ALL">Tous les statuts</SelectItem>
                   <SelectItem value="NOUVEAU">Nouveau</SelectItem>
                   <SelectItem value="EN_COURS">En cours</SelectItem>
                   <SelectItem value="TRAITE">Traité</SelectItem>
@@ -189,12 +189,12 @@ export default function ContactRequestsPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Type</label>
-              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ContactType | '')}>
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ContactType | 'ALL')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tous les types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous les types</SelectItem>
+                  <SelectItem value="ALL">Tous les types</SelectItem>
                   <SelectItem value="AMENAGEUR">Aménageur</SelectItem>
                   <SelectItem value="INDUSTRIEL_INVESTISSEUR">Industriel/Investisseur</SelectItem>
                 </SelectContent>
@@ -204,8 +204,8 @@ export default function ContactRequestsPage() {
               <Button 
                 onClick={() => {
                   setSearchTerm('')
-                  setStatusFilter('')
-                  setTypeFilter('')
+                  setStatusFilter('ALL')
+                  setTypeFilter('ALL')
                   setPage(1)
                 }}
                 variant="outline"

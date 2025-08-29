@@ -1,3 +1,24 @@
+/**
+ * Composant Footer - Pied de page complet du site Industria
+ * 
+ * Fournit un pied de page riche avec :
+ * - Boutons d'action rapide (appel, contact, rendez-vous)
+ * - Liens de navigation structurés (Média, Groupe)
+ * - Informations de contact avec icônes
+ * - Réseaux sociaux et liens institutionnels
+ * - Modal de prise de rendez-vous intégrée
+ * - Copyright automatique avec année courante
+ * 
+ * Design responsive qui s'adapte aux différentes tailles d'écran
+ * avec reorganisation automatique des éléments.
+ * 
+ * @returns Composant React du pied de page
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import { useState } from 'react';
@@ -36,18 +57,11 @@ export default function Footer() {
               <Phone className="w-5 h-5" />
               Appel (Centre d'appel)
             </Button>
-            <Button asChild variant="ghost" className="text-white hover:bg-gray-600 flex items-center gap-2">
+            <Button asChild variant="ghost" className="header-brown text-white hover:opacity-90 flex items-center gap-2">
               <a href="/contact">
                 <Mail className="w-5 h-5" />
                 Être contacté
               </a>
-            </Button>
-            <Button
-              className="header-brown text-white hover:opacity-90 flex items-center gap-2"
-              onClick={() => setShowForm(true)}
-            >
-              <Calendar className="w-5 h-5" />
-              Prise de rendez-vous
             </Button>
           </div>
         </div>
@@ -109,10 +123,10 @@ export default function Footer() {
                 <span className="text-xl font-bold">+212 5 37 57 20 00</span>
               </div>
               <Button
-                className="w-full header-brown text-white hover:opacity-90 mt-3"
-                onClick={() => setShowForm(true)}
-              >
-                Prise de rendez-vous
+                className="w-full header-brown text-white hover:opacity-90 mt-3">
+                <a href="/contact">
+                  Être contacté
+                </a>
               </Button>
             </div>
           </div>

@@ -8,6 +8,16 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * DTO représentant un log d'audit pour les échanges API.
+ * 
+ * Contient toutes les informations de traçabilité d'une action
+ * utilisateur avec métadonnées contextuelles.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Data
 @Builder
 @NoArgsConstructor

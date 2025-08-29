@@ -5,9 +5,12 @@ import com.industria.platform.dto.CreateContactRequestDto;
 import com.industria.platform.dto.ListResponse;
 import com.industria.platform.entity.*;
 import com.industria.platform.repository.*;
-import com.industria.platform.service.EmailService;
 import com.industria.platform.service.AuditService;
+import com.industria.platform.service.ContactRequestFilterService;
+import com.industria.platform.service.EmailService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -16,8 +19,20 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des demandes de contact.
+ * 
+ * Gère les demandes de contact des investisseurs et aménageurs,
+ * avec notification automatique par email et système d'audit.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/contact-requests")
+@RequiredArgsConstructor
+@Slf4j
 public class ContactRequestController {
 
     private final ContactRequestRepository contactRequestRepository;
@@ -25,19 +40,7 @@ public class ContactRequestController {
     private final ParcelRepository parcelRepository;
     private final EmailService emailService;
     private final AuditService auditService;
-
-    public ContactRequestController(
-            ContactRequestRepository contactRequestRepository,
-            ZoneRepository zoneRepository,
-            ParcelRepository parcelRepository,
-            EmailService emailService,
-            AuditService auditService) {
-        this.contactRequestRepository = contactRequestRepository;
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.emailService = emailService;
-        this.auditService = auditService;
-    }
+    private final ContactRequestFilterService contactRequestFilterService;
 
     @PostMapping
     public ResponseEntity<ContactRequestDto> createContactRequest(@Valid @RequestBody CreateContactRequestDto dto) {
@@ -52,7 +55,7 @@ public class ContactRequestController {
                 emailService.sendContactConfirmationEmail(saved);
                 emailService.sendAdminNotificationEmail(saved);
             } catch (Exception e) {
-                System.err.println("Erreur lors de l'envoi des emails: " + e.getMessage());
+                log.error("Erreur lors de l'envoi des emails: {}", e.getMessage());
                 // Ne pas faire échouer la demande si l'email échoue
             }
             
@@ -63,8 +66,7 @@ public class ContactRequestController {
             return ResponseEntity.ok(toDto(saved));
             
         } catch (Exception e) {
-            System.err.println("Erreur lors de la création de la demande de contact: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Erreur lors de la création de la demande de contact: {}", e.getMessage(), e);
             return ResponseEntity.status(500).build();
         }
     }
@@ -82,7 +84,7 @@ public class ContactRequestController {
         int l = Math.min(Math.max(1, limit), 100);
         Pageable pageable = PageRequest.of(p - 1, l);
         
-        var result = contactRequestRepository.findWithFilters(status, contactType, search, pageable);
+        var result = contactRequestFilterService.findWithFilters(status, contactType, search, pageable);
         var items = result.getContent().stream().map(this::toDto).toList();
         
         return new ListResponse<>(items, result.getTotalElements(), 

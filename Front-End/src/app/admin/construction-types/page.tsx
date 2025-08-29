@@ -1,15 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
 import Pagination from '@/components/Pagination'
-import type { ListResponse } from '@/types'
 import {
   Select,
   SelectTrigger,
@@ -17,6 +14,9 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
+
+import { useSecureMutation } from '@/hooks/use-api'
+import { secureApiRequest } from '@/lib/auth-actions'
 
 interface ConstructionType {
   id: string
@@ -33,7 +33,6 @@ const constructionTypes = [
 ]
 
 export default function ConstructionTypesAdmin() {
-  const router = useRouter()
   const [items, setItems] = useState<ConstructionType[]>([])
   const [selectedTypeId, setSelectedTypeId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -48,58 +47,81 @@ export default function ConstructionTypesAdmin() {
     code: 'CUSTOM_BUILD'
   })
 
+  const { mutate, loading: mutLoading } = useSecureMutation()
+
   const load = useCallback(async (page = currentPage, search = searchTerm) => {
-    // Simulate API call - in real scenario would be: /api/construction-types
-    let simulated = constructionTypes.map((ct, index) => ({
+    // Si un endpoint existe, on tente de le lire côté serveur de façon sécurisée
+    // et on retombe sur la liste statique sinon.
+    const params = new URLSearchParams({ page: String(page), limit: String(itemsPerPage) })
+    if (search.trim()) params.append('search', search.trim())
+
+    const { data, error } = await secureApiRequest<{
+      items: ConstructionType[]
+      page: number
+      totalPages: number
+    } | ConstructionType[] | null>(`/api/construction-types?${params.toString()}`)
+
+    let list: ConstructionType[] = constructionTypes.map(ct => ({
       id: ct.code,
       name: ct.name,
       description: ct.description,
-      code: ct.code
+      code: ct.code,
     }))
-    
-    // Filter based on search term
-    if (search.trim()) {
-      const searchLower = search.toLowerCase()
-      simulated = simulated.filter(item => 
-        item.name.toLowerCase().includes(searchLower) ||
-        item.code.toLowerCase().includes(searchLower) ||
-        (item.description && item.description.toLowerCase().includes(searchLower))
-      )
-    }
-    
-    setItems(simulated)
-    setTotalPages(1)
-    setCurrentPage(1)
-  }, [currentPage, searchTerm])
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
+    if (!error && data) {
+      if (Array.isArray(data)) {
+        list = data
+        setTotalPages(1)
+        setCurrentPage(1)
+      } else if (Array.isArray(data.items)) {
+        list = data.items
+        setTotalPages(data.totalPages ?? 1)
+        setCurrentPage(data.page ?? 1)
       }
+    } else {
+      // Fallback filtre local sur la liste statique
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        list = list.filter(it =>
+          it.name.toLowerCase().includes(q) ||
+          it.code.toLowerCase().includes(q) ||
+          (it.description && it.description.toLowerCase().includes(q))
+        )
+      }
+      setTotalPages(1)
+      setCurrentPage(1)
     }
-    load(currentPage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, router])
 
-  // Effet pour la recherche
+    setItems(list)
+  }, [currentPage, itemsPerPage, searchTerm])
+
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setCurrentPage(1) // Retour à la page 1 lors d'une recherche
-      load(1, searchTerm)
-    }, 300) // Debounce de 300ms
+    load(currentPage)
+  }, [currentPage, load])
 
-    return () => clearTimeout(timeoutId)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setCurrentPage(1)
+      load(1, searchTerm)
+    }, 300)
+    return () => clearTimeout(t)
   }, [searchTerm, load])
 
   async function save() {
     if (!form.name.trim()) return
-    
-    console.log('Saving construction type:', form)
-    // In real scenario: await fetchApi('/api/construction-types', { method: form.id ? 'PUT' : 'POST', body: JSON.stringify(form) })
-    
+
+    const payload = {
+      code: form.code,
+      name: form.name.trim(),
+      description: form.description?.trim() || undefined,
+    }
+
+    if (form.id) {
+      await mutate(`/api/construction-types/${form.id}`, payload, { method: 'PUT' })
+    } else {
+      await mutate('/api/construction-types', payload, { method: 'POST' })
+    }
+
     setOpen(false)
     resetForm()
     load(currentPage)
@@ -107,10 +129,7 @@ export default function ConstructionTypesAdmin() {
 
   async function deleteItem(id: string) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce type de construction ?')) return
-    
-    console.log('Deleting construction type:', id)
-    // In real scenario: await fetchApi(`/api/construction-types/${id}`, { method: 'DELETE' })
-    
+    await mutate(`/api/construction-types/${id}`, undefined, { method: 'DELETE' })
     load(currentPage)
   }
 
@@ -135,7 +154,6 @@ export default function ConstructionTypesAdmin() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -159,7 +177,6 @@ export default function ConstructionTypesAdmin() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Liste */}
         <Card>
           <CardHeader>
             <CardTitle>Types de construction ({items.length})</CardTitle>
@@ -188,6 +205,7 @@ export default function ConstructionTypesAdmin() {
                       size="sm"
                       className="text-red-600 hover:text-red-700"
                       onClick={() => deleteItem(item.id)}
+                      disabled={mutLoading}
                     >
                       Supprimer
                     </Button>
@@ -203,7 +221,7 @@ export default function ConstructionTypesAdmin() {
             </div>
 
             {totalPages > 1 && (
-              <Pagination 
+              <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
@@ -213,7 +231,6 @@ export default function ConstructionTypesAdmin() {
         </Card>
       </div>
 
-      {/* Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -262,8 +279,8 @@ export default function ConstructionTypesAdmin() {
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Annuler
               </Button>
-              <Button onClick={save} className="header-red text-white">
-                {form.id ? 'Modifier' : 'Créer'}
+              <Button onClick={save} className="header-red text-white" disabled={mutLoading}>
+                {mutLoading ? 'Enregistrement...' : (form.id ? 'Modifier' : 'Créer')}
               </Button>
             </div>
           </div>

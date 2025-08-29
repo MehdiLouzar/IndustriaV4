@@ -1,3 +1,20 @@
+/**
+ * Composant AdminHeader - En-tête simplifié pour les pages d'administration
+ * 
+ * Affiche un en-tête minimal avec uniquement un lien de retour vers
+ * le dashboard principal d'administration. Utilisé dans les pages
+ * de détail ou de gestion spécifiques.
+ * 
+ * Design volontairement épuré pour ne pas distraire l'utilisateur
+ * de ses tâches administratives.
+ * 
+ * @returns Composant React de l'en-tête admin
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client'
 
 import Link from 'next/link'

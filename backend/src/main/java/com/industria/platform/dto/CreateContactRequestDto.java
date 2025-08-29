@@ -4,6 +4,16 @@ import com.industria.platform.entity.ContactType;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
+/**
+ * DTO pour la création d'une nouvelle demande de contact.
+ * 
+ * Utilisé pour valider et structurer les données saisies
+ * dans le formulaire de contact du site web.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 public record CreateContactRequestDto(
     @NotNull
     ContactType contactType,

@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant un équipement ou service.
+ * 
+ * Définit les équipements et services disponibles dans les zones industrielles
+ * (électricité, eau, internet, transport, services bancaires, etc.).
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

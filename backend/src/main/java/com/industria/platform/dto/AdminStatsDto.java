@@ -5,8 +5,12 @@ import java.util.List;
 /**
  * DTO pour les statistiques du tableau de bord administrateur.
  * 
- * @author Industria Platform
+ * Agrège les métriques clés de la plateforme pour l'affichage
+ * sur le dashboard d'administration.
+ * 
+ * @author Industria Platform Team
  * @version 1.0
+ * @since 1.0
  */
 public class AdminStatsDto {
     private Long totalUsers;

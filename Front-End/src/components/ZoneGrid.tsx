@@ -1,47 +1,172 @@
+/**
+ * Composant ZoneGrid - Grille paginée de zones industrielles
+ * 
+ * Affiche les zones industrielles avec pagination traditionnelle :
+ * - Chargement par pages de 12 zones
+ * - Filtrage avancé par région, type, statut, superficie et prix
+ * - Support des API publiques et authentifiées
+ * - Gestion des états de chargement, erreur et pages vides
+ * - Interface responsive avec boutons de navigation
+ * 
+ * Utilise l'API publique pour les données non-sensibles et bascule
+ * automatiquement vers l'API authentifiée si nécessaire.
+ * 
+ * @param searchFilters Filtres de recherche appliqués
+ * @returns Composant React de la grille paginée
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Factory } from 'lucide-react'
-import { fetchPublicApi, type PublicZonesResponse } from '@/lib/publicApi'
+import { Factory, Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Coffee, Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Tool, Gauge, Settings2, Plane } from 'lucide-react'
+import { fetchPublicApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import ZoneCard from './ZoneCard'
 import LoadingSpinner from './LoadingSpinner'
 
+/** Nombre de zones par page */
 const ZONES_PER_PAGE = 12
 
+/**
+ * Image associée à une zone industrielle
+ */
 interface ZoneImage {
+  /** Identifiant unique */
   id: string
+  /** Nom du fichier stocké */
   filename: string
+  /** Nom original du fichier uploadé */
   originalFilename: string
+  /** Description optionnelle */
   description?: string
+  /** Indique si c'est l'image principale */
   isPrimary: boolean
+  /** Ordre d'affichage */
   displayOrder: number
 }
 
-interface IndustrialZone {
+/**
+ * Représentation d'une activité avec icône
+ */
+interface Activity {
+  /** Identifiant unique */
   id: string
+  /** Nom de l'activité */
   name: string
-  description: string
-  location: string
-  area: string
-  price: string
-  type: string
-  status: string
-  deliveryDate?: string
-  image?: string
-  images?: ZoneImage[]
-  totalParcels?: number
-  availableParcels?: number
+  /** Icône Lucide React (optionnelle) */
+  icon?: string
+  /** Description détaillée */
+  description?: string
+  /** Catégorie de l'activité */
+  category?: string
 }
 
+/**
+ * Représentation d'un équipement avec icône
+ */
+interface Amenity {
+  /** Identifiant unique */
+  id: string
+  /** Nom de l'équipement */
+  name: string
+  /** Icône Lucide React (optionnelle) */
+  icon?: string
+  /** Description détaillée */
+  description?: string
+  /** Catégorie de l'équipement */
+  category?: string
+}
+
+/**
+ * Interface représentant une activité industrielle
+ */
+interface Activity {
+  /** Identifiant unique de l'activité */
+  id: string
+  /** Nom de l'activité */
+  name: string
+  /** Description de l'activité */
+  description: string
+  /** Icône de l'activité */
+  icon?: string
+  /** Catégorie de l'activité */
+  category?: string
+}
+
+/**
+ * Interface représentant un équipement/service
+ */
+interface Amenity {
+  /** Identifiant unique de l'équipement */
+  id: string
+  /** Nom de l'équipement */
+  name: string
+  /** Description de l'équipement */
+  description: string
+  /** Icône de l'équipement */
+  icon?: string
+  /** Catégorie de l'équipement */
+  category?: string
+}
+
+/**
+ * Représentation complète d'une zone industrielle
+ */
+interface IndustrialZone {
+  /** Identifiant unique */
+  id: string
+  /** Nom de la zone */
+  name: string
+  /** Description détaillée */
+  description: string
+  /** Localisation géographique */
+  location: string
+  /** Superficie en m² */
+  area: string
+  /** Prix au m² */
+  price: string
+  /** Type de zone */
+  type: string
+  /** Statut de disponibilité */
+  status: string
+  /** Date de livraison prévue */
+  deliveryDate?: string
+  /** URL image principale */
+  image?: string
+  /** Collection d'images */
+  images?: ZoneImage[]
+  /** Nombre total de parcelles */
+  totalParcels?: number
+  /** Nombre de parcelles disponibles */
+  availableParcels?: number
+  /** Activités autorisées dans la zone */
+  activities?: Activity[]
+  /** Équipements disponibles dans la zone */
+  amenities?: Amenity[]
+}
+
+/**
+ * Filtres de recherche appliqués à la grille
+ */
 interface SearchFilters {
+  /** ID de la région */
   regionId?: string
+  /** ID du type de zone */
   zoneTypeId?: string
+  /** Statut de disponibilité */
   status?: string
+  /** Superficie minimale */
   minArea?: string
+  /** Superficie maximale */
   maxArea?: string
+  /** Prix minimal */
   minPrice?: string
+  /** Prix maximal */
   maxPrice?: string
 }
 
@@ -55,10 +180,34 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
   // Fonction pour charger les images d'une zone
   const loadZoneImages = useCallback(async (zoneId: string): Promise<ZoneImage[]> => {
     try {
-      const images = await fetchPublicApi<ZoneImage[]>(`/api/zones/${zoneId}/images`)
-      return images || []
+      // Tentative avec l'API publique
+      const response = await fetch(`/api/zones/${zoneId}/images`)
+      
+      if (!response.ok) {
+        return []
+      }
+      
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        return []
+      }
+      
+      const responseText = await response.text()
+      
+      if (!responseText.trim()) {
+        return []
+      }
+      
+      let images: ZoneImage[]
+      try {
+        images = JSON.parse(responseText)
+      } catch (jsonError) {
+        console.error(`❌ Erreur parsing JSON pour zone ${zoneId}:`, jsonError)
+        return []
+      }
+      
+      return Array.isArray(images) ? images : []
     } catch (error) {
-      console.warn(`Erreur chargement images zone ${zoneId}:`, error)
       return []
     }
   }, [])
@@ -83,7 +232,7 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
       if (searchFilters?.minPrice) params.append('minPrice', searchFilters.minPrice)
       if (searchFilters?.maxPrice) params.append('maxPrice', searchFilters.maxPrice)
       
-      const response = await fetchPublicApi<PublicZonesResponse>(
+      const response = await fetchPublicApi<ListResponse<Zone>>(
         `/api/zones?${params.toString()}`
       )
 
@@ -134,6 +283,42 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
             // Charger les images de la zone
             const zoneImages = await loadZoneImages(zone.id)
             
+            // Charger les activités et équipements si disponibles
+            let activities: Activity[] = []
+            let amenities: Amenity[] = []
+            
+            try {
+              if ((zone as any).activityIds && Array.isArray((zone as any).activityIds)) {
+                const activityPromises = (zone as any).activityIds.map((id: string) =>
+                  fetchPublicApi<{ id: string; name: string; icon?: string }>(`/api/activities/${id}`)
+                )
+                const activityResults = await Promise.all(activityPromises)
+                activities = activityResults.filter(Boolean).map(a => ({
+                  id: a.id,
+                  name: a.name,
+                  icon: a.icon,
+                  description: '',
+                  category: ''
+                }))
+              }
+              
+              if ((zone as any).amenityIds && Array.isArray((zone as any).amenityIds)) {
+                const amenityPromises = (zone as any).amenityIds.map((id: string) =>
+                  fetchPublicApi<{ id: string; name: string; icon?: string }>(`/api/amenities/${id}`)
+                )
+                const amenityResults = await Promise.all(amenityPromises)
+                amenities = amenityResults.filter(Boolean).map(a => ({
+                  id: a.id,
+                  name: a.name,
+                  icon: a.icon,
+                  description: '',
+                  category: ''
+                }))
+              }
+            } catch (error) {
+              console.warn(`Erreur lors du chargement des activités/équipements pour la zone ${zone.id}:`, error)
+            }
+            
             return {
               id: zone.id,
               name: zone.name,
@@ -151,7 +336,9 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
               image: undefined,
               images: zoneImages,
               totalParcels: (zone as any).totalParcels,
-              availableParcels: (zone as any).availableParcels
+              availableParcels: (zone as any).availableParcels,
+              activities,
+              amenities
             }
           })
         )
@@ -251,7 +438,7 @@ export default function ZoneGrid({ searchFilters }: { searchFilters?: SearchFilt
       </div>
 
       {/* Grille de cartes optimisée */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {safeZones.map((zone) => (
           <ZoneCard key={zone.id} zone={zone} />
         ))}

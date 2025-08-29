@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { fetchApi } from '@/lib/utils'
+import { secureApiRequest } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
 import {
@@ -76,8 +76,10 @@ export default function NotificationsAdmin() {
     textBody: '',
     status: 'PENDING',
     maxRetries: '3',
-    templateId: ''
+    templateId: 'NONE'
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const loadNotifications = useCallback(async (page = currentPage, search = searchTerm) => {
     const params = new URLSearchParams({
@@ -89,9 +91,17 @@ export default function NotificationsAdmin() {
       params.append('search', search.trim())
     }
     
-    const response = await fetchApi<ListResponse<Notification>>(
+    const { data: response, error } = await secureApiRequest<ListResponse<Notification>>(
       `/api/admin/notifications?${params.toString()}`
-    ).catch(() => null)
+    )
+    
+    if (error) {
+      console.error('Error loading notifications:', error)
+      setItems([])
+      setTotalPages(1)
+      setCurrentPage(1)
+      return
+    }
     
     if (response && Array.isArray(response.items)) {
       setItems(response.items)
@@ -105,8 +115,11 @@ export default function NotificationsAdmin() {
   }, [currentPage, itemsPerPage, searchTerm])
 
   async function loadTemplates() {
-    const templates = await fetchApi<NotificationTemplate[]>('/api/admin/notification-templates').catch(() => [])
-    if (Array.isArray(templates)) {
+    const { data: templates, error } = await secureApiRequest<NotificationTemplate[]>('/api/admin/notification-templates')
+    if (error) {
+      console.error('Error loading templates:', error)
+      setTemplates([])
+    } else if (Array.isArray(templates)) {
       setTemplates(templates)
     }
   }
@@ -134,43 +147,126 @@ export default function NotificationsAdmin() {
     return () => clearTimeout(timeoutId)
   }, [searchTerm, loadNotifications])
 
-  async function save() {
-    if (!form.recipientEmail.trim() || !form.subject.trim()) return
+  // Fonction de validation
+  const validateForm = async () => {
+    const newErrors: Record<string, string> = {}
     
-    const payload = {
-      ...form,
-      maxRetries: parseInt(form.maxRetries) || 3
+    // Validation de l'email destinataire (obligatoire)
+    if (!form.recipientEmail.trim()) {
+      newErrors.recipientEmail = 'L\'adresse email du destinataire est obligatoire'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.recipientEmail)) {
+      newErrors.recipientEmail = 'Format d\'email invalide'
     }
     
-    const method = form.id ? 'PUT' : 'POST'
-    const url = form.id ? `/api/admin/notifications/${form.id}` : '/api/admin/notifications'
+    // Validation du nom destinataire (longueur si renseigné)
+    if (form.recipientName && form.recipientName.length < 2) {
+      newErrors.recipientName = 'Le nom doit contenir au moins 2 caractères'
+    }
     
-    await fetchApi(url, {
-      method,
-      body: JSON.stringify(payload)
-    }).catch(console.error)
+    // Validation du sujet (obligatoire)
+    if (!form.subject.trim()) {
+      newErrors.subject = 'Le sujet de la notification est obligatoire'
+    } else if (form.subject.length < 5) {
+      newErrors.subject = 'Le sujet doit contenir au moins 5 caractères'
+    }
     
-    setOpen(false)
-    resetForm()
-    loadNotifications(currentPage)
+    // Validation du corps HTML (obligatoire)
+    if (!form.htmlBody.trim()) {
+      newErrors.htmlBody = 'Le contenu HTML est obligatoire'
+    } else if (form.htmlBody.length < 10) {
+      newErrors.htmlBody = 'Le contenu HTML doit contenir au moins 10 caractères'
+    }
+    
+    // Validation du nombre de tentatives max
+    const maxRetries = parseInt(form.maxRetries)
+    if (isNaN(maxRetries) || maxRetries < 1 || maxRetries > 10) {
+      newErrors.maxRetries = 'Le nombre de tentatives doit être entre 1 et 10'
+    }
+    
+    // Vérification d'unicité de l'email (pour éviter les doublons récents)
+    if (!form.id && form.recipientEmail && form.subject && !newErrors.recipientEmail) {
+      const { data: response, error } = await secureApiRequest(`/api/admin/notifications/check-duplicate?email=${encodeURIComponent(form.recipientEmail.trim())}&subject=${encodeURIComponent(form.subject.trim())}`)
+      if (error) {
+        console.warn('Erreur lors de la vérification de doublon:', error)
+      } else if (response && response.exists) {
+        newErrors.recipientEmail = 'Une notification avec ce destinataire et ce sujet existe déjà récemment'
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  async function save() {
+    setIsSubmitting(true)
+    
+    try {
+      // Validation du formulaire
+      const isValid = await validateForm()
+      if (!isValid) {
+        setIsSubmitting(false)
+        return
+      }
+      
+      const payload = {
+        ...form,
+        recipientEmail: form.recipientEmail.trim(),
+        recipientName: form.recipientName?.trim() || undefined,
+        subject: form.subject.trim(),
+        htmlBody: form.htmlBody.trim(),
+        textBody: form.textBody?.trim() || undefined,
+        maxRetries: parseInt(form.maxRetries) || 3,
+        templateId: form.templateId === 'NONE' ? null : form.templateId
+      }
+      
+      const method = form.id ? 'PUT' : 'POST'
+      const url = form.id ? `/api/admin/notifications/${form.id}` : '/api/admin/notifications'
+      
+      const { error } = await secureApiRequest(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      
+      if (error) {
+        throw new Error('Error saving notification')
+      }
+      
+      setOpen(false)
+      resetForm()
+      loadNotifications(currentPage)
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error)
+      setErrors({ submit: 'Erreur lors de la sauvegarde. Veuillez réessayer.' })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   async function deleteItem(id: string) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette notification ?')) return
     
-    await fetchApi(`/api/admin/notifications/${id}`, {
+    const { error } = await secureApiRequest(`/api/admin/notifications/${id}`, {
       method: 'DELETE'
-    }).catch(console.error)
+    })
     
-    loadNotifications(currentPage)
+    if (error) {
+      console.error('Error deleting notification:', error)
+    } else {
+      loadNotifications(currentPage)
+    }
   }
 
   async function retryNotification(id: string) {
-    await fetchApi(`/api/admin/notifications/${id}/retry`, {
+    const { error } = await secureApiRequest(`/api/admin/notifications/${id}/retry`, {
       method: 'POST'
-    }).catch(console.error)
+    })
     
-    loadNotifications(currentPage)
+    if (error) {
+      console.error('Error retrying notification:', error)
+    } else {
+      loadNotifications(currentPage)
+    }
   }
 
   function resetForm() {
@@ -183,8 +279,9 @@ export default function NotificationsAdmin() {
       textBody: '',
       status: 'PENDING',
       maxRetries: '3',
-      templateId: ''
+      templateId: 'NONE'
     })
+    setErrors({})
   }
 
   function openEdit(item: Notification) {
@@ -223,6 +320,15 @@ export default function NotificationsAdmin() {
     resetForm()
     setViewMode(false)
     setOpen(true)
+  }
+  
+  const handleFormChange = (field: keyof NotificationForm, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    
+    // Effacer l'erreur pour ce champ lors de la saisie
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }))
+    }
   }
 
   function getStatusBadge(status: string) {
@@ -352,16 +458,25 @@ export default function NotificationsAdmin() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {errors.submit && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+                {errors.submit}
+              </div>
+            )}
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="recipientEmail">Email destinataire *</Label>
                 <Input
                   id="recipientEmail"
+                  type="email"
                   value={form.recipientEmail}
-                  onChange={(e) => setForm({ ...form, recipientEmail: e.target.value })}
+                  onChange={(e) => handleFormChange('recipientEmail', e.target.value)}
                   placeholder="destinataire@example.com"
                   disabled={viewMode}
+                  className={errors.recipientEmail ? 'border-red-500' : ''}
                 />
+                {errors.recipientEmail && <span className="text-red-500 text-sm mt-1">{errors.recipientEmail}</span>}
               </div>
 
               <div>
@@ -369,22 +484,26 @@ export default function NotificationsAdmin() {
                 <Input
                   id="recipientName"
                   value={form.recipientName}
-                  onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
-                  placeholder="Nom du destinataire"
+                  onChange={(e) => handleFormChange('recipientName', e.target.value)}
+                  placeholder="Nom du destinataire (optionnel)"
                   disabled={viewMode}
+                  className={errors.recipientName ? 'border-red-500' : ''}
                 />
+                {errors.recipientName && <span className="text-red-500 text-sm mt-1">{errors.recipientName}</span>}
               </div>
             </div>
 
             <div>
-              <Label htmlFor="subject">Sujet *</Label>
+              <Label htmlFor="subject">Sujet de la notification *</Label>
               <Input
                 id="subject"
                 value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                placeholder="Sujet de l'email"
+                onChange={(e) => handleFormChange('subject', e.target.value)}
+                placeholder="Sujet de l'email (minimum 5 caractères)"
                 disabled={viewMode}
+                className={errors.subject ? 'border-red-500' : ''}
               />
+              {errors.subject && <span className="text-red-500 text-sm mt-1">{errors.subject}</span>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -409,16 +528,19 @@ export default function NotificationsAdmin() {
               </div>
 
               <div>
-                <Label htmlFor="maxRetries">Tentatives max</Label>
+                <Label htmlFor="maxRetries">Nombre de tentatives maximum *</Label>
                 <Input
                   id="maxRetries"
                   type="number"
                   min="1"
                   max="10"
                   value={form.maxRetries}
-                  onChange={(e) => setForm({ ...form, maxRetries: e.target.value })}
+                  onChange={(e) => handleFormChange('maxRetries', e.target.value)}
                   disabled={viewMode}
+                  className={errors.maxRetries ? 'border-red-500' : ''}
+                  placeholder="Ex: 3"
                 />
+                {errors.maxRetries && <span className="text-red-500 text-sm mt-1">{errors.maxRetries}</span>}
               </div>
             </div>
 
@@ -434,7 +556,7 @@ export default function NotificationsAdmin() {
                     <SelectValue placeholder="Sélectionner un template" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun template</SelectItem>
+                    <SelectItem value="NONE">Aucun template</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
@@ -446,38 +568,53 @@ export default function NotificationsAdmin() {
             )}
 
             <div>
-              <Label htmlFor="textBody">Corps (texte)</Label>
+              <Label htmlFor="textBody">Version texte (optionnel)</Label>
               <textarea
                 id="textBody"
                 className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={form.textBody}
-                onChange={(e) => setForm({ ...form, textBody: e.target.value })}
-                placeholder="Version texte de l'email"
+                onChange={(e) => handleFormChange('textBody', e.target.value)}
+                placeholder="Version texte de l'email pour les clients ne supportant pas le HTML"
                 rows={4}
                 disabled={viewMode}
               />
             </div>
 
             <div>
-              <Label htmlFor="htmlBody">Corps (HTML) *</Label>
+              <Label htmlFor="htmlBody">Contenu HTML de la notification *</Label>
               <textarea
                 id="htmlBody"
-                className="w-full min-h-[200px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full min-h-[200px] px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.htmlBody ? 'border-red-500' : 'border-gray-300'}`}
                 value={form.htmlBody}
-                onChange={(e) => setForm({ ...form, htmlBody: e.target.value })}
-                placeholder="<html><body>Contenu HTML de l'email</body></html>"
+                onChange={(e) => handleFormChange('htmlBody', e.target.value)}
+                placeholder="<html><body><h1>Titre</h1><p>Contenu HTML de votre notification...</p></body></html>"
                 rows={8}
                 disabled={viewMode}
               />
+              {errors.htmlBody && <span className="text-red-500 text-sm mt-1">{errors.htmlBody}</span>}
+              <p className="text-xs text-gray-500 mt-1">
+                Utilisez du HTML valide pour le contenu de votre email
+              </p>
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false)
+                  setErrors({})
+                }}
+                disabled={isSubmitting}
+              >
                 {viewMode ? 'Fermer' : 'Annuler'}
               </Button>
               {!viewMode && (
-                <Button onClick={save} className="header-red text-white">
-                  {form.id ? 'Modifier' : 'Créer'}
+                <Button 
+                  onClick={save} 
+                  className="header-red text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Enregistrement...' : (form.id ? 'Modifier' : 'Créer')}
                 </Button>
               )}
             </div>

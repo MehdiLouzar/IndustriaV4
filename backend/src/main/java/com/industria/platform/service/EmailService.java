@@ -6,23 +6,32 @@ import com.industria.platform.entity.AppointmentStatus;
 import com.industria.platform.entity.User;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
+/**
+ * Service de gestion des emails.
+ * 
+ * Ce service gère l'envoi d'emails de confirmation, notification et mise à jour
+ * pour les demandes de contact et rendez-vous de la plateforme.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class EmailService {
-    
-    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
     
     private final JavaMailSender mailSender;
     
@@ -31,10 +40,6 @@ public class EmailService {
     
     @Value("${app.email.admin:admin@industria.ma}")
     private String adminEmail;
-
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
 
     public void sendContactConfirmationEmail(ContactRequest request) {
         try {
@@ -49,10 +54,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            logger.info("Email de confirmation envoyé à: {}", request.getContactEmail());
+            log.info("Email de confirmation envoyé à: {}", request.getContactEmail());
             
         } catch (MessagingException | MailException e) {
-            logger.error("Erreur lors de l'envoi de l'email de confirmation à {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de confirmation à {}: {}", 
                         request.getContactEmail(), e.getMessage());
         }
     }
@@ -70,10 +75,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            logger.info("Email de notification admin envoyé pour la demande: {}", request.getId());
+            log.info("Email de notification admin envoyé pour la demande: {}", request.getId());
             
         } catch (MessagingException | MailException e) {
-            logger.error("Erreur lors de l'envoi de l'email admin pour la demande {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email admin pour la demande {}: {}", 
                         request.getId(), e.getMessage());
         }
     }
@@ -177,17 +182,17 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            logger.info("Email de confirmation de RDV envoyé à: {}", appointment.getContactEmail());
+            log.info("Email de confirmation de RDV envoyé à: {}", appointment.getContactEmail());
             
         } catch (MessagingException | MailException e) {
-            logger.error("Erreur lors de l'envoi de l'email de confirmation RDV à {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de confirmation RDV à {}: {}", 
                         appointment.getContactEmail(), e.getMessage());
         }
     }
 
     public void sendAppointmentNotificationToZoneManager(Appointment appointment, User zoneManager) {
         if (zoneManager == null || zoneManager.getEmail() == null) {
-            logger.warn("Aucun responsable de zone trouvé ou email manquant pour la notification RDV: {}", appointment.getId());
+            log.warn("Aucun responsable de zone trouvé ou email manquant pour la notification RDV: {}", appointment.getId());
             return;
         }
 
@@ -204,10 +209,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            logger.info("Email de notification RDV envoyé au responsable: {}", zoneManager.getEmail());
+            log.info("Email de notification RDV envoyé au responsable: {}", zoneManager.getEmail());
             
         } catch (MessagingException | MailException e) {
-            logger.error("Erreur lors de l'envoi de l'email de notification RDV au responsable {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de notification RDV au responsable {}: {}", 
                         zoneManager.getEmail(), e.getMessage());
         }
     }
@@ -225,10 +230,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            logger.info("Email de mise à jour de statut RDV envoyé à: {}", appointment.getContactEmail());
+            log.info("Email de mise à jour de statut RDV envoyé à: {}", appointment.getContactEmail());
             
         } catch (MessagingException | MailException e) {
-            logger.error("Erreur lors de l'envoi de l'email de mise à jour RDV à {}: {}", 
+            log.error("Erreur lors de l'envoi de l'email de mise à jour RDV à {}: {}", 
                         appointment.getContactEmail(), e.getMessage());
         }
     }

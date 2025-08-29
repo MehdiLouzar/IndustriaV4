@@ -1,3 +1,26 @@
+/**
+ * Composant HomeMapView - Carte interactive avancée pour la page d'accueil
+ * 
+ * Carte interactive sophistiquée affichant les zones industrielles avec :
+ * - Polygones de zones avec remplissage selon le statut
+ * - Marqueurs clusterés avec popups détaillées
+ * - Couches de transport (aéroports, ports, gares)
+ * - Icônes dynamiques pour activités et équipements
+ * - Actions rapides (appel, visite, détail)
+ * - Optimisations de performance avec mémorisation
+ * 
+ * Intègre :
+ * - Leaflet pour la cartographie
+ * - Clustering intelligent des marqueurs
+ * - Géométries vectorielles (polygones)
+ * - API publique pour les données
+ * - Styles CSS personnalisés
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client'
 
 import React, {
@@ -15,6 +38,7 @@ import {
   Marker,
   Popup,
   Polygon,
+  useMap,
   type LatLngTuple,
 } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-markercluster'
@@ -24,19 +48,91 @@ import '@/styles/map.css'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye } from 'lucide-react'
+import { TrainFront, Ship, Plane, MapPin, Building2, Grid3X3, Ruler, DollarSign, MapPinned, Factory, Phone, Eye, Zap, Wifi, Car, Wrench, Cpu, Settings, Shield, Droplets, Droplet, Coffee, Truck, Users, Package, Globe, Cog, Gauge, Settings2, Power, Battery, Monitor, Server, Database, HardDrive, Briefcase, Home, Shirt, Pill } from 'lucide-react'
 import type { FeatureCollection } from 'geojson'
 
 import DynamicIcon from '@/components/DynamicIcon'
 import { Button } from '@/components/ui/button'
-import { fetchPublicApi } from '@/lib/publicApi'
+import { fetchPublicApi } from '@/lib/utils'
+import { useOverpassPOI, type OverpassPOI } from '@/hooks/useOverpassPOI'
 
 L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl })
 
 /*************************
- *  Types & Constants    *
+ *  Types & Constantes   *
  *************************/
 
+/**
+ * Composant de légende intégré à la carte
+ */
+function MapLegend() {
+  const map = useMap()
+
+  useEffect(() => {
+    const legend = L.control({ position: 'bottomleft' })
+
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'leaflet-control-legend')
+      div.style.backgroundColor = 'white'
+      div.style.padding = '12px'
+      div.style.borderRadius = '8px'
+      div.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+      div.style.border = '1px solid #e5e7eb'
+      div.style.maxWidth = '200px'
+      div.style.fontSize = '12px'
+      
+      // Créer les icônes SVG avec renderToStaticMarkup
+      const factoryIcon = renderToStaticMarkup(<Factory width={10} height={10} stroke="white" />)
+      const shipIcon = renderToStaticMarkup(<Ship width={10} height={10} stroke="white" />)
+      const planeIcon = renderToStaticMarkup(<Plane width={10} height={10} stroke="white" />)
+      const trainIcon = renderToStaticMarkup(<TrainFront width={10} height={10} stroke="white" />)
+      
+      div.innerHTML = `
+        <h4 style="font-weight: 600; color: #374151; margin: 0 0 8px 0;">Légende</h4>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #d4a574; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${factoryIcon}
+            </div>
+            <span style="color: #4b5563;">Zones industrielles</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #3b82f6; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${shipIcon}
+            </div>
+            <span style="color: #4b5563;">Ports</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${planeIcon}
+            </div>
+            <span style="color: #4b5563;">Aéroports</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #f97316; border-radius: 50%; border: 1px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+              ${trainIcon}
+            </div>
+            <span style="color: #4b5563;">Gares</span>
+          </div>
+        </div>
+      `
+
+      return div
+    }
+
+    legend.addTo(map)
+
+    return () => {
+      legend.remove()
+    }
+  }, [map])
+
+  return null
+}
+
+/**
+ * Représentation d'une zone avec géométrie
+ */
 type ZoneFeature = {
   polygon: [number, number][]
   centroid: [number, number]
@@ -80,23 +176,98 @@ type Poi = {
 }
 
 const DEMO_POIS: readonly Poi[] = [
+  // AÉROPORTS PRINCIPAUX
+  {
+    id: 'casa-airport',
+    coordinates: [33.3665, -7.5897],
+    type: 'airport',
+    name: 'Aéroport Mohammed V Casablanca',
+  },
+  {
+    id: 'marrakech-airport',
+    coordinates: [31.6056, -8.0361],
+    type: 'airport',
+    name: 'Aéroport Marrakech Menara',
+  },
+  {
+    id: 'rabat-airport',
+    coordinates: [34.0515, -6.7562],
+    type: 'airport',
+    name: 'Aéroport Rabat-Salé',
+  },
+  {
+    id: 'fes-airport',
+    coordinates: [33.9273, -4.9778],
+    type: 'airport',
+    name: 'Aéroport Fès-Saïs',
+  },
+  {
+    id: 'agadir-airport',
+    coordinates: [30.3755, -9.5464],
+    type: 'airport',
+    name: 'Aéroport Agadir Al Massira',
+  },
+  {
+    id: 'tanger-airport',
+    coordinates: [35.7269, -5.9167],
+    type: 'airport',
+    name: 'Aéroport Tanger Ibn Battouta',
+  },
+  {
+    id: 'oujda-airport',
+    coordinates: [34.7872, -1.9239],
+    type: 'airport',
+    name: 'Aéroport Oujda Angads',
+  },
+  {
+    id: 'tetouan-airport',
+    coordinates: [35.5944, -5.3203],
+    type: 'airport',
+    name: 'Aéroport Tétouan Sania Ramel',
+  },
+  {
+    id: 'nador-airport',
+    coordinates: [34.9889, -3.0289],
+    type: 'airport',
+    name: 'Aéroport Nador Al Aroui',
+  },
+  {
+    id: 'ouarzazate-airport',
+    coordinates: [30.9392, -6.9094],
+    type: 'airport',
+    name: 'Aéroport Ouarzazate',
+  },
+  {
+    id: 'essaouira-airport',
+    coordinates: [31.3975, -9.6817],
+    type: 'airport',
+    name: 'Aéroport Essaouira Mogador',
+  },
+  {
+    id: 'errachidia-airport',
+    coordinates: [31.9472, -4.3983],
+    type: 'airport',
+    name: 'Aéroport Errachidia Moulay Ali Cherif',
+  },
+  {
+    id: 'laayoune-airport',
+    coordinates: [27.1517, -13.2128],
+    type: 'airport',
+    name: 'Aéroport Laâyoune Hassan 1er',
+  },
+  {
+    id: 'dakhla-airport',
+    coordinates: [23.7183, -15.9322],
+    type: 'airport',
+    name: 'Aéroport Dakhla',
+  },
+
+  // PORTS PRINCIPAUX
   {
     id: 'casa-port',
     coordinates: [33.6022, -7.6324],
     type: 'port',
     name: 'Port de Casablanca',
-  },
-  {
-    id: 'casa-airport',
-    coordinates: [33.3665, -7.5897],
-    type: 'airport',
-    name: 'Aéroport Mohammed V',
-  },
-  {
-    id: 'rabat-station',
-    coordinates: [34.0209, -6.8417],
-    type: 'station',
-    name: 'Gare de Rabat',
   },
   {
     id: 'tanger-port',
@@ -105,16 +276,162 @@ const DEMO_POIS: readonly Poi[] = [
     name: 'Port Tanger Med',
   },
   {
-    id: 'marrakech-airport',
-    coordinates: [31.6056, -8.0361],
-    type: 'airport',
-    name: 'Aéroport Marrakech',
+    id: 'tanger-ville-port',
+    coordinates: [35.7667, -5.8167],
+    type: 'port',
+    name: 'Port de Tanger Ville',
   },
   {
     id: 'agadir-port',
     coordinates: [30.4278, -9.5981],
     type: 'port',
     name: "Port d'Agadir",
+  },
+  {
+    id: 'mohammedia-port',
+    coordinates: [33.6878, -7.3928],
+    type: 'port',
+    name: 'Port de Mohammedia',
+  },
+  {
+    id: 'kenitra-port',
+    coordinates: [34.2433, -6.6156],
+    type: 'port',
+    name: 'Port de Kénitra',
+  },
+  {
+    id: 'safi-port',
+    coordinates: [32.2994, -9.2372],
+    type: 'port',
+    name: 'Port de Safi',
+  },
+  {
+    id: 'essaouira-port',
+    coordinates: [31.5125, -9.7697],
+    type: 'port',
+    name: "Port d'Essaouira",
+  },
+  {
+    id: 'nador-port',
+    coordinates: [35.1833, -2.9333],
+    type: 'port',
+    name: 'Port de Nador West Med',
+  },
+  {
+    id: 'jorf-lasfar-port',
+    coordinates: [33.1167, -8.6333],
+    type: 'port',
+    name: 'Port de Jorf Lasfar',
+  },
+  {
+    id: 'laayoune-port',
+    coordinates: [27.1289, -13.1842],
+    type: 'port',
+    name: 'Port de Laâyoune',
+  },
+  {
+    id: 'dakhla-port',
+    coordinates: [23.7106, -15.9414],
+    type: 'port',
+    name: 'Port de Dakhla',
+  },
+
+  // GARES PRINCIPALES
+  {
+    id: 'casa-port-station',
+    coordinates: [33.6069, -7.6194],
+    type: 'station',
+    name: 'Gare Casa Port',
+  },
+  {
+    id: 'casa-voyageurs-station',
+    coordinates: [33.5906, -7.6131],
+    type: 'station',
+    name: 'Gare Casa Voyageurs',
+  },
+  {
+    id: 'rabat-ville-station',
+    coordinates: [34.0209, -6.8417],
+    type: 'station',
+    name: 'Gare Rabat Ville',
+  },
+  {
+    id: 'rabat-agdal-station',
+    coordinates: [33.9722, -6.8594],
+    type: 'station',
+    name: 'Gare Rabat Agdal',
+  },
+  {
+    id: 'sale-station',
+    coordinates: [34.0531, -6.7944],
+    type: 'station',
+    name: 'Gare Salé',
+  },
+  {
+    id: 'kenitra-station',
+    coordinates: [34.2617, -6.5711],
+    type: 'station',
+    name: 'Gare Kénitra',
+  },
+  {
+    id: 'tanger-ville-station',
+    coordinates: [35.7756, -5.8114],
+    type: 'station',
+    name: 'Gare Tanger Ville',
+  },
+  {
+    id: 'fes-station',
+    coordinates: [34.0958, -5.0022],
+    type: 'station',
+    name: 'Gare Fès',
+  },
+  {
+    id: 'meknes-station',
+    coordinates: [33.8828, -5.5572],
+    type: 'station',
+    name: 'Gare Meknès',
+  },
+  {
+    id: 'oujda-station',
+    coordinates: [34.6889, -1.9089],
+    type: 'station',
+    name: 'Gare Oujda',
+  },
+  {
+    id: 'marrakech-station',
+    coordinates: [31.6294, -7.9925],
+    type: 'station',
+    name: 'Gare Marrakech',
+  },
+  {
+    id: 'settat-station',
+    coordinates: [33.0014, -7.6161],
+    type: 'station',
+    name: 'Gare Settat',
+  },
+  {
+    id: 'benguerir-station',
+    coordinates: [32.2356, -7.9547],
+    type: 'station',
+    name: 'Gare Benguerir',
+  },
+  {
+    id: 'mohammedia-station',
+    coordinates: [33.6881, -7.3831],
+    type: 'station',
+    name: 'Gare Mohammedia',
+  },
+  {
+    id: 'temara-station',
+    coordinates: [33.9289, -6.9075],
+    type: 'station',
+    name: 'Gare Témara',
+  },
+  {
+    id: 'skhirate-station',
+    coordinates: [33.8494, -7.0356],
+    type: 'station',
+    name: 'Gare Skhirate',
   },
 ]
 
@@ -198,18 +515,64 @@ const FALLBACK_ZONES: ZoneFeature[] = [
  *  Composants carte  *
  *********************/
 
-export default function HomeMapView() {
+interface HomeMapViewProps {
+  searchFilters?: any;
+  hasSearchFilters?: boolean;
+}
+
+export default function HomeMapView({ searchFilters, hasSearchFilters }: HomeMapViewProps) {
+  console.log('🏗️ COMPOSANT HomeMapView MONTE/RE-RENDER avec hasSearchFilters:', hasSearchFilters)
+  
   /** ÉTAT */
   const [zones, setZones] = useState<ZoneFeature[]>([])
-  const [pois] = useState<Poi[]>(DEMO_POIS)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
+  const [mapBounds, setMapBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null)
 
   /** RÉFÉRENCES */
   const mapRef = useRef<L.Map | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const zoneCache = useRef<Map<number, ZoneFeature[]>>(new Map())
   const lastLoad = useRef(0)
+  
+  /** HOOK POI DYNAMIQUE */
+  const { pois: overpassPois, loading: poisLoading, error: poisError } = useOverpassPOI(mapBounds, true)
+  
+  /** POI COMBINÉS (fallback + dynamiques) */
+  const allPois = useMemo(() => {
+    const fallbackPois = DEMO_POIS.map(poi => ({
+      ...poi,
+      source: 'fallback' as const
+    }));
+    
+    const dynamicPois = overpassPois.map(poi => ({
+      id: poi.id,
+      coordinates: poi.coordinates,
+      type: poi.type,
+      name: poi.name,
+      source: 'overpass' as const
+    }));
+    
+    // Combiner les deux listes en évitant les doublons proches (même nom dans un rayon de 1km)
+    const combined = [...fallbackPois];
+    
+    dynamicPois.forEach(dynamicPoi => {
+      const isDuplicate = fallbackPois.some(fallbackPoi => {
+        const distance = Math.sqrt(
+          Math.pow(dynamicPoi.coordinates[0] - fallbackPoi.coordinates[0], 2) +
+          Math.pow(dynamicPoi.coordinates[1] - fallbackPoi.coordinates[1], 2)
+        );
+        return distance < 0.01 && // ~1km
+               dynamicPoi.name.toLowerCase().includes(fallbackPoi.name.toLowerCase().split(' ')[0]);
+      });
+      
+      if (!isDuplicate) {
+        combined.push(dynamicPoi);
+      }
+    });
+    
+    return combined;
+  }, [overpassPois])
   
   /** CONSTANTES DE CACHE */
   const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
@@ -219,46 +582,47 @@ export default function HomeMapView() {
     return {
       station: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-olive-light p-1 rounded-full border-2 border-white shadow-lg">
-            <TrainFront width={14} height={14} stroke="white" />
+          <div className="bg-orange-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
+            <TrainFront width={12} height={12} stroke="white" />
           </div>,
         ),
         className: '',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
       }),
       port: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-black p-1 rounded-full border-2 border-white shadow-lg">
-            <Ship width={14} height={14} stroke="white" />
+          <div className="bg-blue-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
+            <Ship width={12} height={12} stroke="white" />
           </div>,
         ),
         className: '',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
       }),
       airport: L.divIcon({
         html: renderToStaticMarkup(
-          <div className="bg-industria-yellow-gold p-1 rounded-full border-2 border-white shadow-lg">
-            <Plane width={14} height={14} stroke="white" />
+          <div className="bg-green-500 rounded-full border-2 border-white shadow-md opacity-80 w-5 h-5 flex items-center justify-center">
+            <Plane width={12} height={12} stroke="white" />
           </div>,
         ),
         className: '',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
       }),
       // Icône pour le centre d'une zone (pin plus grand avec icône)
       zone: L.divIcon({
         html: renderToStaticMarkup(
           <div className="relative">
-            <div className="w-7 h-7 rounded-full bg-industria-brown-gold border-2 border-white shadow-lg flex items-center justify-center">
-              <MapPin width={16} height={16} stroke="white" fill="white" />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-industria-brown-gold to-industria-olive-light border-3 border-white shadow-xl flex items-center justify-center ring-2 ring-industria-brown-gold ring-opacity-30">
+              <Factory width={20} height={20} stroke="white" fill="white" />
             </div>
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-industria-brown-gold rounded-full border border-white shadow-lg"></div>
           </div>
         ),
         className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        iconSize: [48, 54],
+        iconAnchor: [24, 48],
       }),
     } as const
   }, [])
@@ -354,7 +718,58 @@ export default function HomeMapView() {
                 )}
               </div>
 
-              {/* 8. Prix (s'il est fourni) */}
+              {/* 8. Activités et équipements avec icônes */}
+              {(zone.properties.activityIcons.length > 0 || zone.properties.amenityIcons.length > 0) && (
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  {/* Activités */}
+                  {zone.properties.activityIcons.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-1">Activités</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {zone.properties.activityIcons.slice(0, 3).map((iconName, i) => {
+                          const IconComponent = getLucideIcon(iconName)
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full text-xs border border-blue-200">
+                              <IconComponent className="w-3 h-3" />
+                              <span>Activité {i + 1}</span>
+                            </span>
+                          )
+                        })}
+                        {zone.properties.activityIcons.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                            +{zone.properties.activityIcons.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Équipements */}
+                  {zone.properties.amenityIcons.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-gray-800 uppercase tracking-wide mb-1">Équipements</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {zone.properties.amenityIcons.slice(0, 3).map((iconName, i) => {
+                          const IconComponent = getLucideIcon(iconName)
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs border border-green-200">
+                              <IconComponent className="w-3 h-3" />
+                              <span>Équipement {i + 1}</span>
+                            </span>
+                          )
+                        })}
+                        {zone.properties.amenityIcons.length > 3 && (
+                          <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs border border-gray-200">
+                            +{zone.properties.amenityIcons.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 9. Prix (s'il est fourni) */}
               {zone.properties.price && (
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2">
@@ -364,7 +779,7 @@ export default function HomeMapView() {
                 </div>
               )}
 
-              {/* 9. Boutons d'action */}
+              {/* 10. Boutons d'action */}
               <div className="flex gap-2 pt-2">
                 {zone.properties.id.startsWith('demo-') ||
                 zone.properties.id.startsWith('fallback-') ? (
@@ -403,13 +818,16 @@ export default function HomeMapView() {
   })
 
   /** Marqueur d'un POI (port, gare, aéroport) */
-  const PoiMarker = React.memo(function PoiMarker({ poi }: { poi: Poi }) {
+  const PoiMarker = React.memo(function PoiMarker({ poi }: { poi: (Poi & { source?: string }) | (OverpassPOI & { source?: string }) }) {
     return (
       <Marker position={poi.coordinates} icon={ICONS[poi.type]}>
         <Popup>
           <div className="text-center space-y-1 p-1">
             <div className="font-semibold text-sm">{TYPE_LABELS[poi.type]}</div>
             <div className="text-xs text-gray-600">{poi.name}</div>
+            {poi.source === 'overpass' && (
+              <div className="text-xs text-blue-500 mt-1">📍 OpenStreetMap</div>
+            )}
           </div>
         </Popup>
       </Marker>
@@ -420,8 +838,12 @@ export default function HomeMapView() {
 //  Data loading (LOD + WebWorker)
 // ————————————————————————————————————————————————————————
 const loadZones = useCallback(async (precision: number, force = false) => {
-  // Simple time-based cache
-  if (!force && Date.now() - lastLoad.current < CACHE_DURATION) {
+  console.log('⚡ loadZones APPELÉ avec precision:', precision, 'force:', force, 'hasSearchFilters:', hasSearchFiltersRef.current)
+  
+  // Ne pas utiliser le cache si on a des filtres de recherche
+  const useCache = !hasSearchFiltersRef.current && !force && Date.now() - lastLoad.current < CACHE_DURATION;
+  
+  if (useCache) {
     const cached = zoneCache.current.get(precision);
     if (cached) {
       setZones(cached);
@@ -445,8 +867,28 @@ const loadZones = useCallback(async (precision: number, force = false) => {
       }
     }, 8000); // 8 seconds timeout
 
+    // Construire l'URL avec les filtres de recherche
+    let apiUrl = `/api/map/zones/simplified?zoom=${precision}`;
+    
+    if (hasSearchFiltersRef.current && searchFiltersRef.current) {
+      const params = new URLSearchParams();
+      const filters = searchFiltersRef.current;
+      if (filters.regionId) params.append('regionId', filters.regionId);
+      if (filters.zoneTypeId) params.append('zoneTypeId', filters.zoneTypeId);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.minArea) params.append('minArea', filters.minArea);
+      if (filters.maxArea) params.append('maxArea', filters.maxArea);
+      if (filters.minPrice) params.append('minPrice', filters.minPrice);
+      if (filters.maxPrice) params.append('maxPrice', filters.maxPrice);
+      
+      const paramString = params.toString();
+      if (paramString) {
+        apiUrl += '&' + paramString;
+      }
+    }
+
     const resp = await fetchPublicApi<{ features: ZoneFeatureResp[] }>(
-      `/api/map/zones/simplified?zoom=${precision}`,
+      apiUrl,
       { signal: abortControllerRef.current.signal }
     );
     
@@ -479,8 +921,14 @@ const loadZones = useCallback(async (precision: number, force = false) => {
         }
       })
     }
-    zoneCache.current.set(precision, data)
-    setZones(data.length ? data : FALLBACK_ZONES)
+    
+    // Seulement mettre en cache si pas de filtres
+    if (!hasSearchFiltersRef.current) {
+      zoneCache.current.set(precision, data)
+    }
+    
+    console.log(`📊 setZones appelé avec ${data.length} zones:`, data.map(z => z.properties.id))
+    setZones(data) // Utiliser les données de l'API même si vides
     lastLoad.current = Date.now()
   } catch (err) {
     // Ignorer seulement les erreurs d'annulation explicites
@@ -500,12 +948,30 @@ const loadZones = useCallback(async (precision: number, force = false) => {
   } finally {
     setLoading(false);
   }
-}, [])
+}, []) // Pas de dépendances car utilise des refs
 
-  // Chargement initial des zones simplifié
+  // Refs pour les searchFilters et hasSearchFilters actuels
+  const searchFiltersRef = useRef(searchFilters);
+  const hasSearchFiltersRef = useRef(hasSearchFilters);
+  searchFiltersRef.current = searchFilters;
+  hasSearchFiltersRef.current = hasSearchFilters;
+
+  // Chargement initial des zones
   useEffect(() => {
-    loadZones(10) // Chargement unique au montage
-  }, [loadZones])
+    console.log('🚀 useEffect INITIAL - loadZones(10, false)')
+    loadZones(10, false)
+  }, []) // Une seule fois au montage
+
+  // Rechargement quand les filtres changent
+  useEffect(() => {
+    console.log('🔄 useEffect FILTERS - hasSearchFilters:', hasSearchFilters, 'loadZones(10, true)')
+    loadZones(10, true) // Force le rechargement
+  }, [hasSearchFilters]) // Seulement quand hasSearchFilters change
+
+  // Générer une clé unique basée sur les zones actuelles
+  const zonesKey = useMemo(() => {
+    return `${zones.length}-${zones.map(z => z.properties.id).sort().join(',').slice(0, 50)}`
+  }, [zones])
 
   // Nettoyage des AbortController au démontage
   useEffect(() => {
@@ -516,17 +982,93 @@ const loadZones = useCallback(async (precision: number, force = false) => {
     }
   }, [])
 
+  // Fonction pour obtenir l'icône Lucide React appropriée
+  const getLucideIcon = (iconName?: string) => {
+    if (!iconName) return Factory
+    
+    const iconMap: { [key: string]: any } = {
+      // Électricité et énergie
+      'Zap': Zap,
+      'Power': Power,
+      'Battery': Battery,
+      'Lightbulb': Zap,
+      'Sun': Power,
+      'Flame': Zap,
+      
+      // Internet et communication
+      'Wifi': Wifi,
+      'Globe': Globe,
+      'Mail': Globe,
+      'Server': Server,
+      'Database': Database,
+      'HardDrive': HardDrive,
+      'Monitor': Monitor,
+      
+      // Transport et parking
+      'Car': Car,
+      'Truck': Truck,
+      'Plane': Plane,
+      'ParkingCircle': Car,
+      
+      // Bâtiments et infrastructure
+      'Building': Building2,
+      'Factory': Factory,
+      'Home': Home,
+      'Briefcase': Briefcase,
+      'Hospital': Building2,
+      'CreditCard': Package,
+      
+      // Technologie et outils
+      'Cpu': Cpu,
+      'Wrench': Wrench,
+      'Settings': Settings,
+      'Cog': Settings,
+      'Gauge': Gauge,
+      'Settings2': Settings2,
+      
+      // Sécurité et services
+      'Shield': Shield,
+      'shield': Shield,
+      'Droplets': Droplets,
+      'droplet': Droplet,
+      'droplets': Droplets,
+      'Coffee': Coffee,
+      'Users': Users,
+      'Package': Package,
+      'package': Package,
+      'UtensilsCrossed': Coffee,
+      
+      // Icônes spécifiques de la base
+      'car': Car,
+      'zap': Zap,
+      'wifi': Wifi,
+      'shirt': Shirt,
+      'pill': Pill,
+      
+      // Icônes génériques
+      'MapPin': MapPin,
+      'Ruler': Ruler,
+      'Phone': Phone,
+      'Eye': Eye,
+      'Grid3X3': Grid3X3
+    }
+    
+    return iconMap[iconName] || Factory
+  }
+
   return (
     <div className="w-full h-full relative">
-      {loading && (
+      {(loading || poisLoading) && (
         <div className="absolute top-4 right-4 z-50 bg-industria-brown-gold text-white px-3 py-1 rounded-md shadow-lg">
-          Chargement des zones...
+          {loading && poisLoading ? 'Chargement zones et POI...' :
+           loading ? 'Chargement des zones...' :
+           'Chargement des centres d\'intérêt...'}
         </div>
       )}
       
-      {error && (
+      {(error || poisError) && (
         <div className="absolute top-4 right-4 z-50 bg-red-500 text-white px-3 py-1 rounded-md shadow-lg">
-          {error}
+          {error || poisError}
         </div>
       )}
 
@@ -537,6 +1079,25 @@ const loadZones = useCallback(async (precision: number, force = false) => {
         style={{ height: '100%', width: '100%' }}
         whenCreated={(mapInstance) => {
           mapRef.current = mapInstance
+          
+          // Fonction pour mettre à jour les bounds
+          const updateBounds = () => {
+            const bounds = mapInstance.getBounds();
+            setMapBounds({
+              south: bounds.getSouth(),
+              west: bounds.getWest(), 
+              north: bounds.getNorth(),
+              east: bounds.getEast()
+            });
+          };
+          
+          // Écouter les événements de déplacement/zoom
+          mapInstance.on('moveend', updateBounds);
+          mapInstance.on('zoomend', updateBounds);
+          
+          // Initialiser les bounds
+          updateBounds();
+          
           // Invalidation de taille pour s'assurer du bon rendu
           setTimeout(() => mapInstance.invalidateSize(), 100)
         }}
@@ -548,37 +1109,47 @@ const loadZones = useCallback(async (precision: number, force = false) => {
 
         {/* Affichage des zones avec clustering personnalisé */}
         <MarkerClusterGroup
+          key={zonesKey}
           iconCreateFunction={(cluster) => {
             const count = cluster.getChildCount()
             let size = 'small'
-            let bgColor = '#A79059' // industria-brown-gold
+            let bgGradient = 'from-industria-brown-gold to-industria-olive-light'
+            let ringColor = 'ring-industria-brown-gold'
             
             if (count >= 100) {
               size = 'large'
-              bgColor = '#8C6B2F'
+              bgGradient = 'from-red-600 to-red-800'
+              ringColor = 'ring-red-500'
             } else if (count >= 10) {
               size = 'medium'
-              bgColor = '#9B8B46'
+              bgGradient = 'from-orange-500 to-orange-700'
+              ringColor = 'ring-orange-400'
             }
             
             const sizeClasses = {
-              small: 'w-8 h-8 text-xs',
-              medium: 'w-10 h-10 text-sm',
-              large: 'w-12 h-12 text-base'
+              small: 'w-14 h-14 text-sm font-black',
+              medium: 'w-16 h-16 text-base font-black',
+              large: 'w-20 h-20 text-xl font-black'
             }
             
             return L.divIcon({
               html: renderToStaticMarkup(
-                <div 
-                  className={`rounded-full border-2 border-white shadow-lg flex items-center justify-center font-bold text-white ${sizeClasses[size as keyof typeof sizeClasses]}`}
-                  style={{ backgroundColor: bgColor }}
-                >
-                  {count}
+                <div className="relative">
+                  <div 
+                    className={`rounded-full border-4 border-white shadow-2xl flex items-center justify-center text-white bg-gradient-to-br ${bgGradient} ${sizeClasses[size as keyof typeof sizeClasses]} ring-4 ring-opacity-30 ${ringColor} animate-pulse`}
+                  >
+                    <div className="relative z-10">{count}</div>
+                    <div className="absolute inset-0 rounded-full bg-white opacity-20"></div>
+                  </div>
+                  {/* Petit indicateur factory */}
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-white rounded-full shadow-lg flex items-center justify-center">
+                    <Factory className="w-3 h-3 text-industria-brown-gold" />
+                  </div>
                 </div>
               ),
               className: '',
-              iconSize: size === 'large' ? [48, 48] : size === 'medium' ? [40, 40] : [32, 32],
-              iconAnchor: size === 'large' ? [24, 24] : size === 'medium' ? [20, 20] : [16, 16],
+              iconSize: size === 'large' ? [80, 80] : size === 'medium' ? [64, 64] : [56, 56],
+              iconAnchor: size === 'large' ? [40, 40] : size === 'medium' ? [32, 32] : [28, 28],
             })
           }}
           maxClusterRadius={50}
@@ -586,15 +1157,19 @@ const loadZones = useCallback(async (precision: number, force = false) => {
           showCoverageOnHover={false}
           zoomToBoundsOnClick={true}
         >
-          {zones.map((zone) => (
-            <ZoneMarker key={`home-zone-${zone.properties.id}`} zone={zone} />
-          ))}
+          {zones.map((zone, index) => {
+            console.log(`🎯 Rendu zone ${index + 1}/${zones.length}: ${zone.properties.id} - ${zone.properties.name}`)
+            return <ZoneMarker key={`home-zone-${zone.properties.id}`} zone={zone} />
+          })}
         </MarkerClusterGroup>
 
         {/* Affichage des POIs (ports, gares, aéroports) */}
-        {pois.map((poi) => (
+        {allPois.map((poi) => (
           <PoiMarker key={`home-poi-${poi.id}`} poi={poi} />
         ))}
+
+        {/* Légende intégrée à la carte */}
+        <MapLegend />
       </MapContainer>
     </div>
   )

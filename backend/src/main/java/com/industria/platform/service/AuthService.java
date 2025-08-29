@@ -1,0 +1,124 @@
+package com.industria.platform.service;
+
+import com.industria.platform.config.OidcProperties;
+import com.industria.platform.dto.LoginRequest;
+import com.industria.platform.dto.LoginResponse;
+import com.industria.platform.dto.RefreshTokenRequest;
+import com.industria.platform.dto.UserDto;
+import com.industria.platform.entity.User;
+import com.industria.platform.exception.AuthenticationException;
+import com.industria.platform.oidc.OidcTokenClient;
+import com.industria.platform.oidc.TokenResponse;
+import com.industria.platform.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final OidcTokenClient oidc;
+    private final OidcProperties props;
+    private final JwtDecoder jwtDecoder;
+    private final UserProvisioningService userProvisioningService;
+     private final ZoneRepository zoneRepository;
+
+    public LoginResponse login(LoginRequest request) {
+        try {
+            TokenResponse tr = oidc.tokenWithPassword(request.email(), request.password());
+
+            // IMPORTANT: Always use access token for authorization, never ID token
+            if (tr.accessToken() == null) {
+                throw new AuthenticationException("Réponse token invalide");
+            }
+
+            Jwt jwt = jwtDecoder.decode(tr.accessToken());
+
+            User user = userProvisioningService.upsertFromClaims(jwt.getClaims(), props.getResource());
+            Integer zoneCount = getZoneCountForUser(user);
+
+            UserDto userInfo = userProvisioningService.toUserDto(user, zoneCount);
+
+            return new LoginResponse(
+                    tr.accessToken(),
+                    tr.refreshToken(),
+                    tr.expiresIn(),
+                    tr.tokenType() != null ? tr.tokenType() : "Bearer",
+                    userInfo
+            );
+        } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+            log.warn("Login failed: bad credentials (status={})", HttpStatus.UNAUTHORIZED.value());
+            throw new AuthenticationException("Email ou mot de passe incorrect");
+        } catch (AuthenticationException e) {
+            // Re-throw our custom exceptions
+            throw e;
+        } catch (Exception e) {
+            log.error("Login error: {}", e.getMessage(), e);
+            throw new AuthenticationException("Erreur lors de l'authentification");
+        }
+    }
+
+    public LoginResponse refreshToken(RefreshTokenRequest request) {
+        try {
+            TokenResponse tr = oidc.refresh(request.refreshToken());
+
+            // IMPORTANT: Always use access token for authorization, never ID token
+            if (tr.accessToken() == null) {
+                throw new AuthenticationException("Réponse token invalide");
+            }
+
+            Jwt jwt = jwtDecoder.decode(tr.accessToken());
+
+            User user = userProvisioningService.upsertFromClaims(jwt.getClaims(), props.getResource());
+            Integer zoneCount = getZoneCountForUser(user);
+
+            UserDto userInfo = userProvisioningService.toUserDto(user, zoneCount);
+
+            return new LoginResponse(
+                    tr.accessToken(),
+                    tr.refreshToken(),
+                    tr.expiresIn(),
+                    tr.tokenType() != null ? tr.tokenType() : "Bearer",
+                    userInfo
+            );
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.warn("Refresh failed: {}", e.getStatusCode().value());
+            throw new AuthenticationException("Token invalide ou expiré");
+        } catch (AuthenticationException e) {
+            // Re-throw our custom exceptions
+            throw e;
+        } catch (Exception e) {
+            log.error("Refresh error: {}", e.getMessage(), e);
+            throw new AuthenticationException("Erreur lors du rafraîchissement");
+        }
+    }
+
+    /** Pass the REFRESH TOKEN here, not the access token. */
+    public void logout(String refreshToken) {
+        try {
+            oidc.logout(refreshToken);
+        } catch (Exception e) {
+            // Log but don't throw - logout should be best effort
+            log.info("Logout call to IdP failed: {}", e.getMessage());
+        }
+    }
+
+    /** Use this in controllers that already have a validated Jwt via Spring Security. */
+    public UserDto currentUserInfo(Jwt jwt) {
+        User user = userProvisioningService.upsertFromClaims(jwt.getClaims(), props.getResource());
+        Integer zoneCount = getZoneCountForUser(user);
+        return userProvisioningService.toUserDto(user, zoneCount);
+    }
+
+    private Integer getZoneCountForUser(User user) {
+        if (user.getRole() != null && "ZONE_MANAGER".equals(user.getRole().name())) {
+             return  zoneRepository.countByCreatedBy_Id(user.getId());
+        }
+        return null;
+    }
+}

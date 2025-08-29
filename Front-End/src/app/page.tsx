@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import SearchBar from '@/components/SearchBar';
 import dynamic from 'next/dynamic';
 import React, { useEffect, useState, Suspense } from 'react';
-import { fetchPublicApi } from '@/lib/publicApi';
+import { fetchPublicApi } from '@/lib/utils';
 import Footer from '@/components/Footer';
 import ViewToggle from '@/components/ViewToggle';
 
@@ -39,8 +39,8 @@ function SearchParamsHandler({ onFiltersChange }: { onFiltersChange: (filters: a
   const { useSearchParams } = require('next/navigation');
   const searchParams = useSearchParams();
 
-  // Extraction des filtres depuis les paramètres URL
-  const searchFilters = {
+  // Stabiliser les filtres avec useMemo pour éviter les re-renders multiples
+  const searchFilters = React.useMemo(() => ({
     regionId: searchParams.get('regionId') || '',
     zoneTypeId: searchParams.get('zoneTypeId') || '',
     status: searchParams.get('status') || '',
@@ -48,14 +48,17 @@ function SearchParamsHandler({ onFiltersChange }: { onFiltersChange: (filters: a
     maxArea: searchParams.get('maxArea') || '',
     minPrice: searchParams.get('minPrice') || '',
     maxPrice: searchParams.get('maxPrice') || '',
-  };
+  }), [searchParams.toString()]);
 
-  // Vérifier si des filtres de recherche sont actifs
-  const hasSearchFilters = Object.values(searchFilters).some(value => value !== '');
+  // Stabiliser hasSearchFilters
+  const hasSearchFilters = React.useMemo(() => 
+    Object.values(searchFilters).some(value => value !== ''), 
+    [searchFilters]
+  );
 
   React.useEffect(() => {
     onFiltersChange(searchFilters, hasSearchFilters);
-  }, [onFiltersChange, searchParams]);
+  }, [onFiltersChange, searchFilters, hasSearchFilters]);
 
   return null;
 }
@@ -73,10 +76,36 @@ export default function Home() {
   });
   const [hasSearchFilters, setHasSearchFilters] = useState(false);
 
+  // Stabiliser searchFilters avec useMemo pour éviter les re-renders multiples
+  const stableSearchFilters = React.useMemo(() => searchFilters, [
+    searchFilters.regionId,
+    searchFilters.zoneTypeId,
+    searchFilters.status,
+    searchFilters.minArea,
+    searchFilters.maxArea,
+    searchFilters.minPrice,
+    searchFilters.maxPrice,
+  ]);
+
   const handleFiltersChange = React.useCallback((filters: any, hasFilters: boolean) => {
-    setSearchFilters(filters);
-    setHasSearchFilters(hasFilters);
-    setViewMode(hasFilters ? 'grid' : 'map');
+    setSearchFilters(prevFilters => {
+      // Ne pas mettre à jour si les filtres sont identiques
+      if (JSON.stringify(prevFilters) === JSON.stringify(filters)) {
+        return prevFilters;
+      }
+      return filters;
+    });
+    
+    setHasSearchFilters(prevHas => {
+      if (prevHas === hasFilters) return prevHas;
+      return hasFilters;
+    });
+    
+    setViewMode(prevMode => {
+      const newMode = hasFilters ? 'grid' : 'map';
+      if (prevMode === newMode) return prevMode;
+      return newMode;
+    });
   }, []);
 
   // Si des filtres de recherche sont actifs, commencer en vue grille, sinon vue carte
@@ -129,45 +158,53 @@ export default function Home() {
       <Header />
 
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-industria-gray-light to-white py-16">
+      <section className="relative bg-gradient-to-br from-industria-gray-light to-white py-8">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-gray-900 mb-6">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
               {welcome || 'Bienvenue sur Industria'}
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Découvrez et réservez des zones industrielles, parcs logistiques et zones franches à travers le Maroc.
-              Votre partenaire de confiance pour l&apos;implantation industrielle.
             </p>
-            <SearchBar />
           </div>
         </div>
       </section>
 
-      {/* Map / Grid */}
-      <section className="py-16 bg-white">
+      {/* Search + Map/Grid côte à côte */}
+      <section className="py-8 bg-white min-h-screen">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between mb-12">
-            <div className="text-center md:text-left mb-6 md:mb-0">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Explorez nos zones industrielles
-              </h2>
-              <p className="text-xl text-gray-600 max-w-2xl">
-                Découvrez l&apos;emplacement de toutes nos zones industrielles et les centres d&apos;intérêt stratégiques du Maroc
-              </p>
+          <div className="grid lg:grid-cols-12 gap-6 h-full">
+            {/* Panneau de recherche - 4 colonnes */}
+            <div className="lg:col-span-4">
+              <div className="sticky top-4">
+                <SearchBar />
+              </div>
             </div>
+            
+            {/* Contenu carte/grille - 8 colonnes */}
+            <div className="lg:col-span-8">
+              <div className="flex flex-col md:flex-row items-center justify-between mb-6">
+                <div className="text-center md:text-left mb-4 md:mb-0">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Explorez nos zones industrielles
+                  </h2>
+                  <p className="text-gray-600">
+                    Découvrez l&apos;emplacement de toutes nos zones industrielles
+                  </p>
+                </div>
 
-            <ViewToggle
-              currentView={viewMode}
-              onViewChange={setViewMode}
-              className="flex-shrink-0"
-            />
-          </div>
+                <ViewToggle
+                  currentView={viewMode}
+                  onViewChange={setViewMode}
+                  className="flex-shrink-0"
+                />
+              </div>
 
-          <div className="relative">
-            {/* Keep map mounted after the first time, give it real height */}
-            <div className={viewMode === 'map' ? 'block' : 'hidden'} aria-hidden={viewMode !== 'map'}>
-              <div className="h-[600px]">
+              <div className="relative">
+                {/* Keep map mounted after the first time, give it real height */}
+                <div className={viewMode === 'map' ? 'block' : 'hidden'} aria-hidden={viewMode !== 'map'}>
+                  <div className="h-[700px] rounded-lg overflow-hidden border border-gray-200">
                 <Suspense
                   fallback={
                     <div className="relative overflow-hidden h-[600px]">
@@ -181,23 +218,27 @@ export default function Home() {
                     </div>
                   }
                 >
-                  {mapEverShown ? <HomeMapView /> : null}
-                </Suspense>
-              </div>
-            </div>
-
-            <div className={viewMode === 'map' ? 'hidden' : 'block'} aria-hidden={viewMode === 'map'}>
-              <Suspense
-                fallback={
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto mb-4"></div>
-                    <p className="text-gray-600 font-medium">Chargement des zones industrielles...</p>
-                    <p className="text-sm text-gray-500 mt-2">Recherche des meilleures opportunités pour vous</p>
+                  {mapEverShown ? <HomeMapView searchFilters={stableSearchFilters} hasSearchFilters={hasSearchFilters} /> : null}
+                  </Suspense>
                   </div>
-                }
-              >
-                <ZoneGrid searchFilters={searchFilters} />
-              </Suspense>
+                </div>
+
+                <div className={viewMode === 'map' ? 'hidden' : 'block'} aria-hidden={viewMode === 'map'}>
+                  <Suspense
+                    fallback={
+                      <div className="text-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-industria-brown-gold mx-auto mb-4"></div>
+                        <p className="text-gray-600 font-medium">Chargement des zones industrielles...</p>
+                        <p className="text-sm text-gray-500 mt-2">Recherche des meilleures opportunités pour vous</p>
+                      </div>
+                    }
+                  >
+                    <div className="max-h-[700px] overflow-y-auto">
+                      <ZoneGrid searchFilters={stableSearchFilters} />
+                    </div>
+                  </Suspense>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -257,8 +298,8 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="font-semibold mb-2">Zones Certifiées</h3>
-              <p className="text-gray-600 text-sm">Toutes nos zones respectent les normes internationales</p>
+              <h3 className="font-semibold mb-2">Zones Vérifiées</h3>
+              <p className="text-gray-600 text-sm">Les données de toutes nos zones sont vérifiées</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-industria-gray-light rounded-lg flex items-center justify-center mx-auto mb-4">

@@ -13,8 +13,8 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,24 +26,32 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Contrôleur REST pour la gestion des cartes et des données géospatiales.
+ * 
+ * Fournit les données cartographiques optimisées pour l'affichage des zones
+ * et parcelles avec conversion automatique de coordonnées et simplification géométrique.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/map")
+@RequiredArgsConstructor
+@Slf4j
 public class MapController {
-    private static final Logger logger = LoggerFactory.getLogger(MapController.class);
     
     private final ZoneRepository zoneRepository;
     private final ParcelRepository parcelRepository;
     private final CoordinateCalculationService coordinateService;
     private final Map<Integer, List<ZoneSimplifiedFeatureDto>> simplifiedCache = new ConcurrentHashMap<>();
 
-    public MapController(ZoneRepository zoneRepository,
-                         ParcelRepository parcelRepository,
-                         CoordinateCalculationService coordinateService) {
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.coordinateService = coordinateService;
-    }
-
+    /**
+     * Récupère toutes les zones pour l'affichage sur la carte.
+     *
+     * @return réponse contenant les caractéristiques des zones
+     */
     @GetMapping("/zones")
     public MapResponse<ZoneFeatureDto> zones() {
         List<ZoneFeatureDto> features = zoneRepository.findAll().stream().map(z ->
@@ -56,6 +64,11 @@ public class MapController {
         return new MapResponse<>(features);
     }
 
+    /**
+     * Récupère toutes les parcelles pour l'affichage sur la carte.
+     *
+     * @return réponse contenant les caractéristiques des parcelles
+     */
     @GetMapping("/parcels")
     public MapResponse<ParcelFeatureDto> parcels() {
         List<ParcelFeatureDto> features = parcelRepository.findAll().stream().map(p ->
@@ -65,6 +78,11 @@ public class MapController {
         return new MapResponse<>(features);
     }
 
+    /**
+     * Récupère le nombre total de zones et d'informations statistiques.
+     *
+     * @return carte contenant les statistiques des zones
+     */
     @GetMapping("/zones/count")
     public Map<String, Object> getZoneCount() {
         List<Zone> zones = zoneRepository.findAll();
@@ -81,6 +99,12 @@ public class MapController {
         );
     }
     
+    /**
+     * Récupère les zones simplifiées pour l'affichage optimisé sur la carte.
+     *
+     * @param zoom niveau de zoom pour déterminer le niveau de simplification
+     * @return réponse contenant les caractéristiques simplifiées des zones
+     */
     @GetMapping("/zones/simplified")
     public MapResponse<ZoneSimplifiedFeatureDto> simplifiedZones(@RequestParam(defaultValue = "6") int zoom) {
         // Get all zones and create simplified features
@@ -158,7 +182,7 @@ public class MapController {
                     
                     features.add(feature);
                 } catch (Exception e) {
-                    logger.warn("Skipping zone {} due to error: {}", z.getId(), e.getMessage());
+                    log.warn("Skipping zone {} due to error: {}", z.getId(), e.getMessage());
                 }
             }
         }
@@ -167,16 +191,16 @@ public class MapController {
     }
 
     private List<ZoneSimplifiedFeatureDto> buildSimplifiedZones(int zoom) {
-        logger.info("Building simplified zones for zoom level {}", zoom);
+        log.info("Building simplified zones for zoom level {}", zoom);
         List<Zone> allZones = zoneRepository.findAll();
-        logger.info("Found {} zones in database", allZones.size());
+        log.info("Found {} zones in database", allZones.size());
         
         List<ZoneSimplifiedFeatureDto> result = new ArrayList<>();
         
         for (Zone z : allZones) {
             try {
-                logger.info("Processing zone {} - {}", z.getId(), z.getName());
-                logger.info("Zone has latitude={}, longitude={}", z.getLatitude(), z.getLongitude());
+                log.info("Processing zone {} - {}", z.getId(), z.getName());
+                log.info("Zone has latitude={}, longitude={}", z.getLatitude(), z.getLongitude());
                 
                 // Utiliser les coordonnées WGS84 déjà calculées si disponibles
                 List<double[]> coords = new ArrayList<>();
@@ -194,9 +218,9 @@ public class MapController {
                     coords.add(new double[]{lat + offset, lon - offset});
                     coords.add(new double[]{lat - offset, lon - offset}); // fermer le polygone
                     
-                    logger.info("Using center coordinates for zone {}: {}, {}", z.getId(), lat, lon);
+                    log.info("Using center coordinates for zone {}: {}, {}", z.getId(), lat, lon);
                 } else {
-                    logger.info("No latitude/longitude for zone {}, trying WKT geometry", z.getId());
+                    log.info("No latitude/longitude for zone {}, trying WKT geometry", z.getId());
                     // Fallback: essayer de lire la géométrie WKT si elle existe
                     if (z.getGeometry() != null && !z.getGeometry().trim().isEmpty()) {
                         try {
@@ -204,22 +228,22 @@ public class MapController {
                             Geometry geom = reader.read(z.getGeometry());
                             Geometry simplified = DouglasPeuckerSimplifier.simplify(geom, zoomToTolerance(zoom));
                             for (Coordinate c : simplified.getCoordinates()) {
-                                double[] wgs = coordinateService.lambertToWGS84(c.getX(), c.getY());
+                                double[] wgs = coordinateService.lambertToWGS84ForZone(c.getX(), c.getY(), z);
                                 coords.add(new double[]{wgs[1], wgs[0]}); // lat, lon
                             }
-                            logger.info("Using WKT geometry for zone {}", z.getId());
+                            log.info("Using WKT geometry for zone {}", z.getId());
                         } catch (Exception e) {
-                            logger.error("Error reading WKT for zone {}: {}", z.getId(), e.getMessage());
+                            log.error("Error reading WKT for zone {}: {}", z.getId(), e.getMessage());
                             continue; // Skip this zone
                         }
                     } else {
-                        logger.info("No geometry available for zone {}", z.getId());
+                        log.info("No geometry available for zone {}", z.getId());
                         continue; // Skip this zone
                     }
                 }
                 
                 if (coords.isEmpty()) {
-                    logger.info("No coordinates generated for zone {}", z.getId());
+                    log.info("No coordinates generated for zone {}", z.getId());
                     continue; // Skip this zone
                 }
                 
@@ -276,14 +300,14 @@ public class MapController {
                 );
                 
                 result.add(feature);
-                logger.info("Successfully created feature for zone {} with {} coordinates", z.getId(), coords.size());
+                log.info("Successfully created feature for zone {} with {} coordinates", z.getId(), coords.size());
                 
             } catch (Exception e) {
-                logger.error("Error processing zone {}: {}", z.getId(), e.getMessage(), e);
+                log.error("Error processing zone {}: {}", z.getId(), e.getMessage(), e);
             }
         }
         
-        logger.info("Built {} zone features total", result.size());
+        log.info("Built {} zone features total", result.size());
         return result;
     }
 

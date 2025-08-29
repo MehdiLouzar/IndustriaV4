@@ -7,8 +7,10 @@ import com.industria.platform.repository.AppointmentRepository;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.service.AppointmentService;
 import com.industria.platform.service.PermissionService;
-import org.springframework.security.access.prepost.PreAuthorize;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,8 +18,20 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Contrôleur REST pour la gestion des rendez-vous.
+ * 
+ * Gère les demandes de visite et rendez-vous des investisseurs,
+ * avec notifications automatiques par email et gestion des statuts.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api")
+@RequiredArgsConstructor
+@Slf4j
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
@@ -25,47 +39,58 @@ public class AppointmentController {
     private final ParcelRepository parcelRepository;
     private final PermissionService permissionService;
 
-    public AppointmentController(AppointmentService appointmentService,
-                                 AppointmentRepository appointmentRepository,
-                                 ParcelRepository parcelRepository,
-                                 PermissionService permissionService) {
-        this.appointmentService = appointmentService;
-        this.appointmentRepository = appointmentRepository;
-        this.parcelRepository = parcelRepository;
-        this.permissionService = permissionService;
-    }
-
+    /**
+     * Crée un nouveau rendez-vous depuis l'interface publique.
+     * Accessible à tous sans authentification.
+     *
+     * @param request requête de création de rendez-vous
+     * @return le rendez-vous créé
+     */
     @PostMapping("/public/appointments")
     public Appointment create(@RequestBody AppointmentRequest request) {
         Appointment appointment = new Appointment();
         appointment.setContactName(request.contactName());
         appointment.setContactEmail(request.contactEmail());
         appointment.setContactPhone(request.contactPhone());
+        appointment.setCompanyName(request.company());
+        appointment.setActivityType(request.activityType());
+        appointment.setProjectDescription(request.projectDescription());
+        appointment.setInvestmentBudget(request.investmentBudget());
+        appointment.setPreferredDate(request.preferredDate());
+        appointment.setPreferredTime(request.preferredTime());
+        appointment.setUrgency(request.urgency());
+        appointment.setStatus(AppointmentStatus.PENDING);
         return appointmentService.createAppointment(appointment, request.parcelId());
     }
 
+    /**
+     * Récupère tous les rendez-vous.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param authentication contexte d'authentification
+     * @return liste des rendez-vous filtrée selon les permissions
+     */
     @GetMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public List<AppointmentDto> all(Authentication authentication) {
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
         List<Appointment> appointments = appointmentRepository.findAll();
         
-        // Filtrer pour les ZONE_MANAGER : seulement leurs rendez-vous
         if (!permissionService.hasRole("ADMIN")) {
             appointments = appointments.stream()
                 .filter(a -> a.getParcel() != null && permissionService.canModifyParcel(a.getParcel().getId()))
                 .toList();
         }
         
-        return appointments.stream().map(a -> new AppointmentDto(
-                a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name()
-        )).toList();
+        return appointments.stream().map(this::toDto).toList();
     }
 
+    /**
+     * Récupère un rendez-vous par son identifiant.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous
+     * @return données du rendez-vous
+     */
     @GetMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> get(@PathVariable String id) {
@@ -74,15 +99,16 @@ public class AppointmentController {
         }
         
         Appointment a = appointmentRepository.findById(id).orElseThrow();
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto dto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(toDto(a));
     }
 
+    /**
+     * Crée un nouveau rendez-vous depuis l'interface admin.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param dto données du rendez-vous à créer
+     * @return le rendez-vous créé
+     */
     @PostMapping("/appointments")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> createAdmin(@RequestBody AppointmentDto dto) {
@@ -96,16 +122,17 @@ public class AppointmentController {
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
         appointmentRepository.save(a);
-        
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto createdDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(createdDto);
+        return ResponseEntity.ok(toDto(a));
     }
 
+    /**
+     * Met à jour un rendez-vous existant.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous
+     * @param dto nouvelles données du rendez-vous
+     * @return le rendez-vous mis à jour
+     */
     @PutMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> update(@PathVariable String id, @RequestBody AppointmentDto dto) {
@@ -114,20 +141,29 @@ public class AppointmentController {
         }
         
         Appointment a = appointmentRepository.findById(id).orElseThrow();
+        AppointmentStatus oldStatus = a.getStatus();
+        
         updateEntity(a, dto);
         if (dto.parcelId() != null)
             a.setParcel(parcelRepository.findById(dto.parcelId()).orElse(null));
-        appointmentRepository.save(a);
         
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto updatedDto = new AppointmentDto(a.getId(), a.getContactName(), a.getContactEmail(), a.getContactPhone(),
-                a.getCompanyName(), a.getMessage(),
-                a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
-                a.getParcel() == null ? null : a.getParcel().getId(),
-                a.getStatus() == null ? null : a.getStatus().name());
-        return ResponseEntity.ok(updatedDto);
+        // Si le statut a changé, utiliser le service pour déclencher les notifications email
+        if (oldStatus != a.getStatus() && a.getStatus() != null) {
+            return ResponseEntity.ok(toDto(appointmentService.updateAppointmentStatus(id, a.getStatus(), a.getNotes())));
+        } else {
+            appointmentRepository.save(a);
+            return ResponseEntity.ok(toDto(a));
+        }
     }
 
+    /**
+     * Met à jour le statut d'un rendez-vous.
+     * Déclenche automatiquement les notifications email appropriées.
+     *
+     * @param id identifiant du rendez-vous
+     * @param request requête contenant le nouveau statut et notes
+     * @return le rendez-vous avec le statut mis à jour
+     */
     @PutMapping("/appointments/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<AppointmentDto> updateStatus(@PathVariable String id, @RequestBody UpdateStatusRequest request) {
@@ -136,21 +172,16 @@ public class AppointmentController {
         }
         
         Appointment updatedAppointment = appointmentService.updateAppointmentStatus(id, request.status(), request.notes());
-        
-        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        AppointmentDto updatedDto = new AppointmentDto(
-                updatedAppointment.getId(), 
-                updatedAppointment.getContactName(), 
-                updatedAppointment.getContactEmail(), 
-                updatedAppointment.getContactPhone(),
-                updatedAppointment.getCompanyName(), 
-                updatedAppointment.getMessage(),
-                updatedAppointment.getRequestedDate() == null ? null : updatedAppointment.getRequestedDate().format(fmt),
-                updatedAppointment.getParcel() == null ? null : updatedAppointment.getParcel().getId(),
-                updatedAppointment.getStatus() == null ? null : updatedAppointment.getStatus().name());
-        return ResponseEntity.ok(updatedDto);
+        return ResponseEntity.ok(toDto(updatedAppointment));
     }
 
+    /**
+     * Supprime un rendez-vous.
+     * Accessible aux administrateurs et gestionnaires de zones.
+     *
+     * @param id identifiant du rendez-vous à supprimer
+     * @return réponse vide
+     */
     @DeleteMapping("/appointments/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('ZONE_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
@@ -162,12 +193,48 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
+    private AppointmentDto toDto(Appointment a) {
+        DateTimeFormatter fmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        return new AppointmentDto(
+            a.getId(), 
+            a.getContactName(), 
+            a.getContactEmail(), 
+            a.getContactPhone(),
+            a.getCompanyName(), 
+            a.getMessage(),
+            a.getActivityType(),
+            a.getProjectDescription(),
+            a.getInvestmentBudget(),
+            a.getPreferredDate(),
+            a.getPreferredTime(),
+            a.getUrgency(),
+            a.getRequestedDate() == null ? null : a.getRequestedDate().format(fmt),
+            a.getParcel() == null ? null : a.getParcel().getId(),
+            a.getStatus() == null ? null : a.getStatus().name()
+        );
+    }
+
     private void updateEntity(Appointment a, AppointmentDto dto) {
         a.setContactName(dto.contactName());
         a.setContactEmail(dto.contactEmail());
         a.setContactPhone(dto.contactPhone());
         a.setCompanyName(dto.companyName());
         a.setMessage(dto.message());
+        a.setActivityType(dto.activityType());
+        a.setProjectDescription(dto.projectDescription());
+        a.setInvestmentBudget(dto.investmentBudget());
+        a.setPreferredDate(dto.preferredDate());
+        a.setPreferredTime(dto.preferredTime());
+        a.setUrgency(dto.urgency());
+        
+        // Traitement du statut
+        if (dto.status() != null && !dto.status().trim().isEmpty()) {
+            try {
+                a.setStatus(AppointmentStatus.valueOf(dto.status()));
+            } catch (IllegalArgumentException e) {
+                log.error("Statut invalide: {}", dto.status());
+            }
+        }
         
         // Traitement de la date
         if (dto.requestedDate() != null && !dto.requestedDate().trim().isEmpty()) {
@@ -179,7 +246,7 @@ public class AppointmentController {
                 }
                 a.setRequestedDate(LocalDateTime.parse(dateStr));
             } catch (Exception e) {
-                System.err.println("Erreur lors du parsing de la date: " + dto.requestedDate() + " - " + e.getMessage());
+                log.error("Erreur lors du parsing de la date: {} - {}", dto.requestedDate(), e.getMessage());
                 a.setRequestedDate(null);
             }
         } else {
@@ -187,7 +254,19 @@ public class AppointmentController {
         }
     }
 
-    public record AppointmentRequest(String parcelId, String contactName, String contactEmail, String contactPhone) {}
+    public record AppointmentRequest(
+        String parcelId, 
+        String contactName, 
+        String contactEmail, 
+        String contactPhone,
+        String company,
+        String activityType,
+        String projectDescription,
+        String investmentBudget,
+        String preferredDate,
+        String preferredTime,
+        String urgency
+    ) {}
     
     public record UpdateStatusRequest(AppointmentStatus status, String notes) {}
 }

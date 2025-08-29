@@ -1,27 +1,63 @@
+/**
+ * Composant ZoneGridInfinite - Grille infinie de zones industrielles
+ * 
+ * Affiche les zones industrielles avec chargement infini (infinite scroll) :
+ * - Chargement initial de 12 zones par page
+ * - Détection automatique du scroll pour charger plus de contenu
+ * - Limite de sécurité à 100 zones pour éviter les problèmes de performance
+ * - Gestion des états de chargement et d'erreur
+ * - Interface responsive avec grilles adaptatives
+ * 
+ * Intègre le hook useInfiniteScroll pour une expérience utilisateur fluide
+ * sans pagination traditionnelle. Optimisé pour les performances avec
+ * des limites et une gestion mémoire prudente.
+ * 
+ * @returns Composant React de la grille infinie
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Factory } from 'lucide-react'
-import { fetchApi } from '@/lib/utils'
+import { fetchPublicApi } from '@/lib/utils'
 import type { ListResponse } from '@/types'
 import ZoneCard from './ZoneCard'
 import LoadingSpinner from './LoadingSpinner'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 
+/** Nombre de zones chargées par page */
 const ZONES_PER_PAGE = 12
-const MAX_TOTAL_ZONES = 100 // Limite pour éviter les problèmes de performance
+/** Limite maximale pour éviter les problèmes de performance */
+const MAX_TOTAL_ZONES = 100
 
+/**
+ * Interface représentant une zone industrielle
+ */
 interface IndustrialZone {
+  /** Identifiant unique */
   id: string
+  /** Nom de la zone */
   name: string
+  /** Description détaillée */
   description: string
+  /** Localisation géographique */
   location: string
+  /** Superficie en m² */
   area: string
+  /** Prix au m² */
   price: string
+  /** Type de zone industrielle */
   type: string
+  /** Statut de disponibilité */
   status: string
+  /** Date de livraison prévue */
   deliveryDate?: string
+  /** URL de l'image principale */
   image?: string
 }
 
@@ -42,7 +78,7 @@ export default function ZoneGridInfinite() {
     setError(null)
     
     try {
-      const response = await fetchApi<ListResponse<IndustrialZone>>(
+      const response = await fetchPublicApi<ListResponse<IndustrialZone>>(
         `/api/zones?page=${page}&limit=${ZONES_PER_PAGE}`
       )
 

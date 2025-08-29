@@ -3,22 +3,41 @@ package com.industria.platform.service;
 import com.industria.platform.entity.*;
 import com.industria.platform.repository.ParcelRepository;
 import com.industria.platform.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
+/**
+ * Service de gestion des statuts des zones et parcelles.
+ * 
+ * Gère les transitions d'état avec propagation automatique
+ * des statuts entre zones et leurs parcelles associées.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class StatusService {
 
     private final ZoneRepository zoneRepository;
     private final ParcelRepository parcelRepository;
 
-    public StatusService(ZoneRepository zoneRepository, ParcelRepository parcelRepository) {
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-    }
-
+    /**
+     * Met à jour le statut d'une zone.
+     * 
+     * Propage automatiquement le statut aux parcelles de la zone
+     * pour certains statuts (EN_DEVELOPPEMENT, LIBRE).
+     * 
+     * @param zoneId identifiant de la zone
+     * @param newStatus nouveau statut de la zone
+     * @return la zone mise à jour
+     */
     @Transactional
     public Zone updateZoneStatus(String zoneId, ZoneStatus newStatus) {
         Zone zone = zoneRepository.findById(zoneId).orElseThrow();
@@ -35,6 +54,16 @@ public class StatusService {
         return zone;
     }
 
+    /**
+     * Met à jour le statut d'une parcelle.
+     * 
+     * Récalcule automatiquement le statut de la zone parente
+     * en fonction du statut de toutes ses parcelles.
+     * 
+     * @param parcelId identifiant de la parcelle
+     * @param newStatus nouveau statut de la parcelle
+     * @return la parcelle mise à jour
+     */
     @Transactional
     public Parcel updateParcelStatus(String parcelId, ParcelStatus newStatus) {
         Parcel parcel = parcelRepository.findById(parcelId).orElseThrow();

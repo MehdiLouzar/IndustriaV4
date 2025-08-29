@@ -5,6 +5,16 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Entité représentant un pays.
+ * 
+ * Référentiel géographique des pays pour la localisation
+ * des utilisateurs et zones industrielles.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 @Entity
 @Getter
 @Setter

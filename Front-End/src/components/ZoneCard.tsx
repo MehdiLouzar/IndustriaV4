@@ -1,42 +1,121 @@
 "use client"
 
+/**
+ * Composant ZoneCard - Carte d'affichage d'une zone industrielle
+ */
+
 import React, { memo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight, Grid3X3 } from 'lucide-react'
+import { 
+  MapPin, Ruler, Factory, Phone, Eye, ChevronLeft, ChevronRight, Grid3X3,
+  Zap, Wifi, Car, Wrench, Building2, Cpu, Settings, Shield, Droplets, Droplet, Coffee, 
+  Truck, Users, Package, Globe, Power, Battery, Monitor, Server, Database, 
+  HardDrive, Briefcase, Home, Gauge, Settings2, Plane, Shirt, Pill
+} from 'lucide-react'
 
+/**
+ * Interface représentant une image de zone industrielle
+ */
 interface ZoneImage {
+  /** Identifiant unique de l'image */
   id: string
+  /** Nom du fichier stocké */
   filename: string
+  /** Nom original du fichier uploadé */
   originalFilename: string
+  /** Description optionnelle de l'image */
   description?: string
+  /** Indique si c'est l'image principale */
   isPrimary: boolean
+  /** Ordre d'affichage dans le carrousel */
   displayOrder: number
 }
 
-interface IndustrialZone {
+/**
+ * Interface représentant une activité industrielle
+ */
+interface Activity {
+  /** Identifiant unique de l'activité */
   id: string
+  /** Nom de l'activité */
   name: string
+  /** Description de l'activité */
   description: string
-  location: string
-  area: string
-  price: string
-  type: string
-  status: string
-  deliveryDate?: string
-  image?: string
-  images?: ZoneImage[]
-  totalParcels?: number
-  availableParcels?: number
+  /** Icône de l'activité */
+  icon?: string
+  /** Catégorie de l'activité */
+  category?: string
 }
 
+/**
+ * Interface représentant un équipement/service
+ */
+interface Amenity {
+  /** Identifiant unique de l'équipement */
+  id: string
+  /** Nom de l'équipement */
+  name: string
+  /** Description de l'équipement */
+  description: string
+  /** Icône de l'équipement */
+  icon?: string
+  /** Catégorie de l'équipement */
+  category?: string
+}
+
+/**
+ * Interface représentant une zone industrielle
+ */
+interface IndustrialZone {
+  /** Identifiant unique de la zone */
+  id: string
+  /** Nom de la zone */
+  name: string
+  /** Description détaillée */
+  description: string
+  /** Localisation géographique */
+  location: string
+  /** Superficie formatée avec unité */
+  area: string
+  /** Prix formaté avec devise */
+  price: string
+  /** Type de zone (parc industriel, zone franche, etc.) */
+  type: string
+  /** Statut actuel (LIBRE, OCCUPE, RESERVE, etc.) */
+  status: string
+  /** Date de livraison prévue */
+  deliveryDate?: string
+  /** URL de l'image principale (legacy) */
+  image?: string
+  /** Collection d'images pour carrousel */
+  images?: ZoneImage[]
+  /** Nombre total de parcelles */
+  totalParcels?: number
+  /** Nombre de parcelles disponibles */
+  availableParcels?: number
+  /** Activités autorisées dans la zone */
+  activities?: Activity[]
+  /** Équipements disponibles dans la zone */
+  amenities?: Amenity[]
+}
+
+/**
+ * Props du composant ZoneCard
+ */
 interface ZoneCardProps {
+  /** Données de la zone industrielle à afficher */
   zone: IndustrialZone
 }
 
+/**
+ * Détermine les classes CSS de couleur pour un badge de statut
+ * @param status - Statut de la zone (LIBRE, OCCUPE, RESERVE, etc.)
+ * @returns Classes Tailwind CSS pour le badge
+ */
 function getStatusColor(status: string) {
   switch (status) {
     case 'Disponible':
@@ -55,13 +134,104 @@ function getStatusColor(status: string) {
   }
 }
 
+/**
+ * Obtient l'icône Lucide React appropriée
+ */
+function getLucideIcon(iconName?: string) {
+  if (!iconName) return Factory
+  
+  const iconMap: { [key: string]: any } = {
+    // Électricité et énergie
+    'Zap': Zap,
+    'Power': Power,
+    'Battery': Battery,
+    'Lightbulb': Zap,
+    'Sun': Power,
+    'Flame': Zap,
+    
+    // Internet et communication
+    'Wifi': Wifi,
+    'Globe': Globe,
+    'Mail': Globe,
+    'Server': Server,
+    'Database': Database,
+    'HardDrive': HardDrive,
+    'Monitor': Monitor,
+    
+    // Transport et parking
+    'Car': Car,
+    'Truck': Truck,
+    'Plane': Plane,
+    'ParkingCircle': Car,
+    
+    // Bâtiments et infrastructure
+    'Building': Building2,
+    'Building2': Building2,
+    'Factory': Factory,
+    'Home': Home,
+    'Briefcase': Briefcase,
+    'Hospital': Building2,
+    'CreditCard': Package,
+    
+    // Technologie et outils
+    'Cpu': Cpu,
+    'Wrench': Wrench,
+    'Settings': Settings,
+    'Cog': Settings,
+    'Gauge': Gauge,
+    'Settings2': Settings2,
+    
+    // Sécurité et services
+    'Shield': Shield,
+    'shield': Shield,
+    'Droplets': Droplets,
+    'droplet': Droplet,
+    'droplets': Droplets,
+    'Coffee': Coffee,
+    'Users': Users,
+    'Package': Package,
+    'package': Package,
+    'UtensilsCrossed': Coffee,
+    
+    // Icônes spécifiques de la base
+    'car': Car,
+    'zap': Zap,
+    'wifi': Wifi,
+    'shirt': Shirt,
+    'pill': Pill,
+    
+    // Icônes génériques
+    'MapPin': MapPin,
+    'Ruler': Ruler,
+    'Phone': Phone,
+    'Eye': Eye,
+    'Grid3X3': Grid3X3,
+    'ChevronLeft': ChevronLeft,
+    'ChevronRight': ChevronRight
+  }
+  
+  return iconMap[iconName] || Factory
+}
+
+/**
+ * Composant carte de zone industrielle avec carrousel d'images
+ * 
+ * Affiche une zone industrielle sous forme de carte avec :
+ * - Carrousel d'images interactif
+ * - Informations clés (superficie, prix, parcelles)
+ * - Badge de statut coloré
+ * - Actions (voir détails, demander rendez-vous)
+ * 
+ * @param props - Props du composant
+ * @returns Élément React de la carte zone
+ */
 const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   // Utiliser les images du carousel si disponibles, sinon fallback sur l'image unique
-  const displayImages = zone.images && zone.images.length > 0 ? zone.images : null
-  const hasImages = displayImages && displayImages.length > 0
-  const hasMultipleImages = displayImages && displayImages.length > 1
+  const displayImages = zone.images && Array.isArray(zone.images) && zone.images.length > 0 ? zone.images : null
+  const hasImages = Boolean(displayImages && displayImages.length > 0)
+  const hasMultipleImages = Boolean(displayImages && displayImages.length > 1)
   
   const nextImage = () => {
     if (displayImages) {
@@ -78,7 +248,7 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
   const getCurrentImageUrl = () => {
     if (hasImages) {
       const currentImage = displayImages[currentImageIndex]
-      return `/api/zones/${zone.id}/images/${currentImage.id}/file`
+      return `${process.env.NEXT_PUBLIC_API_URL}/api/zones/${zone.id}/images/${currentImage.id}/file`
     }
     return zone.image
   }
@@ -87,7 +257,7 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
     <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
       <div className="relative">
         {hasImages || zone.image ? (
-          <div className="relative w-full h-48 overflow-hidden">
+          <div className="relative w-full h-32 overflow-hidden">
             <Image
               src={getCurrentImageUrl() || ''}
               alt={zone.name}
@@ -133,8 +303,8 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
             )}
           </div>
         ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-colors duration-300">
-            <Factory className="w-12 h-12 text-gray-400" />
+          <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center group-hover:from-gray-200 group-hover:to-gray-300 transition-colors duration-300">
+            <Factory className="w-8 h-8 text-gray-400" />
           </div>
         )}
         <div className="absolute top-3 left-3">
@@ -156,56 +326,119 @@ const ZoneCard = memo(({ zone }: ZoneCardProps) => {
         )}
       </div>
       
-      <CardHeader className="pb-3">
-        <h3 className="font-bold text-lg leading-tight text-gray-900 group-hover:text-industria-brown-gold transition-colors line-clamp-2">
+      <CardHeader className="pb-2">
+        <h3 className="font-bold text-base leading-tight text-gray-900 group-hover:text-industria-brown-gold transition-colors line-clamp-1">
           {zone.name}
         </h3>
-        <p className="text-sm text-gray-600 line-clamp-2">{zone.description}</p>
+        <p className="text-xs text-gray-600 line-clamp-1">{zone.description}</p>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+      <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <MapPin className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span className="truncate">{zone.location}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Ruler className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Ruler className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span>{zone.area}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Factory className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Factory className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
             <span className="truncate">{zone.type}</span>
           </div>
           {(zone.totalParcels !== undefined && zone.availableParcels !== undefined) && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Grid3X3 className="w-4 h-4 text-industria-brown-gold flex-shrink-0" />
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Grid3X3 className="w-3 h-3 text-industria-brown-gold flex-shrink-0" />
               <span>
-                {zone.availableParcels} / {zone.totalParcels} parcelles disponibles
+                {zone.availableParcels} / {zone.totalParcels} parcelles
               </span>
             </div>
           )}
         </div>
         
-        <div className="pt-2 border-t">
-          <p className="font-semibold text-gray-900">{zone.price}</p>
+        {/* Section Activités et Équipements */}
+        {((zone.activities && zone.activities.length > 0) || (zone.amenities && zone.amenities.length > 0)) && (
+          <div className="space-y-2">
+            {/* Activités autorisées */}
+            {zone.activities && zone.activities.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                  Activités
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {zone.activities.slice(0, 3).map((activity) => {
+                    const IconComponent = getLucideIcon(activity.icon)
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded-full border border-blue-200"
+                        title={activity.description || activity.name}
+                      >
+                        <IconComponent className="w-3 h-3" />
+                        <span className="truncate max-w-12 text-xs">{activity.name}</span>
+                      </div>
+                    )
+                  })}
+                  {zone.activities.length > 3 && (
+                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">
+                      +{zone.activities.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Équipements disponibles */}
+            {zone.amenities && zone.amenities.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                  Équipements
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {zone.amenities.slice(0, 3).map((amenity) => {
+                    const IconComponent = getLucideIcon(amenity.icon)
+                    return (
+                      <div
+                        key={amenity.id}
+                        className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-1.5 py-0.5 rounded-full border border-green-200"
+                        title={amenity.description || amenity.name}
+                      >
+                        <IconComponent className="w-3 h-3" />
+                        <span className="truncate max-w-12 text-xs">{amenity.name}</span>
+                      </div>
+                    )
+                  })}
+                  {zone.amenities.length > 3 && (
+                    <div className="flex items-center bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">
+                      +{zone.amenities.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="pt-1 border-t">
+          <p className="font-semibold text-sm text-gray-900">{zone.price}</p>
         </div>
         
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           {zone.id.startsWith('demo-') || zone.id.startsWith('fallback-') ? (
-            <Button size="sm" className="flex-1 bg-gray-400 text-white cursor-not-allowed" disabled>
-              <Eye className="w-4 h-4 mr-1" /> Démonstration
+            <Button size="sm" className="flex-1 bg-gray-400 text-white cursor-not-allowed text-xs" disabled>
+              <Eye className="w-3 h-3 mr-1" /> Démo
             </Button>
           ) : (
-            <Button asChild size="sm" className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white">
+            <Button asChild size="sm" className="flex-1 bg-industria-brown-gold hover:bg-industria-olive-light text-white text-xs">
               <Link href={`/zones/${zone.id}`}>
-                <Eye className="w-4 h-4 mr-1" /> Voir
+                <Eye className="w-3 h-3 mr-1" /> Voir
               </Link>
             </Button>
           )}
-          <Button asChild variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold">
+          <Button asChild variant="outline" size="sm" className="flex-1 hover:bg-industria-gray-light hover:border-industria-brown-gold text-xs">
             <Link href={`/contact?zone=${zone.id}`}>
-              <Phone className="w-4 h-4 mr-1" /> Contact
+              <Phone className="w-3 h-3 mr-1" /> Contact
             </Link>
           </Button>
         </div>

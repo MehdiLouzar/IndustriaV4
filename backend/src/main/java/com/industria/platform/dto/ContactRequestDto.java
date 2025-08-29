@@ -5,6 +5,16 @@ import com.industria.platform.entity.ContactRequestStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * DTO représentant une demande de contact d'investisseur ou d'aménageur.
+ * 
+ * Contient toutes les informations saisies via le formulaire de contact
+ * avec des champs spécialisés selon le type de demandeur.
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
 public record ContactRequestDto(
     String id,
     ContactType contactType,

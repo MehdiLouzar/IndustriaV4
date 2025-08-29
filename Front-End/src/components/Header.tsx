@@ -1,3 +1,23 @@
+/**
+ * Composant Header - En-tête principal du site Industria
+ * 
+ * Fournit la navigation principale du site avec :
+ * - Barre de contact supérieure avec téléphone et localisation
+ * - Navigation desktop avec menus déroulants (Média, Le Groupe)
+ * - Interface mobile responsive avec menu hamburger
+ * - Authentification utilisateur et liens admin
+ * - Sélecteur de langue et badges informatifs
+ * 
+ * Le composant s'adapte automatiquement aux différentes tailles d'écran
+ * et affiche conditionnellement les liens d'administration selon les permissions.
+ * 
+ * @param showAdminLink Indique s'il faut afficher le lien Dashboard admin
+ * 
+ * @author Industria Platform Team
+ * @version 1.0
+ * @since 1.0
+ */
+
 'use client';
 
 import { useState } from 'react';
@@ -29,7 +49,20 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
     { title: 'Politique de recrutement', href: '/groupe/recrutement' },
   ];
 
-  const navItems = [
+  const investmentLinks = [
+    { title: 'Simulateur de dispositif principal', href: '/simulateur/principal' },
+    { title: 'Simulateur TPME', href: '/simulateur/tpme' },
+  ];
+
+  const discoursLinks = [
+    { title: 'Discours de Sa Majesté', href: '/discours-royaux' },
+  ];
+
+  const navItems: Array<{title: string; items: Array<{title: string; href: string}>}> = [
+    {
+      title: 'Discours Royaux',
+      items: discoursLinks,
+    },
     {
       title: 'Média',
       items: mediaLinks,
@@ -38,10 +71,14 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
       title: 'Le Groupe',
       items: groupLinks,
     },
+    {
+      title: 'Booster votre investissement',
+      items: investmentLinks,
+    },
   ];
 
   return (
-    <header className="w-full">
+  <header className="w-full bg-white relative z-50 isolation-isolate">
       {/* Top contact bar */}
       <div className="header-brown text-white py-2 px-4">
         <div className="container mx-auto flex justify-between items-center">
@@ -69,25 +106,27 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Industria</h1>
-                  <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
+            <Link href="/" className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Industria</h1>
+                    <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Desktop Navigation */}
-            <NavigationMenu className="hidden lg:flex">
+            <NavigationMenu className="hidden lg:flex relative z-50">
               <NavigationMenuList>
                 {navItems.map((item, index) => (
                   <NavigationMenuItem key={index}>
                     <NavigationMenuTrigger className="text-gray-700 hover:text-industria-brown-gold">
                       {item.title}
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent>
+                    <NavigationMenuContent className="z-50 bg-white ring-1 ring-black/5 shadow-lg">
                       <div className="grid gap-2 p-4 w-[400px]">
                         {item.items.map((subItem, subIndex) => (
                           <NavigationMenuLink

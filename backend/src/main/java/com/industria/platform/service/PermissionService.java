@@ -1,16 +1,28 @@
 package com.industria.platform.service;
 
-import com.industria.platform.entity.Zone;
-import com.industria.platform.entity.Parcel;
 import com.industria.platform.entity.Appointment;
-import com.industria.platform.repository.ZoneRepository;
-import com.industria.platform.repository.ParcelRepository;
+import com.industria.platform.entity.Parcel;
+import com.industria.platform.entity.Zone;
 import com.industria.platform.repository.AppointmentRepository;
+import com.industria.platform.repository.ParcelRepository;
+import com.industria.platform.repository.ZoneRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
+/**
+ * Service des permissions/autorisation basées rôles et ownership.
+ *
+ * Rôles (du plus élevé au plus bas): ADMIN > ZONE_MANAGER > MANAGER > USER
+ */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class PermissionService {
 
     private final ZoneRepository zoneRepository;
@@ -18,135 +30,134 @@ public class PermissionService {
     private final AppointmentRepository appointmentRepository;
     private final UserService userService;
 
-    public PermissionService(ZoneRepository zoneRepository, 
-                           ParcelRepository parcelRepository,
-                           AppointmentRepository appointmentRepository,
-                           UserService userService) {
-        this.zoneRepository = zoneRepository;
-        this.parcelRepository = parcelRepository;
-        this.appointmentRepository = appointmentRepository;
-        this.userService = userService;
-    }
+    /** Zones **/
 
-    /**
-     * Vérifie si l'utilisateur actuel peut modifier une zone
-     */
     public boolean canModifyZone(String zoneId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Authentication auth = getAuth();
         if (auth == null) return false;
 
-        // Les ADMIN peuvent tout modifier
-        if (hasRole(auth, "ADMIN")) {
-            return true;
-        }
+        // ADMIN: tout accès
+        if (hasRole(auth, "ADMIN")) return true;
 
-        // Les ZONE_MANAGER peuvent modifier seulement leurs zones
+        // ZONE_MANAGER: uniquement ses zones
         if (hasRole(auth, "ZONE_MANAGER")) {
+            Optional<String> userId = currentUserId();
+            if (userId.isEmpty()) return false;
+
             Zone zone = zoneRepository.findById(zoneId).orElse(null);
-            if (zone != null && zone.getCreatedBy() != null) {
-                String currentUserEmail = userService.getCurrentUserEmail();
-                return zone.getCreatedBy().getEmail().equals(currentUserEmail);
-            }
+            if (zone == null || zone.getCreatedBy() == null) return false;
+
+            return userId.get().equals(zone.getCreatedBy().getId());
         }
 
         return false;
     }
 
-    /**
-     * Vérifie si l'utilisateur actuel peut modifier une parcelle
-     */
+    /** Parcels **/
+
     public boolean canModifyParcel(String parcelId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Authentication auth = getAuth();
         if (auth == null) return false;
 
-        // Les ADMIN peuvent tout modifier
-        if (hasRole(auth, "ADMIN")) {
-            return true;
-        }
+        if (hasRole(auth, "ADMIN")) return true;
 
-        // Les ZONE_MANAGER peuvent modifier seulement leurs parcelles
         if (hasRole(auth, "ZONE_MANAGER")) {
+            Optional<String> userId = currentUserId();
+            if (userId.isEmpty()) return false;
+
             Parcel parcel = parcelRepository.findById(parcelId).orElse(null);
-            if (parcel != null && parcel.getCreatedBy() != null) {
-                String currentUserEmail = userService.getCurrentUserEmail();
-                return parcel.getCreatedBy().getEmail().equals(currentUserEmail);
-            }
+            if (parcel == null || parcel.getCreatedBy() == null) return false;
+
+            return userId.get().equals(parcel.getCreatedBy().getId());
         }
 
         return false;
     }
 
-    /**
-     * Vérifie si l'utilisateur actuel peut gérer un rendez-vous
-     * (basé sur la parcelle/zone associée au rendez-vous)
-     */
+    /** Appointments **/
+
     public boolean canManageAppointment(String appointmentId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Authentication auth = getAuth();
         if (auth == null) return false;
 
-        // Les ADMIN peuvent gérer tous les rendez-vous
-        if (hasRole(auth, "ADMIN")) {
-            return true;
-        }
+        if (hasRole(auth, "ADMIN")) return true;
 
-        // Les ZONE_MANAGER peuvent gérer les rendez-vous de leurs parcelles/zones
         if (hasRole(auth, "ZONE_MANAGER")) {
-            Appointment appointment = appointmentRepository.findById(appointmentId).orElse(null);
-            if (appointment != null && appointment.getParcel() != null) {
-                return canModifyParcel(appointment.getParcel().getId());
-            }
+            Optional<String> userId = currentUserId();
+            if (userId.isEmpty()) return false;
+
+            Appointment appt = appointmentRepository.findById(appointmentId).orElse(null);
+            if (appt == null || appt.getParcel() == null || appt.getParcel().getCreatedBy() == null) return false;
+
+            return userId.get().equals(appt.getParcel().getCreatedBy().getId());
         }
 
         return false;
     }
 
-    /**
-     * Vérifie si l'utilisateur a un rôle spécifique
-     */
+    /** Role checks **/
+
     public boolean hasRole(String role) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return hasRole(auth, role);
+        return hasRole(getAuth(), role);
     }
 
-    private boolean hasRole(Authentication auth, String role) {
-        return auth.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
-    }
-
-    /**
-     * Vérifie si l'utilisateur peut accéder à l'interface d'administration
-     */
     public boolean canAccessAdmin() {
-        return hasRole("ADMIN") || hasRole("ZONE_MANAGER") || hasRole("MANAGER");
+        return hasAnyRole("ADMIN", "ZONE_MANAGER", "MANAGER");
     }
 
-    /**
-     * Vérifie si l'utilisateur peut voir une fonction admin spécifique
-     */
     public boolean canAccessAdminFunction(String function) {
         return switch (function) {
-            case "users", "countries", "regions", "zone-types", "activities", "amenities", 
-                 "construction-types", "audit-logs", "reports" -> hasRole("ADMIN");
-            case "zones", "parcels", "appointments", "contact-requests", "notifications" -> 
-                 hasRole("ADMIN") || hasRole("ZONE_MANAGER") || hasRole("MANAGER");
+            // ADMIN only
+            case "users", "countries", "regions", "zone-types", "activities",
+                    "amenities", "construction-types", "audit-logs", "reports" -> hasRole("ADMIN");
+            // Shared
+            case "zones", "parcels", "appointments", "contact-requests", "notifications" ->
+                    hasAnyRole("ADMIN", "ZONE_MANAGER", "MANAGER");
             default -> false;
         };
     }
 
-    /**
-     * Vérifie si l'utilisateur est un simple utilisateur (sans rôles admin)
-     */
     public boolean isRegularUser() {
-        return !hasRole("ADMIN") && !hasRole("ZONE_MANAGER") && !hasRole("MANAGER");
+        return !hasAnyRole("ADMIN", "ZONE_MANAGER", "MANAGER");
     }
 
-    /**
-     * Récupère le rôle le plus élevé de l'utilisateur
-     */
     public String getHighestRole() {
         if (hasRole("ADMIN")) return "ADMIN";
         if (hasRole("ZONE_MANAGER")) return "ZONE_MANAGER";
         if (hasRole("MANAGER")) return "MANAGER";
         return "USER";
+    }
+
+    /** Helpers **/
+
+    private Authentication getAuth() {
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
+    private boolean hasAnyRole(String... roles) {
+        Authentication auth = getAuth();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        for (String r : roles) {
+            if (hasRole(auth, r)) return true;
+        }
+        return false;
+    }
+
+    private boolean hasRole(Authentication auth, String role) {
+        if (auth == null || auth.getAuthorities() == null) return false;
+        final String expected = "ROLE_" + role;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            if (expected.equalsIgnoreCase(ga.getAuthority())) return true;
+        }
+        return false;
+    }
+
+    private Optional<String> currentUserId() {
+        try {
+            return userService.findCurrentUser().map(u -> u.getId());
+        } catch (Exception e) {
+            log.warn("Unable to load current user id: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 }

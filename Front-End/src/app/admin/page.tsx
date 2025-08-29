@@ -7,7 +7,8 @@ import { Suspense, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { fetchApi } from '@/lib/utils';
+import { useSecureApi } from '@/hooks/use-api';
+import { logout } from '@/lib/auth-actions';
 import AdminGuard from '@/components/AdminGuard';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
@@ -54,28 +55,16 @@ const emptyStats: AdminStats = {
 
 function AdminDashboardContent() {
   const router = useRouter()
-  const [stats, setStats] = useState<AdminStats>(emptyStats)
   const { canAccessFunction, permissions } = usePermissions()
   
-  // Fonction de déconnexion
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    router.push('/auth/login')
+  // Use the secure hook for fetching stats
+  const { data: stats = emptyStats, loading, error } = useSecureApi<AdminStats>('/api/admin/stats');
+  
+  // Fonction de déconnexion - using Server Action
+  const handleLogout = async () => {
+    await logout()
+    // The logout function will handle the redirect
   }
-
-  // Chargement des statistiques côté client
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const statsData = await fetchApi<AdminStats>('/api/admin/stats');
-        setStats(statsData || emptyStats);
-      } catch (error) {
-        console.error('Erreur lors du chargement des statistiques:', error);
-        setStats(emptyStats);
-      }
-    }
-    loadStats()
-  }, [])
 
   const adminCards = [
     {
@@ -135,8 +124,8 @@ function AdminDashboardContent() {
       permission: ['ADMIN']
     },
     {
-      title: 'Activités & Équipements',
-      description: 'Gérer les types d\'activités et équipements',
+      title: 'Activités',
+      description: 'Gérer les types d\'activités',
       icon: Settings,
       href: '/admin/activities',
       color: 'bg-red-500',
@@ -206,14 +195,15 @@ function AdminDashboardContent() {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-              <p className="text-gray-600">
-                Tableau de bord - Rôle: <Badge variant="outline">{permissions?.role}</Badge>
-              </p>
+              <div className="text-gray-600">
+                <p>Tableau de bord - Rôle:</p>
+                <Badge variant="outline" className="mt-1 inline-flex">{permissions?.role}</Badge>
+              </div>
             </div>
             <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push('/')}
+              <Button
+                  variant="outline"
+                  onClick={() => router.push('/')}
                 className="bg-industria-brown-gold text-white hover:bg-industria-olive-light"
               >
                 <Building2 className="w-4 h-4 mr-2" />
@@ -238,14 +228,14 @@ function AdminDashboardContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.totalUsers || '0'}
+                {loading ? '...' : stats.totalUsers || '0'}
               </div>
               <p className="text-xs text-muted-foreground">
                 Comptes actifs
-                {stats.totalUsers > 0 && (
+                {!loading && stats.totalUsers > 0 && (
                   <span className="text-green-600 ml-1">↗ +12% ce mois</span>
                 )}
-                {stats.totalUsers === 0 && (
+                {!loading && stats.totalUsers === 0 && (
                   <span className="text-gray-400 ml-1">Aucun utilisateur</span>
                 )}
               </p>
@@ -258,10 +248,10 @@ function AdminDashboardContent() {
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalZones}</div>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.totalZones}</div>
               <p className="text-xs text-muted-foreground">
                 Zones industrielles
-                {stats.totalZones > 0 && (
+                {!loading && stats.totalZones > 0 && (
                   <span className="text-blue-600 ml-1">↗ +3 nouvelles</span>
                 )}
               </p>
@@ -274,10 +264,10 @@ function AdminDashboardContent() {
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.availableParcels}</div>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.availableParcels}</div>
               <p className="text-xs text-muted-foreground">
-                Sur {stats.totalParcels} total
-                {stats.totalParcels > 0 && (
+                Sur {loading ? '...' : stats.totalParcels} total
+                {!loading && stats.totalParcels > 0 && (
                   <span className="text-orange-600 ml-1">
                     ({Math.round((stats.availableParcels / stats.totalParcels) * 100)}% libre)
                   </span>
@@ -293,16 +283,16 @@ function AdminDashboardContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                <span className={stats.pendingAppointments > 0 ? "text-red-600" : "text-green-600"}>
-                  {stats.pendingAppointments}
+                <span className={!loading && stats.pendingAppointments > 0 ? "text-red-600" : "text-green-600"}>
+                  {loading ? '...' : stats.pendingAppointments}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Sur {stats.totalAppointments} total
-                {stats.pendingAppointments > 0 && (
+                Sur {loading ? '...' : stats.totalAppointments} total
+                {!loading && stats.pendingAppointments > 0 && (
                   <span className="text-red-600 ml-1">⚠ À traiter</span>
                 )}
-                {stats.pendingAppointments === 0 && stats.totalAppointments > 0 && (
+                {!loading && stats.pendingAppointments === 0 && stats.totalAppointments > 0 && (
                   <span className="text-green-600 ml-1">✓ Tous traités</span>
                 )}
               </p>
@@ -343,32 +333,36 @@ function AdminDashboardContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {(Array.isArray(stats.recentActivities) ? stats.recentActivities : []).map((activity, index) => (
-                <div key={activity.id || index} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.action}</p>
-                    <p className="text-xs text-gray-600">{activity.description}</p>
+            {loading ? (
+              <div className="text-center py-4 text-gray-500">Chargement...</div>
+            ) : (
+              <div className="space-y-4">
+                {(Array.isArray(stats.recentActivities) ? stats.recentActivities : []).map((activity, index) => (
+                  <div key={activity.id || index} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.action}</p>
+                      <p className="text-xs text-gray-600">{activity.description}</p>
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="text-xs text-gray-500">
+                        {activity.user?.name || 'Système'}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(activity.createdAt).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right ml-4">
-                    <p className="text-xs text-gray-500">
-                      {activity.user?.name || 'Système'}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(activity.createdAt).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {(Array.isArray(stats.recentActivities) ? stats.recentActivities.length : 0) === 0 && (
-                <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
-              )}
-            </div>
+                ))}
+                {(Array.isArray(stats.recentActivities) ? stats.recentActivities.length : 0) === 0 && (
+                  <p className="text-gray-500 text-center py-4">Aucune activité récente</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
