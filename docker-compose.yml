@@ -126,6 +126,7 @@ services:
       context: ./Front-End
       dockerfile: Dockerfile
     container_name: industria-frontend
+    env_file: .env
     ports:
       - "3000:3000"
     restart: unless-stopped
