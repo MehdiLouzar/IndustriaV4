@@ -58,7 +58,7 @@ echo "✅ PostgreSQL est prêt !"
 echo
 
 # Attendre Keycloak
-wait_for_service "Keycloak" "http://keycloak:8081/realms/industria"
+wait_for_service "Keycloak" "http://keycloak:8080/realms/industria"
 echo
 
 # Attendre Backend
