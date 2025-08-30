@@ -141,18 +141,18 @@ export default function Home() {
       <Header />
 
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-industria-gray-light to-white py-8">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Première plateforme au Maroc dédiée aux zones industrielles privées
-            </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Là où les zones industrielles privées passent au digital
-            </p>
-          </div>
+    <section className="relative bg-gradient-to-br from-industria-gray-light to-white py-8">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            Première plateforme au Maroc dédiée aux zones industrielles privées
+          </h1>
+          <p className="text-base text-gray-600 max-w-2xl mx-auto">
+            Là où les zones industrielles privées passent au digital
+          </p>
         </div>
-      </section>
+      </div>
+    </section>
 
       {/* Search + Map/Grid côte à côte */}
       <section className="py-8 bg-white min-h-900">
