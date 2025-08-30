@@ -1,29 +1,20 @@
 "use server";
 
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || '';
-
-function isHttpsRequest() {
-  const h = headers();
-  const xfwd = (h.get("x-forwarded-proto") || "").toLowerCase();
-  const fwd  = (h.get("forwarded") || "").toLowerCase();
-  // true if you're really behind TLS (e.g., when you later enable HTTPS)
-  return xfwd === "https" || fwd.includes("proto=https");
-}
 
 /**
  * Stockage sécurisé des tokens dans des cookies httpOnly
  */
 async function setSecureTokens(accessToken: string, refreshToken: string, expiresIn: number = 3600) {
   const cookieStore = await cookies();
-  const secure = isHttpsRequest();
   
   // Cookie httpOnly pour l'access token
   cookieStore.set('access_token', accessToken, {
     httpOnly: true,
-    secure,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: expiresIn,
     path: '/'
@@ -32,7 +23,7 @@ async function setSecureTokens(accessToken: string, refreshToken: string, expire
   // Cookie httpOnly pour le refresh token (30 jours)
   cookieStore.set('refresh_token', refreshToken, {
     httpOnly: true,
-    secure,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60,
     path: '/'
@@ -44,7 +35,6 @@ async function setSecureTokens(accessToken: string, refreshToken: string, expire
  */
 export async function getTokens() {
   const cookieStore = await cookies();
-  
   return {
     accessToken: cookieStore.get('access_token')?.value,
     refreshToken: cookieStore.get('refresh_token')?.value
@@ -76,7 +66,6 @@ export async function login(email: string, password: string) {
     
     // Stocker uniquement les infos utilisateur non sensibles dans un cookie lisible côté client
     const cookieStore = await cookies();
-    const secure = isHttpsRequest();
     cookieStore.set('user_info', JSON.stringify({
       id: data.userInfo.id,
       email: data.userInfo.email,
@@ -84,7 +73,7 @@ export async function login(email: string, password: string) {
       roles: data.userInfo.roles
     }), {
       httpOnly: false, // Accessible côté client pour l'UI
-      secure,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: data.expiresIn,
       path: '/'
@@ -123,14 +112,13 @@ export async function refreshToken() {
     
     // Mettre à jour les tokens
     await setSecureTokens(data.accessToken, data.refreshToken, data.expiresIn);
-    const secure = isHttpsRequest();
     
     // Mettre à jour les infos utilisateur
     if (data.userInfo) {
       const cookieStore = await cookies();
       cookieStore.set('user_info', JSON.stringify(data.userInfo), {
         httpOnly: false,
-        secure,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: data.expiresIn,
         path: '/'
