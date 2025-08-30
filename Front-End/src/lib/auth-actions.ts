@@ -44,7 +44,7 @@ async function setSecureTokens(accessToken: string, refreshToken: string, expire
  */
 export async function getTokens() {
   const cookieStore = await cookies();
-  const secure = isHttpsRequest();
+  
   return {
     accessToken: cookieStore.get('access_token')?.value,
     refreshToken: cookieStore.get('refresh_token')?.value
@@ -76,6 +76,7 @@ export async function login(email: string, password: string) {
     
     // Stocker uniquement les infos utilisateur non sensibles dans un cookie lisible côté client
     const cookieStore = await cookies();
+    const secure = isHttpsRequest();
     cookieStore.set('user_info', JSON.stringify({
       id: data.userInfo.id,
       email: data.userInfo.email,
