@@ -123,13 +123,14 @@ export async function refreshToken() {
     
     // Mettre à jour les tokens
     await setSecureTokens(data.accessToken, data.refreshToken, data.expiresIn);
+    const secure = isHttpsRequest();
     
     // Mettre à jour les infos utilisateur
     if (data.userInfo) {
       const cookieStore = await cookies();
       cookieStore.set('user_info', JSON.stringify(data.userInfo), {
         httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
+        secure,
         sameSite: 'lax',
         maxAge: data.expiresIn,
         path: '/'
