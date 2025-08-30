@@ -150,19 +150,6 @@ INSERT INTO zone (
     created_at, updated_at, deleted_at, zone_type_id, region_id, created_by
 )
 
--- Zone démo - Coordonnées Lambert précises
-SELECT 
-    'zone-demo', 'Zone Industrielle Demo', 'Zone de démonstration avec infrastructures complètes', 'Route Demo, Casablanca',
-    150000, 2500, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-    ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191) as geom,
-    26191,
-    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as latitude,
-    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((423400 372800, 423600 372800, 423600 373000, 423400 373000, 423400 372800))'), 26191)), 4326)) as longitude,
-    NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-private', 'region-cas', 'admin@industria.ma'
-WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-demo')
-
-UNION ALL
 
 -- Zone Casablanca Nord
 SELECT 
@@ -218,35 +205,7 @@ SELECT
     'zt-logistics', 'region-rab', 'admin@industria.ma'
 WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-ottawa')
 
-UNION ALL
 
--- Zone additionnelle Marrakech
-SELECT 
-    'zone-marrakech-1', 'Zone Industrielle Marrakech Sud', 'Zone industrielle avec avantages fiscaux', 'Route de l''Aéroport, Marrakech',
-    95000, 2000, 'PER_SQUARE_METER', 'CUSTOM_BUILD', 'LIBRE',
-    ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191),
-    26191,
-    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
-    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((280000 315000, 280200 315000, 280200 315200, 280000 315200, 280000 315000))'), 26191)), 4326)),
-    NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-private', 'region-mar', 'admin@industria.ma'
-WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-marrakech-1')
-
-UNION ALL
-
--- Zone en France - Parc Industriel Lyon Sud (zone agrandie - 2km x 2km)
--- Utilisation du système Lambert 93 (EPSG:2154) pour la France
--- Coordonnées Lambert 93 réelles pour la région de Lyon
-SELECT 
-    'zone-lyon-sud', 'Parc Industriel Lyon Sud', 'Zone industrielle moderne près de Lyon avec accès autoroutier', 'Lyon Sud, Rhône, France',
-    4000000, 150, 'PER_SQUARE_METER', 'TURNKEY', 'LIBRE',
-    ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154),
-    2154,
-    ST_Y(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
-    ST_X(ST_Transform(ST_Centroid(ST_SetSRID(ST_GeomFromText('POLYGON((842000 6517000, 844000 6517000, 844000 6519000, 842000 6519000, 842000 6517000))'), 2154)), 4326)),
-    NOW(), NOW(), NULL::timestamp without time zone,
-    'zt-public', 'region-ara-lyon', 'admin@industria.ma'
-WHERE NOT EXISTS (SELECT 1 FROM zone WHERE id = 'zone-lyon-sud')
 
 ;
 
