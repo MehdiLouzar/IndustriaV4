@@ -85,19 +85,14 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4" />
-              <span className="text-sm font-medium">+212 5 37 57 20 00</span>
+              <span className="text-sm font-medium">+212 6 60 51 78 85</span>
             </div>
             <div className="hidden md:flex items-center gap-2">
               <MapPin className="w-4 h-4" />
               <span className="text-sm">Zones Industrielles du Maroc</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="bg-white text-industria-brown-gold hover:bg-gray-100">
-              Zones B2B
-            </Badge>
-            <LanguageSwitcher />
-          </div>
+         
         </div>
       </div>
 
@@ -112,7 +107,7 @@ export default function Header({ showAdminLink = false }: { showAdminLink?: bool
                   <Image src="/logo.png" alt="Nom de votre site" width={32} height={32} />
                   <div>
                     <h1 className="text-xl font-bold text-gray-900">Industria</h1>
-                    <p className="text-xs text-gray-600">Zones Industrielles B2B</p>
+                    <p className="text-xs text-gray-600"></p>
                   </div>
                 </div>
               </div>
