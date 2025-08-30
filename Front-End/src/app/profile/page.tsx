@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import { User, Calendar, Shield, Mail, LogOut } from 'lucide-react'
+import { checkAuth, getCurrentUser, logout } from '@/lib/auth-actions'
 
 interface UserProfile {
   id: string
@@ -23,73 +24,51 @@ interface UserProfile {
   createdTimestamp?: number
 }
 
-interface TokenPayload {
-  sub: string
-  email?: string
-  name?: string
-  preferred_username?: string
-  given_name?: string
-  family_name?: string
-  realm_access?: {
-    roles?: string[]
-  }
-  iat?: number
-  exp?: number
-}
 
-function parseJwt(token: string): TokenPayload | null {
-  try {
-    const base64 = token.split('.')[1]
-    const json = atob(base64)
-    return JSON.parse(json)
-  } catch (e) {
-    return null
-  }
-}
 
 export default function ProfilePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [tokenPayload, setTokenPayload] = useState<TokenPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    if (!token) {
+ useEffect(() => {
+  const initializeProfile = async () => {
+    const { isAuthenticated } = await checkAuth()
+    if (!isAuthenticated) {
       router.push('/auth/login')
       return
     }
 
-    const payload = parseJwt(token)
-    if (!payload) {
-      setError('Token invalide')
+    const user = await getCurrentUser()
+    if (!user) {
+      setError('Impossible de récupérer les informations utilisateur')
       setLoading(false)
       return
     }
 
-    setTokenPayload(payload)
-
-    // Créer un profil basé sur les données du token JWT
+    // Créer un profil basé sur les données du cookie user_info
     const userProfile: UserProfile = {
-      id: payload.sub,
-      email: payload.email || payload.preferred_username || '',
-      name: payload.name || `${payload.given_name || ''} ${payload.family_name || ''}`.trim() || payload.preferred_username || '',
-      firstName: payload.given_name,
-      lastName: payload.family_name,
-      roles: payload.realm_access?.roles?.filter(role => role !== 'default-roles-industria') || [],
-      emailVerified: true, // Assumé vrai si l'utilisateur est connecté
-      enabled: true,
-      createdTimestamp: payload.iat ? payload.iat * 1000 : undefined
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles || [],
+      emailVerified: user.emailVerified ?? true,
+      enabled: user.enabled ?? true,
+      createdTimestamp: user.createdTimestamp
     }
 
     setProfile(userProfile)
     setLoading(false)
-  }, [router])
+  }
 
-  const logout = () => {
-    localStorage.removeItem('token')
-    router.push('/auth/login')
+  initializeProfile()
+}, [router])
+
+  const handleLogout = async () => {
+  await logout() // This will handle cleanup and redirect
   }
 
   const getRoleColor = (role: string) => {
@@ -137,7 +116,7 @@ export default function ProfilePage() {
     )
   }
 
-  if (error || !profile || !tokenPayload) {
+  if (error || !profile ) {
     return (
       <main className="min-h-screen bg-gray-50 flex flex-col">
         <Header />
@@ -154,7 +133,7 @@ export default function ProfilePage() {
                 <Button onClick={() => router.push('/')} variant="outline">
                   Retour à l'accueil
                 </Button>
-                <Button onClick={logout} variant="destructive">
+                <Button onClick={handleLogout} variant="destructive">
                   Se reconnecter
                 </Button>
               </div>
@@ -191,7 +170,7 @@ export default function ProfilePage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Nom d'utilisateur</Label>
-                  <p className="text-lg font-medium">{tokenPayload.preferred_username}</p>
+                  <p className="text-lg font-medium">{profile.email.split('@')[0]}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-600">Nom complet</Label>
@@ -307,12 +286,6 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {tokenPayload.exp && (
-                <div>
-                  <Label className="text-sm font-medium text-gray-600">Session expire le</Label>
-                  <p>{new Date(tokenPayload.exp * 1000).toLocaleString('fr-FR')}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -337,14 +310,14 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                <Button 
+                {/* <Button 
                   variant="outline" 
                   onClick={() => window.open('http://localhost:8081/realms/industria/account', '_blank')}
                 >
                   ⚙️ Gérer le compte Keycloak
-                </Button>
+                </Button> */}
 
-                <Button variant="destructive" onClick={logout}>
+                <Button variant="destructive" onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Se déconnecter
                 </Button>

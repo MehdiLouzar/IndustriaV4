@@ -14,7 +14,7 @@ import {
   Building2, MapPin, Eye, FileText, PieChart, Activity
 } from 'lucide-react'
 import { secureDownloadFile } from '@/lib/download-actions'
-import { secureApiRequest } from '@/lib/auth-actions'
+import { secureApiRequest , checkAuth} from '@/lib/auth-actions'
 
 interface ReportStats {
   totalZones: number
@@ -105,16 +105,19 @@ export default function ReportsPage() {
     }
   }
 
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
+  const verifyAuth = async () => {
+    const { isAuthenticated } = await checkAuth()
+    if (!isAuthenticated) {
+      router.push('/auth/login')
+      return
     }
     loadStats()
-  }, [router])
+  }
+  verifyAuth()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [router])
 
   if (loading) {
     return (

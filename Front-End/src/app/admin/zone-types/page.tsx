@@ -13,7 +13,7 @@ import type { ListResponse } from '@/types'
 
 // Use both helpers: public reads via fetchPublicApi, writes via secureApiRequest
 import { fetchPublicApi } from '@/lib/utils'
-import { secureApiRequest } from '@/lib/auth-actions'
+import { secureApiRequest , checkAuth } from '@/lib/auth-actions'
 
 interface ZoneType {
   id: string
@@ -62,17 +62,17 @@ export default function ZoneTypesAdmin() {
   }, [currentPage, itemsPerPage, searchTerm])
 
   useEffect(() => {
-    // Admin page still requires auth for create/update/delete
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
+  const verifyAuth = async () => {
+    const { isAuthenticated } = await checkAuth()
+    if (!isAuthenticated) {
+      router.push('/auth/login')
+      return
     }
     load(currentPage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, router])
+  }
+  verifyAuth()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [currentPage, router])
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

@@ -2,68 +2,31 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getBaseUrl } from './utils';
 
-/**
- * Get cookie domain from environment or request
- */
-function getCookieDomain(): string | undefined {
-  // In production, you might want to set cookies for .industria.ma
-  // to work across subdomains
-  if (process.env.COOKIE_DOMAIN) {
-    return process.env.COOKIE_DOMAIN;
-  }
-  
-  // Don't set domain for localhost/development
-  if (process.env.NODE_ENV !== 'production') {
-    return undefined;
-  }
-  
-  // For production, let the browser handle it
-  return undefined;
-}
+const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || '';
 
 /**
  * Stockage sécurisé des tokens dans des cookies httpOnly
  */
 async function setSecureTokens(accessToken: string, refreshToken: string, expiresIn: number = 3600) {
   const cookieStore = await cookies();
-  const domain = getCookieDomain();
   
-  console.log('[Auth] Setting cookies with config:', {
+  // Cookie httpOnly pour l'access token
+  cookieStore.set('access_token', accessToken, {
+    httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    domain,
     sameSite: 'lax',
+    maxAge: expiresIn,
     path: '/'
   });
   
-  // Cookie httpOnly pour l'access token
-  await cookieStore.set('access_token', accessToken, {
-    httpOnly: true,
-    secure: false, // Set to false if using HTTP, true for HTTPS
-    sameSite: 'lax',
-    maxAge: expiresIn,
-    path: '/',
-    ...(domain && { domain })
-  });
-  
   // Cookie httpOnly pour le refresh token (30 jours)
-  await cookieStore.set('refresh_token', refreshToken, {
+  cookieStore.set('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: false, // Set to false if using HTTP, true for HTTPS
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 30 * 24 * 60 * 60,
-    path: '/',
-    ...(domain && { domain })
-  });
-  
-  // Verify cookies were set
-  const verifyAccess = cookieStore.get('access_token');
-  const verifyRefresh = cookieStore.get('refresh_token');
-  
-  console.log('[Auth] Cookies verification:', {
-    accessTokenSet: !!verifyAccess,
-    refreshTokenSet: !!verifyRefresh
+    path: '/'
   });
 }
 
@@ -72,30 +35,18 @@ async function setSecureTokens(accessToken: string, refreshToken: string, expire
  */
 export async function getTokens() {
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get('access_token')?.value;
-  const refreshToken = cookieStore.get('refresh_token')?.value;
-  
-  console.log('[Auth] Getting tokens:', {
-    hasAccessToken: !!accessToken,
-    hasRefreshToken: !!refreshToken
-  });
-  
-  return { accessToken, refreshToken };
+  return {
+    accessToken: cookieStore.get('access_token')?.value,
+    refreshToken: cookieStore.get('refresh_token')?.value
+  };
 }
 
 /**
  * Connexion utilisateur avec stockage sécurisé des tokens
  */
 export async function login(email: string, password: string) {
-  console.log('[Auth] Login attempt for:', email);
-
   try {
-    const API_URL = getBaseUrl();
-    const loginUrl = API_URL ? `${API_URL}/api/auth/login` : '/api/auth/login';
-    
-    console.log('[Auth] Login URL:', loginUrl);
-    
-    const response = await fetch(loginUrl, {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,48 +55,33 @@ export async function login(email: string, password: string) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Login failed');
-      console.error('[Auth] Login failed:', response.status);
-      return { 
-        success: false, 
-        error: `Login failed: ${response.status}` 
-      };
+      const error = await response.text();
+      return { success: false, error };
     }
 
     const data = await response.json();
-    console.log('[Auth] Login response received, setting cookies...');
     
     // Stocker les tokens dans des cookies httpOnly
     await setSecureTokens(data.accessToken, data.refreshToken, data.expiresIn);
     
     // Stocker uniquement les infos utilisateur non sensibles dans un cookie lisible côté client
     const cookieStore = await cookies();
-    const domain = getCookieDomain();
-    
-    await cookieStore.set('user_info', JSON.stringify({
+    cookieStore.set('user_info', JSON.stringify({
       id: data.userInfo.id,
       email: data.userInfo.email,
       name: data.userInfo.name,
       roles: data.userInfo.roles
     }), {
       httpOnly: false, // Accessible côté client pour l'UI
-      secure: false, // Set to false if using HTTP, true for HTTPS
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: data.expiresIn,
-      path: '/',
-      ...(domain && { domain })
+      path: '/'
     });
-    
-    console.log('[Auth] Login successful, all cookies should be set');
 
     return { success: true, user: data.userInfo };
   } catch (error) {
-    console.error('[Auth] Login error:', error);
-    const message = error instanceof Error ? error.message : 'Une erreur est survenue lors de la connexion';
-    return { 
-      success: false, 
-      error: message 
-    };
+    return { success: false, error: 'Login failed' };
   }
 }
 
@@ -160,7 +96,6 @@ export async function refreshToken() {
       throw new Error('No refresh token');
     }
 
-    const API_URL = getBaseUrl();
     const response = await fetch(`${API_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
@@ -181,21 +116,17 @@ export async function refreshToken() {
     // Mettre à jour les infos utilisateur
     if (data.userInfo) {
       const cookieStore = await cookies();
-      const domain = getCookieDomain();
-      
       cookieStore.set('user_info', JSON.stringify(data.userInfo), {
         httpOnly: false,
-        secure: false, // Set to false if using HTTP, true for HTTPS
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: data.expiresIn,
-        path: '/',
-        ...(domain && { domain })
+        path: '/'
       });
     }
     
     return { success: true };
   } catch (error) {
-    console.error('[Auth] Refresh token error:', error);
     return { success: false };
   }
 }
@@ -206,7 +137,6 @@ export async function refreshToken() {
 export async function logout() {
   try {
     const { accessToken } = await getTokens();
-    const API_URL = getBaseUrl();
     
     if (accessToken) {
       // Appeler l'endpoint de logout backend
@@ -222,26 +152,9 @@ export async function logout() {
   } finally {
     // Nettoyer les cookies
     const cookieStore = await cookies();
-    const domain = getCookieDomain();
-    
-    // Delete with same options as set
-    await cookieStore.delete({
-      name: 'access_token',
-      path: '/',
-      ...(domain && { domain })
-    });
-    
-    await cookieStore.delete({
-      name: 'refresh_token', 
-      path: '/',
-      ...(domain && { domain })
-    });
-    
-    await cookieStore.delete({
-      name: 'user_info',
-      path: '/',
-      ...(domain && { domain })
-    });
+    cookieStore.delete('access_token');
+    cookieStore.delete('refresh_token');
+    cookieStore.delete('user_info');
     
     // Rediriger vers la page de login
     redirect('/auth/login');
@@ -256,7 +169,6 @@ export async function secureApiRequest<T>(
   options: RequestInit = {}
 ): Promise<{ data?: T; error?: string }> {
   let { accessToken } = await getTokens();
-  const API_URL = getBaseUrl();
   
   if (!accessToken) {
     return { error: 'Not authenticated' };
@@ -326,7 +238,6 @@ export async function checkAuth() {
   
   // Optionnel : vérifier la validité du token auprès de l'API
   try {
-    const API_URL = getBaseUrl();
     const response = await fetch(`${API_URL}/api/auth/verify`, {
       method: 'GET',
       headers: {

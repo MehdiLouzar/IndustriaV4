@@ -64,7 +64,6 @@ function SearchParamsHandler({ onFiltersChange }: { onFiltersChange: (filters: a
 }
 
 export default function Home() {
-  const [welcome, setWelcome] = useState('Bienvenue sur Industria');
   const [searchFilters, setSearchFilters] = useState({
     regionId: '',
     zoneTypeId: '',
@@ -132,23 +131,7 @@ export default function Home() {
     })();
   }, []);
 
-  // Greeting (cached)
-  useEffect(() => {
-    const cacheKey = 'greeting-fr';
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      setWelcome(cached);
-      return;
-    }
-    fetchPublicApi<{ message: string }>('/api/public/greeting')
-      .then((data) => {
-        if (data?.message) {
-          setWelcome(data.message);
-          sessionStorage.setItem(cacheKey, data.message);
-        }
-      })
-      .catch(() => {});
-  }, []);
+
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -162,17 +145,17 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              {welcome || 'Bienvenue sur Industria'}
+              Première plateforme au Maroc dédiée aux zones industrielles privées
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Découvrez et réservez des zones industrielles, parcs logistiques et zones franches à travers le Maroc.
+              Là où les zones industrielles privées passent au digital
             </p>
           </div>
         </div>
       </section>
 
       {/* Search + Map/Grid côte à côte */}
-      <section className="py-8 bg-white min-h-screen">
+      <section className="py-8 bg-white min-h-900">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-12 gap-6 h-full">
             {/* Panneau de recherche - 4 colonnes */}
@@ -272,8 +255,8 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Zones Franches</h3>
-              <p className="text-gray-600">Avantages fiscaux et douaniers pour développer votre activité export</p>
+              <h3 className="text-xl font-semibold mb-2">Simulateur d'investissement</h3>
+              <p className="text-gray-600">Simulez votre projet d’investissement et optimisez votre CAPEX.</p>
             </div>
           </div>
         </div>

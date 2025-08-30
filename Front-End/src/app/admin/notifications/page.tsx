@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { secureApiRequest } from '@/lib/auth-actions'
+import { secureApiRequest , checkAuth } from '@/lib/auth-actions'
 import Pagination from '@/components/Pagination'
 import type { ListResponse } from '@/types'
 import {
@@ -124,18 +124,20 @@ export default function NotificationsAdmin() {
     }
   }
 
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
+  const verifyAuth = async () => {
+    const { isAuthenticated } = await checkAuth()
+    if (!isAuthenticated) {
+      router.push('/auth/login')
+      return
     }
     loadNotifications(currentPage)
     loadTemplates()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, router])
+  }
+  verifyAuth()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [currentPage, router])
 
   // Effet pour la recherche
   useEffect(() => {

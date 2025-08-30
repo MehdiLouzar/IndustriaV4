@@ -31,6 +31,8 @@ export default function Footer() {
   const [showForm, setShowForm] = useState(false);
 
 
+
+
   const mediaLinks = [
     { title: 'Communiqués de presse', href: '/media/communiques' },
     { title: 'Actualités', href: '/media/actualites' },
@@ -99,37 +101,39 @@ export default function Footer() {
           </div>
 
           {/* Contact & Social */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Suivez-nous</h3>
-            <div className="flex space-x-4 mb-6">
-              <a href="#" className="w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center transition-colors">
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center transition-colors">
-                <Youtube className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center transition-colors">
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center transition-colors">
-                <Twitter className="w-5 h-5" />
-              </a>
-            </div>
-
+         <div>
             <div className="space-y-2">
               <h4 className="font-semibold">Contactez-nous sur</h4>
+
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-industria-yellow-gold" />
-                <span className="text-xl font-bold">+212 5 37 57 20 00</span>
-              </div>
-              <Button
-                className="w-full header-brown text-white hover:opacity-90 mt-3">
-                <a href="/contact">
-                  Être contacté
+                <span className="text-xl font-bold">+212 6 60 51 78 85</span>
+
+                {/* Small inline icon link (optional) */}
+                <a
+                  href="https://wa.me/212660517885?text=Bonjour%20Industria%2C%20j%27aimerais%20avoir%20plus%20d%27infos."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Nous écrire sur WhatsApp"
+                  className="ml-2 inline-flex items-center"
+                  title="WhatsApp"
+                >
                 </a>
-              </Button>
+              </div>
+
+              {/* Buttons row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <Button className="w-full header-brown text-white hover:opacity-90">
+                  <a href="/contact">Être contacté</a>
+                </Button>
+
+                <Button className="w-full bg-[#25D366] text-white hover:bg-[#1EBE5C] focus-visible:ring-[#25D366]">
+                  <a href="https://wa.me/212660517885?text=Bonjour%20Industria%2C%20j%27aimerais%20avoir%20plus%20d%27infos.">WhatsApp</a>
+                </Button>
+              </div>
             </div>
           </div>
+
         </div>
       </div>
 

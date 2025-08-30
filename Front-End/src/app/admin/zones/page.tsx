@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useSecureApi, useSecureMutation } from '@/hooks/use-api'
+import { checkAuth } from '@/lib/auth-actions'
 import { secureApiRequest } from '@/lib/auth-actions'
 import type { ListResponse } from '@/types'
 import Pagination from '@/components/Pagination'
@@ -259,16 +260,17 @@ export default function ZonesAdmin() {
   }, [itemsPerPage]) // Seule dépendance stable
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/auth/login')
-        return
-      }
+  const verifyAuth = async () => {
+    const { isAuthenticated } = await checkAuth()
+    if (!isAuthenticated) {
+      router.push('/auth/login')
+      return
     }
     loadZones(currentPage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, router])
+  }
+  verifyAuth()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [currentPage, router])
 
   // Effet pour la recherche  
   useEffect(() => {
