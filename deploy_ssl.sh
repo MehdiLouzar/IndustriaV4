@@ -84,15 +84,15 @@ setup_ssl_certificates() {
     fi
     
     # Check if certificate files exist
-    if [[ ! -f "$HOST_CERT_PATH/industria_ma.crt" ]] || [[ ! -f "$HOST_CERT_PATH/industria_ma.key" ]]; then
+    if [[ ! -f "$HOST_CERT_PATH/industria.ma.crt" ]] || [[ ! -f "$HOST_CERT_PATH/industria.ma.key" ]]; then
         print_warning "SSL certificate files not found in $HOST_CERT_PATH/"
         print_status "Please copy your Gandi certificate files to:"
-        echo "  $HOST_CERT_PATH/industria_ma.crt  (certificate file)"
-        echo "  $HOST_CERT_PATH/industria_ma.key  (private key file)"
+        echo "  $HOST_CERT_PATH/industria.ma.crt  (certificate file)"
+        echo "  $HOST_CERT_PATH/industria.ma.key  (private key file)"
         echo ""
         print_status "If you have different file names, you can copy them like this:"
-        echo "  cp /path/to/your/certificate.crt $HOST_CERT_PATH/industria_ma.crt"
-        echo "  cp /path/to/your/private.key $HOST_CERT_PATH/industria_ma.key"
+        echo "  cp /path/to/your/certificate.crt $HOST_CERT_PATH/industria.ma.crt"
+        echo "  cp /path/to/your/private.key $HOST_CERT_PATH/industria.ma.key"
         echo ""
         read -p "Have you copied the certificate files? (y/n): " -n 1 -r
         echo
@@ -103,13 +103,13 @@ setup_ssl_certificates() {
     fi
     
     # Verify files exist now
-    if [[ ! -f "$HOST_CERT_PATH/industria_ma.crt" ]]; then
-        print_error "Certificate file not found: $HOST_CERT_PATH/industria_ma.crt"
+    if [[ ! -f "$HOST_CERT_PATH/industria.ma.crt" ]]; then
+        print_error "Certificate file not found: $HOST_CERT_PATH/industria.ma.crt"
         exit 1
     fi
     
-    if [[ ! -f "$HOST_CERT_PATH/industria_ma.key" ]]; then
-        print_error "Private key file not found: $HOST_CERT_PATH/industria_ma.key"
+    if [[ ! -f "$HOST_CERT_PATH/industria.ma.key" ]]; then
+        print_error "Private key file not found: $HOST_CERT_PATH/industria.ma.key"
         exit 1
     fi
     
@@ -124,15 +124,15 @@ copy_ssl_certificates() {
     docker exec $NGINX_CONTAINER mkdir -p $SSL_CERT_PATH
     
     # Copy certificate files to container
-    docker cp "$HOST_CERT_PATH/industria_ma.crt" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria_ma.crt"
-    docker cp "$HOST_CERT_PATH/industria_ma.key" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria_ma.key"
+    docker cp "$HOST_CERT_PATH/industria.ma.crt" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria.ma.crt"
+    docker cp "$HOST_CERT_PATH/industria.ma.key" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria.ma.key"
     
     # Set proper permissions
-    docker exec $NGINX_CONTAINER chmod 644 "$SSL_CERT_PATH/industria_ma.crt"
-    docker exec $NGINX_CONTAINER chmod 600 "$SSL_CERT_PATH/industria_ma.key"
+    docker exec $NGINX_CONTAINER chmod 644 "$SSL_CERT_PATH/industria.ma.crt"
+    docker exec $NGINX_CONTAINER chmod 600 "$SSL_CERT_PATH/industria.ma.key"
     
     # Verify files were copied
-    if docker exec $NGINX_CONTAINER ls -la "$SSL_CERT_PATH/" | grep -E "(industria_ma\.(crt|key))"; then
+    if docker exec $NGINX_CONTAINER ls -la "$SSL_CERT_PATH/" | grep -E "(industria.ma\.(crt|key))"; then
         print_success "SSL certificates copied to container"
     else
         print_error "Failed to copy SSL certificates"
