@@ -159,9 +159,6 @@ main() {
     print_status "Step 3: Copying certificates to container..."
     copy_ssl_certificates
     
-    # Step 4: Create HTTPS configuration
-    print_status "Step 4: Creating HTTPS configuration..."
-    create_https_config
     
     # Step 5: Apply HTTPS configuration
     print_status "Step 5: Applying HTTPS configuration..."
