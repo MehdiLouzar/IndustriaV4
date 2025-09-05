@@ -1,216 +1,151 @@
 #!/bin/bash
+set -euo pipefail
 
-# SSL Deployment Script for Industria.ma with Gandi Certificates
-# This script automates the nginx configuration with existing Gandi SSL certificates
-
-set -e  # Exit on any error
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Configuration
+# ========= config =========
 DOMAIN="industria.ma"
 NGINX_CONTAINER="industria-nginx"
-CONFIG_PATH="./nginx/sites-available"
-HTTP_CONFIG="industria.ma.conf"
-HTTPS_CONFIG="industria.ma.final.conf"
 
-# SSL Certificate paths
-SSL_CERT_PATH="/etc/nginx/ssl"  # Where certificates will be stored in container
-HOST_CERT_PATH="./ssl"  # Where certificates are stored on host (create this directory)
+HOST_SSL_DIR="./ssl"
+CONTAINER_SSL_DIR="/etc/nginx/ssl"
 
-# Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+VHOST_HTTP="./nginx/sites-available/industria.ma.conf"      # your base vhost file
+VHOST_DST="/etc/nginx/conf.d/default.conf"
+# =========================
+
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+info(){ echo -e "${BLUE}[INFO]${NC} $*"; }
+ok(){ echo -e "${GREEN}[SUCCESS]${NC} $*"; }
+warn(){ echo -e "${YELLOW}[WARNING]${NC} $*"; }
+err(){ echo -e "${RED}[ERROR]${NC} $*"; }
+
+need_file(){ [[ -f "$1" ]] || { err "Missing file: $1"; exit 1; } }
+
+ensure_container() {
+  if ! docker ps --format '{{.Names}}' | grep -qx "$NGINX_CONTAINER"; then
+    info "Starting nginx container: $NGINX_CONTAINER"
+    docker compose up -d nginx
+    sleep 3
+  fi
 }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+prepare_certs() {
+  info "Preparing certificates in $HOST_SSL_DIR"
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+  mkdir -p "$HOST_SSL_DIR"
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+  # Normalize file names from your Gandi zip
+  if [[ -f "$HOST_SSL_DIR/industria_ma.crt" && ! -f "$HOST_SSL_DIR/industria.ma.crt" ]]; then
+    cp "$HOST_SSL_DIR/industria_ma.crt" "$HOST_SSL_DIR/industria.ma.crt"
+  fi
 
-# Function to check if container is running
-check_container() {
-    if ! docker ps | grep -q "$NGINX_CONTAINER"; then
-        print_error "Nginx container ($NGINX_CONTAINER) is not running!"
-        print_status "Starting nginx container..."
-        docker compose up -d nginx
-        sleep 5
-    fi
-}
+  need_file "$HOST_SSL_DIR/industria.ma.crt"
+  need_file "$HOST_SSL_DIR/industria.ma.key"
 
-# Function to test nginx configuration
-test_nginx_config() {
-    print_status "Testing nginx configuration..."
-    if docker exec $NGINX_CONTAINER nginx -t; then
-        print_success "Nginx configuration is valid"
-        return 0
-    else
-        print_error "Nginx configuration test failed!"
-        return 1
-    fi
-}
+  # Intermediates from your zip (names as shown)
+  local INT1="$HOST_SSL_DIR/GENIOUSRSADomainValidationSecureServerCA.crt"
+  local INT2="$HOST_SSL_DIR/USERTrustRSAAAACA.crt"
+  local ROOT="$HOST_SSL_DIR/AAACertificateServices.crt"   # not used in chain
 
-# Function to reload nginx
-reload_nginx() {
-    print_status "Reloading nginx..."
-    if docker exec $NGINX_CONTAINER nginx -s reload; then
-        print_success "Nginx reloaded successfully"
-    else
-        print_error "Failed to reload nginx"
-        exit 1
-    fi
-}
+  # Build fullchain if we have both intermediates
+  if [[ -f "$INT1" && -f "$INT2" ]]; then
+    cat "$HOST_SSL_DIR/industria.ma.crt" "$INT1" "$INT2" > "$HOST_SSL_DIR/industria.ma.fullchain.crt"
+    ok "Built industria.ma.fullchain.crt (leaf + intermediates)"
+  else
+    warn "Intermediates not found. Using industria.ma.crt only. Some clients may fail chain validation."
+    cp "$HOST_SSL_DIR/industria.ma.crt" "$HOST_SSL_DIR/industria.ma.fullchain.crt"
+  fi
 
-# Function to setup SSL certificates directory and files
-setup_ssl_certificates() {
-    print_status "Setting up SSL certificates..."
-    
-    # Create SSL directory on host if it doesn't exist
-    if [[ ! -d "$HOST_CERT_PATH" ]]; then
-        print_status "Creating SSL directory: $HOST_CERT_PATH"
-        mkdir -p "$HOST_CERT_PATH"
-    fi
-    
-    # Check if certificate files exist
-    if [[ ! -f "$HOST_CERT_PATH/industria.ma.crt" ]] || [[ ! -f "$HOST_CERT_PATH/industria.ma.key" ]]; then
-        print_warning "SSL certificate files not found in $HOST_CERT_PATH/"
-        print_status "Please copy your Gandi certificate files to:"
-        echo "  $HOST_CERT_PATH/industria.ma.crt  (certificate file)"
-        echo "  $HOST_CERT_PATH/industria.ma.key  (private key file)"
-        echo ""
-        print_status "If you have different file names, you can copy them like this:"
-        echo "  cp /path/to/your/certificate.crt $HOST_CERT_PATH/industria.ma.crt"
-        echo "  cp /path/to/your/private.key $HOST_CERT_PATH/industria.ma.key"
-        echo ""
-        read -p "Have you copied the certificate files? (y/n): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_error "Please copy the certificate files first"
-            exit 1
-        fi
-    fi
-    
-    # Verify files exist now
-    if [[ ! -f "$HOST_CERT_PATH/industria.ma.crt" ]]; then
-        print_error "Certificate file not found: $HOST_CERT_PATH/industria.ma.crt"
-        exit 1
-    fi
-    
-    if [[ ! -f "$HOST_CERT_PATH/industria.ma.key" ]]; then
-        print_error "Private key file not found: $HOST_CERT_PATH/industria.ma.key"
-        exit 1
-    fi
-    
-    print_success "SSL certificate files found"
-}
-
-# Function to copy SSL certificates to container
-copy_ssl_certificates() {
-    print_status "Copying SSL certificates to nginx container..."
-    
-    # Create SSL directory in container
-    docker exec $NGINX_CONTAINER mkdir -p $SSL_CERT_PATH
-    
-    # Copy certificate files to container
-    docker cp "$HOST_CERT_PATH/industria.ma.crt" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria.ma.crt"
-    docker cp "$HOST_CERT_PATH/industria.ma.key" "$NGINX_CONTAINER:$SSL_CERT_PATH/industria.ma.key"
-    
-    # Set proper permissions
-    docker exec $NGINX_CONTAINER chmod 644 "$SSL_CERT_PATH/industria.ma.crt"
-    docker exec $NGINX_CONTAINER chmod 600 "$SSL_CERT_PATH/industria.ma.key"
-    
-    # Verify files were copied
-    if docker exec $NGINX_CONTAINER ls -la "$SSL_CERT_PATH/" | grep -E "(industria.ma\.(crt|key))"; then
-        print_success "SSL certificates copied to container"
-    else
-        print_error "Failed to copy SSL certificates"
-        exit 1
-    fi
-}
-
-
-
-# Main deployment function
-main() {
-    print_status "Starting SSL deployment for $DOMAIN with Gandi certificates"
-    echo "================================================="
-    
-    # Step 1: Check if containers are running
-    print_status "Step 1: Checking containers..."
-    check_container
-    
-    # Step 2: Setup SSL certificates
-    print_status "Step 2: Setting up SSL certificates..."
-    setup_ssl_certificates
-    
-    # Step 3: Copy certificates to container
-    print_status "Step 3: Copying certificates to container..."
-    copy_ssl_certificates
-    
-    
-    # Step 5: Apply HTTPS configuration
-    print_status "Step 5: Applying HTTPS configuration..."
-    docker cp "$CONFIG_PATH/industria.ma.final.conf" "$NGINX_CONTAINER:/etc/nginx/conf.d/default.conf"
-    print_success "HTTPS config applied"
-    
-    # Step 6: Test and reload nginx
-    print_status "Step 6: Testing and reloading nginx..."
-    if test_nginx_config; then
-        reload_nginx
-    else
-        print_error "HTTPS configuration failed!"
-        # Try to rollback if HTTP config exists
-        if [[ -f "$CONFIG_PATH/$HTTP_CONFIG" ]]; then
-            print_status "Rolling back to HTTP configuration..."
-            docker cp "$CONFIG_PATH/$HTTP_CONFIG" "$NGINX_CONTAINER:/etc/nginx/conf.d/default.conf"
-            reload_nginx
-        fi
-        exit 1
-    fi
-    
-    # Step 7: Final verification
-    print_status "Step 7: Final verification..."
-    sleep 5  # Wait for nginx to fully reload
-    
-    if curl -f --connect-timeout 10 -k "https://$DOMAIN" >/dev/null 2>&1; then
-        print_success "HTTPS is working!"
-    else
-        print_warning "HTTPS test failed, but configuration was applied"
-        print_status "You can test manually with: curl -I https://$DOMAIN"
-    fi
-    
-    # Success message
-    echo "================================================="
-    print_success "SSL deployment completed successfully!"
-    print_success "Your site should now be accessible at: https://$DOMAIN"
-    echo ""
-    print_status "Configuration files created:"
-    echo "  - $CONFIG_PATH/industria.ma.https.conf"
-    echo "  - SSL certificates in container: $SSL_CERT_PATH/"
-    echo ""
-    print_status "Test your deployment:"
-    echo "  curl -I https://$DOMAIN"
-    echo "  curl -I http://$DOMAIN  # Should redirect to HTTPS"
-    echo ""
-}
-
-# Check if we're in the right directory
-if [[ ! -f "docker-compose.yml" ]] && [[ ! -f "docker-compose.yaml" ]]; then
-    print_error "docker-compose.yml not found. Please run this script from your project root directory."
+  # Optional: verify key/cert match
+  local CH1 CH2
+  CH1=$(openssl x509 -noout -modulus -in "$HOST_SSL_DIR/industria.ma.crt" | openssl md5)
+  CH2=$(openssl rsa -noout -modulus -in "$HOST_SSL_DIR/industria.ma.key" | openssl md5)
+  if [[ "$CH1" != "$CH2" ]]; then
+    err "Certificate and private key do not match."
     exit 1
-fi
+  fi
+  ok "Certificate and key match"
+}
 
-# Run main function
+copy_certs() {
+  info "Copying certs to container"
+  docker exec "$NGINX_CONTAINER" mkdir -p "$CONTAINER_SSL_DIR"
+
+  docker cp "$HOST_SSL_DIR/industria.ma.key"             "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.key"
+  docker cp "$HOST_SSL_DIR/industria.ma.crt"             "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.crt"
+  docker cp "$HOST_SSL_DIR/industria.ma.fullchain.crt"   "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.fullchain.crt"
+
+  docker exec "$NGINX_CONTAINER" sh -c "chmod 600 $CONTAINER_SSL_DIR/industria.ma.key && chmod 644 $CONTAINER_SSL_DIR/*.crt"
+  ok "Certs copied to $CONTAINER_SSL_DIR"
+}
+
+rewrite_vhost_paths() {
+  info "Rewriting vhost TLS paths to /etc/nginx/ssl"
+  need_file "$VHOST_HTTP"
+
+  # Create a temp copy we can modify
+  TMP_VHOST=$(mktemp)
+  cp "$VHOST_HTTP" "$TMP_VHOST"
+
+  # Replace any old Let's Encrypt paths with our mounted SSL paths
+  sed -i 's#/etc/letsencrypt/live/industria\.ma/fullchain\.pem#/etc/nginx/ssl/industria.ma.fullchain.crt#g' "$TMP_VHOST"
+  sed -i 's#/etc/letsencrypt/live/industria\.ma/privkey\.pem#/etc/nginx/ssl/industria.ma.key#g' "$TMP_VHOST"
+
+  # If the file does not already have ssl_* directives, inject ours
+  if ! grep -q 'ssl_certificate' "$TMP_VHOST"; then
+    # Insert typical ssl directives into the 443 server block
+    awk '
+      BEGIN{in443=0}
+      /server\s*{/{if (seen==0) seen=1}
+      {print}
+      /listen 443/ {in443=1}
+      in443 && /server_name/ && !printed {
+        print "    ssl_certificate           /etc/nginx/ssl/industria.ma.fullchain.crt;";
+        print "    ssl_certificate_key       /etc/nginx/ssl/industria.ma.key;";
+        print "    ssl_trusted_certificate   /etc/nginx/ssl/industria.ma.fullchain.crt;";
+        printed=1
+      }
+      /}/{ if(in443){in443=0} }
+    ' "$TMP_VHOST" > "${TMP_VHOST}.new" && mv "${TMP_VHOST}.new" "$TMP_VHOST"
+  fi
+
+  docker cp "$TMP_VHOST" "$NGINX_CONTAINER:$VHOST_DST"
+  rm -f "$TMP_VHOST"
+  ok "Vhost updated in container: $VHOST_DST"
+}
+
+test_and_reload() {
+  info "Testing nginx config"
+  if docker exec "$NGINX_CONTAINER" nginx -t; then
+    ok "Config is valid"
+    info "Reloading nginx"
+    docker exec "$NGINX_CONTAINER" nginx -s reload
+    ok "Nginx reloaded"
+  else
+    err "nginx -t failed. Rolling back to HTTP-only file."
+    docker cp "$VHOST_HTTP" "$NGINX_CONTAINER:$VHOST_DST" || true
+    docker exec "$NGINX_CONTAINER" nginx -s reload || true
+    exit 1
+  fi
+}
+
+verify_https() {
+  info "Quick HTTPS check (may fail if DNS not pointed yet)"
+  if curl -sSf -k "https://$DOMAIN" >/dev/null; then
+    ok "HTTPS reachable for $DOMAIN"
+  else
+    warn "HTTPS probe did not succeed. Check DNS, firewall, or review nginx error log."
+  fi
+}
+
+main() {
+  info "Starting SSL deployment for $DOMAIN (Gandi certs, Nginx only)"
+  ensure_container
+  prepare_certs
+  copy_certs
+  rewrite_vhost_paths
+  test_and_reload
+  verify_https
+  ok "Done"
+}
+
 main "$@"

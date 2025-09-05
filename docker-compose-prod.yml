@@ -101,17 +101,7 @@ services:
     networks:
       - industria-network
     volumes:
-      - letsencrypt:/etc/letsencrypt
-      - certbot-webroot:/var/www/certbot
-
-  certbot:
-    image: certbot/certbot:latest
-    container_name: industria-certbot
-    volumes:
-      - letsencrypt:/etc/letsencrypt
-      - certbot-webroot:/var/www/certbot
-    networks:
-      - industria-network
+      - ./ssl:/etc/nginx/ssl:ro
 
   frontend:
     build:
