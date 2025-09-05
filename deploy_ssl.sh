@@ -66,16 +66,14 @@ prepare_certs() {
   ok "Certificate and key match"
 }
 
-copy_certs() {
-  info "Copying certs to container"
-  docker exec "$NGINX_CONTAINER" mkdir -p "$CONTAINER_SSL_DIR"
-
-  docker cp "$HOST_SSL_DIR/industria.ma.key"             "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.key"
-  docker cp "$HOST_SSL_DIR/industria.ma.crt"             "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.crt"
-  docker cp "$HOST_SSL_DIR/industria.ma.fullchain.crt"   "$NGINX_CONTAINER:$CONTAINER_SSL_DIR/industria.ma.fullchain.crt"
-
-  docker exec "$NGINX_CONTAINER" sh -c "chmod 600 $CONTAINER_SSL_DIR/industria.ma.key && chmod 644 $CONTAINER_SSL_DIR/*.crt"
-  ok "Certs copied to $CONTAINER_SSL_DIR"
+verify_mounted_certs() {
+  info "Verifying mounted certs inside container"
+  docker exec "$NGINX_CONTAINER" sh -lc '
+    test -r /etc/nginx/ssl/industria.ma.key &&
+    test -r /etc/nginx/ssl/industria.ma.fullchain.crt &&
+    test -r /etc/nginx/ssl/industria.ma.crt
+  ' || { err "Mounted certs not found/readable in container"; exit 1; }
+  ok "Mounted certs are present"
 }
 
 rewrite_vhost_paths() {
@@ -141,7 +139,7 @@ main() {
   info "Starting SSL deployment for $DOMAIN (Gandi certs, Nginx only)"
   ensure_container
   prepare_certs
-  copy_certs
+  verify_mounted_certs
   rewrite_vhost_paths
   test_and_reload
   verify_https
